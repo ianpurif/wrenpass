@@ -1,7 +1,17 @@
 allowBuilds:
   '@firebase/util': true
+  '@reown/appkit': false
+  '@stellar/stellar-sdk': false
+  blake-hash: false
+  bufferutil: false
   esbuild: true
   protobufjs: true
+  secp256k1: false
+  tiny-secp256k1: false
   unrs-resolver: true
+  usb: false
+  utf-8-validate: false
 overrides:
+  axios: 1.18.1
+  protobufjs: 7.6.5
   uuid: 11.1.1

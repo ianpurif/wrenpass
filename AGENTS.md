@@ -16,6 +16,9 @@ Your architecture decisions should be senior-level, but your code must remain si
 - Define durable design tokens in `src/app/globals.css`; avoid repeating raw brand colors in components.
 - Before completing a frontend phase, run `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build`.
 - Never commit local environment files. Document variable names with placeholders in `.env.example` when a later phase introduces configuration.
+- Use Stellar RPC for current ledger and Soroban access; do not introduce Horizon as the primary Soroban API.
+- Run `pnpm stellar:smoke` after changing public Stellar network or asset configuration.
+- Wallet sessions are server-verified SEP-53 challenges stored as opaque Firestore records; never authorize a server action from a client-provided address alone.
 
 ---
 

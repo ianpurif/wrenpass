@@ -1,8 +1,16 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { Navigation } from "@/components/layout/navigation";
+
+vi.mock("@/components/wallet/wallet-button", () => ({
+  WalletButton: () => <button type="button">Connect Freighter</button>,
+}));
+
+vi.mock("@/components/wallet/wallet-balance-strip", () => ({
+  WalletBalanceStrip: () => null,
+}));
 
 describe("Navigation", () => {
   it("toggles the mobile menu with an accessible button", async () => {

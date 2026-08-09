@@ -8,6 +8,8 @@ import { useState } from "react";
 import { Logo } from "@/components/layout/logo";
 import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
+import { WalletBalanceStrip } from "@/components/wallet/wallet-balance-strip";
+import { WalletButton } from "@/components/wallet/wallet-button";
 
 const navItems = [
   { href: "#how-it-works", label: "How it works" },
@@ -38,9 +40,7 @@ export function Navigation() {
         </nav>
 
         <div className="hidden md:block">
-          <Link className={buttonStyles({ size: "sm" })} href="#for-merchants">
-            See the model
-          </Link>
+          <WalletButton />
         </div>
 
         <button
@@ -54,6 +54,8 @@ export function Navigation() {
           {menuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
         </button>
       </Container>
+
+      <WalletBalanceStrip />
 
       <AnimatePresence>
         {menuOpen && (
@@ -77,13 +79,7 @@ export function Navigation() {
                   {item.label}
                 </Link>
               ))}
-              <Link
-                className={buttonStyles({ className: "mt-2 w-full" })}
-                href="#for-merchants"
-                onClick={() => setMenuOpen(false)}
-              >
-                See the model
-              </Link>
+              <WalletButton className="mt-2" />
             </div>
           </motion.nav>
         )}
