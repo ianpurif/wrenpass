@@ -16,6 +16,7 @@ const navItems = [
   { href: "/#for-merchants", label: "For merchants" },
   { href: "/#trust", label: "Trust & safety" },
   { href: "/merchant", label: "Merchant dashboard" },
+  { href: "/passes", label: "My passes" },
 ];
 
 export function Navigation() {

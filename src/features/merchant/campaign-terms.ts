@@ -15,7 +15,7 @@ const BASIS_POINTS_TOTAL = BigInt(10_000);
 const MAX_I128 = (BigInt(1) << BigInt(127)) - BigInt(1);
 const decimalUsdcPattern = /^(?:0|[1-9]\d*)(?:\.(\d{1,7}))?$/;
 
-export function parseUsdcAmount(value: string): bigint {
+function parseUsdcUnits(value: string, allowZero: boolean): bigint {
   const normalized = value.trim();
   const match = decimalUsdcPattern.exec(normalized);
   if (!match) {
@@ -24,10 +24,18 @@ export function parseUsdcAmount(value: string): bigint {
 
   const [wholePart, fractionPart = ""] = normalized.split(".");
   const amount = BigInt(wholePart) * USDC_SCALE + BigInt(fractionPart.padEnd(7, "0") || "0");
-  if (amount <= ZERO) {
+  if (allowZero ? amount < ZERO : amount <= ZERO) {
     throw new Error("Amount must be greater than zero.");
   }
   return amount;
+}
+
+export function parseUsdcAmount(value: string): bigint {
+  return parseUsdcUnits(value, false);
+}
+
+export function parseUsdcBalance(value: string): bigint {
+  return parseUsdcUnits(value, true);
 }
 
 export function formatUsdcAmount(amount: bigint): string {

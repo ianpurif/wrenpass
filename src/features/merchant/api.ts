@@ -7,7 +7,7 @@ import {
 } from "@/server/models";
 
 const integerStringSchema = z.string().regex(/^\d+$/);
-const onchainCampaignSchema = z.object({
+export const onchainCampaignSchema = z.object({
   id: integerStringSchema,
   merchant: z.string(),
   passPrice: integerStringSchema,
@@ -28,7 +28,7 @@ const onchainCampaignSchema = z.object({
   }),
   status: z.enum(["Draft", "Active", "Paused", "Expired", "Cancelled"]),
 });
-const merchantCampaignSchema = z.object({
+export const merchantCampaignSchema = z.object({
   metadata: campaignMetadataSchema,
   onchain: onchainCampaignSchema,
 });
@@ -40,6 +40,7 @@ const profileResponseSchema = z.object({ merchant: merchantSchema.nullable() });
 const savedProfileResponseSchema = z.object({ merchant: merchantSchema });
 const savedMetadataResponseSchema = z.object({ metadata: campaignMetadataSchema });
 const uploadResponseSchema = z.object({ url: z.url(), publicId: z.string().min(1) });
+export const publicCampaignSchema = merchantCampaignSchema.extend({ merchant: merchantSchema });
 
 async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
   const response = await fetch(url, { ...init, credentials: "same-origin" });
