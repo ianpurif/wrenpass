@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDownLeft, CheckCircle2, ChevronDown, Gift, History, LoaderCircle, RefreshCcw, RotateCcw, TicketCheck, WalletCards } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CustomerPassCard } from "@/components/customer/customer-pass-card";
 import { RedemptionRequests } from "@/components/customer/redemption-requests";
@@ -59,6 +59,9 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
   const [dashboard, setDashboard] = useState<CustomerDashboardDto | null>(null);
   const [loadedAddress, setLoadedAddress] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<CustomerPassStatusDto>("Active");
+  const [mobileStatusOpen, setMobileStatusOpen] = useState(false);
+  const mobileStatusRef = useRef<HTMLDivElement>(null);
+  const mobileStatusButtonRef = useRef<HTMLButtonElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
@@ -107,6 +110,24 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
     };
   }, [address]);
 
+  useEffect(() => {
+    if (!mobileStatusOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMobileStatusOpen(false);
+      mobileStatusButtonRef.current?.focus();
+    };
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!mobileStatusRef.current?.contains(event.target as Node)) setMobileStatusOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+    };
+  }, [mobileStatusOpen]);
+
   const passCounts = useMemo(() => {
     const counts: Record<CustomerPassStatusDto, number> = { Active: 0, Redeemed: 0, Expired: 0, Refunded: 0 };
     for (const pass of dashboard?.passes ?? []) counts[pass.status] += 1;
@@ -146,22 +167,54 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
 
       <section aria-labelledby="owned-passes-heading" className="min-w-0 max-w-full">
         <div><p className="eyebrow">Current ownership</p><h2 id="owned-passes-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-ink">Passes held by this wallet</h2></div>
-        <div className="mt-5 w-full min-w-0 max-w-full overflow-hidden sm:hidden">
-          <label className="block text-xs font-bold uppercase tracking-[0.12em] text-ink-muted" htmlFor="mobile-pass-status">
+        <div className="mt-5 w-full min-w-0 max-w-full sm:hidden" ref={mobileStatusRef}>
+          <span className="block text-xs font-bold uppercase tracking-[0.12em] text-ink-muted" id="mobile-pass-status-label">
             Show passes
-          </label>
-          <div className="relative mt-2 w-full min-w-0 max-w-full overflow-hidden">
-            <select
-              id="mobile-pass-status"
-              className="block h-14 w-full min-w-0 max-w-full touch-manipulation appearance-none truncate rounded-2xl border border-line bg-white py-0 pl-4 pr-14 text-base font-bold text-ink shadow-sm outline-none transition focus:border-forest focus:ring-4 focus:ring-forest/10 active:bg-sage-soft"
-              value={selectedStatus}
-              onChange={(event) => setSelectedStatus(event.target.value as CustomerPassStatusDto)}
+          </span>
+          <div className="relative mt-2 w-full min-w-0 max-w-full">
+            <button
+              ref={mobileStatusButtonRef}
+              type="button"
+              aria-controls="mobile-pass-status-options"
+              aria-expanded={mobileStatusOpen}
+              aria-haspopup="listbox"
+              aria-labelledby="mobile-pass-status-label mobile-pass-status-value"
+              className="flex h-14 w-full min-w-0 max-w-full touch-manipulation items-center justify-between gap-3 rounded-2xl border border-line bg-white px-4 text-left text-base font-bold text-ink shadow-sm outline-none transition hover:border-forest/40 focus:border-forest focus:ring-4 focus:ring-forest/10 active:bg-sage-soft"
+              onClick={() => setMobileStatusOpen((open) => !open)}
             >
-              {passTabs.map((tab) => <option key={tab.status} value={tab.status}>{tab.label} passes ({passCounts[tab.status]})</option>)}
-            </select>
-            <span className="pointer-events-none absolute right-3 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-xl bg-sage-soft text-forest">
-              <ChevronDown aria-hidden="true" className="size-4" />
-            </span>
+              <span className="min-w-0 truncate" id="mobile-pass-status-value">
+                {passTabs.find((tab) => tab.status === selectedStatus)?.label} passes ({passCounts[selectedStatus]})
+              </span>
+              <span className={`grid size-8 shrink-0 place-items-center rounded-xl bg-sage-soft text-forest transition-transform ${mobileStatusOpen ? "rotate-180" : ""}`}>
+                <ChevronDown aria-hidden="true" className="size-4" />
+              </span>
+            </button>
+            {mobileStatusOpen && (
+              <div
+                id="mobile-pass-status-options"
+                role="listbox"
+                aria-labelledby="mobile-pass-status-label"
+                className="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 w-full min-w-0 max-w-full overflow-y-auto overflow-x-hidden rounded-2xl border border-line bg-white p-1 shadow-dialog"
+              >
+                {passTabs.map((tab) => (
+                  <button
+                    key={tab.status}
+                    type="button"
+                    role="option"
+                    aria-selected={selectedStatus === tab.status}
+                    className={`flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-bold transition ${selectedStatus === tab.status ? "bg-mint-soft text-forest" : "text-ink-muted hover:bg-sage-soft hover:text-ink"}`}
+                    onClick={() => {
+                      setSelectedStatus(tab.status);
+                      setMobileStatusOpen(false);
+                      mobileStatusButtonRef.current?.focus();
+                    }}
+                  >
+                    <span className="min-w-0 truncate">{tab.label} passes</span>
+                    <span className="shrink-0 text-xs opacity-70">{passCounts[tab.status]}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <div className="mt-5 hidden flex-wrap gap-2 sm:flex" role="tablist" aria-label="Pass status">
