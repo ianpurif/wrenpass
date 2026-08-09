@@ -1,15 +1,22 @@
 import { getStellarConfig } from "@/lib/stellar/config";
-import { readContractConfig } from "@/lib/stellar/wrenpass-client";
+import {
+  readContractCampaignCount,
+  readContractConfig,
+  readContractPassCount,
+} from "@/lib/stellar/wrenpass-client";
 import { assertPurchaseDistributionReady } from "@/server/stellar/purchase-readiness";
 import { StellarRpcGateway } from "@/server/stellar/rpc-gateway";
+import { assertWrenPassTtlReady } from "@/server/stellar/ttl-service";
 
 async function main() {
   const config = getStellarConfig();
   const gateway = new StellarRpcGateway(config.rpcUrl);
-  const [networkPassphrase, issuerBalance, contractConfig] = await Promise.all([
+  const [networkPassphrase, issuerBalance, contractConfig, campaignCount, passCount] = await Promise.all([
     gateway.getNetworkPassphrase(),
     gateway.readAccountBalance(config.assetIssuer),
     readContractConfig(config),
+    readContractCampaignCount(config),
+    readContractPassCount(config),
   ]);
 
   if (networkPassphrase !== config.networkPassphrase) {
@@ -21,6 +28,7 @@ async function main() {
   }
 
   await assertPurchaseDistributionReady(config, contractConfig, gateway);
+  const ttl = await assertWrenPassTtlReady(config, campaignCount, passCount);
 
   console.log(`Stellar RPC network verified: ${config.network}`);
   console.log(`Configured asset verified: ${config.assetCode}`);
@@ -28,6 +36,9 @@ async function main() {
   console.log(`Asset contract matches asset and network: yes`);
   console.log(`WrenPass contract payment asset matches configuration: yes`);
   console.log(`Platform fee account can receive ${config.assetCode}: yes`);
+  console.log(
+    `WrenPass TTL verified: ${ttl.entryCount} entries, minimum ${ttl.minimumRemainingLedgers} ledgers remaining`,
+  );
 }
 
 main().catch((error: unknown) => {

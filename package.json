@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "services:smoke": "node --conditions=react-server --env-file=.env.local --import tsx scripts/smoke-services.ts",
     "stellar:smoke": "node --conditions=react-server --env-file=.env.local --import tsx scripts/smoke-stellar.ts",
+    "stellar:ttl:plan": "node --conditions=react-server --env-file=.env.local --import tsx scripts/plan-stellar-ttl.ts",
     "contract:fmt": "cargo fmt --manifest-path contracts/Cargo.toml --all -- --check",
     "contract:clippy": "cargo clippy --manifest-path contracts/Cargo.toml --all-targets --locked -- -D warnings",
     "contract:test": "cargo test --manifest-path contracts/Cargo.toml --locked",

@@ -327,3 +327,8 @@ export async function readContractPassCount(config: StellarConfig): Promise<bigi
   const transaction = await createClient(config).pass_count();
   return transaction.result;
 }
+
+export async function readContractCampaignCount(config: StellarConfig): Promise<bigint> {
+  const transaction = await createClient(config).campaign_count();
+  return transaction.result;
+}

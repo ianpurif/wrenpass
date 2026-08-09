@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -28,5 +28,11 @@ describe("Navigation", () => {
       "true",
     );
     expect(screen.getByRole("navigation", { name: "Mobile navigation" })).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("navigation", { name: "Mobile navigation" })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("button", { name: "Open navigation menu" })).toHaveFocus();
   });
 });

@@ -23,6 +23,18 @@ interface IdentifiedEntity {
   id: string;
 }
 
+function omitUndefined(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(omitUndefined);
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, nested]) => nested !== undefined)
+        .map(([key, nested]) => [key, omitUndefined(nested)]),
+    );
+  }
+  return value;
+}
+
 export class EntityRepository<T extends IdentifiedEntity> {
   constructor(
     private readonly collectionName: string,
@@ -35,7 +47,7 @@ export class EntityRepository<T extends IdentifiedEntity> {
     await this.store.write(
       this.collectionName,
       validated.id,
-      validated as unknown as Record<string, unknown>,
+      omitUndefined(validated) as Record<string, unknown>,
     );
     return validated;
   }

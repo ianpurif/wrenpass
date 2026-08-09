@@ -3,7 +3,12 @@ import "server-only";
 import type { Campaign, Pass } from "@/generated/wrenpass-contract/src";
 import { buildNotificationEmail, type EmailService } from "@/server/email/email-service";
 import type { OffchainRepositories } from "@/server/firestore/repositories";
-import { indexedBlockchainEventSchema, notificationSchema, type NotificationType } from "@/server/models";
+import {
+  indexedBlockchainEventSchema,
+  notificationSchema,
+  type Notification,
+  type NotificationType,
+} from "@/server/models";
 import type { WrenPassEvent, WrenPassEventSource } from "@/server/events/event-source";
 
 interface LifecycleReader {
@@ -17,6 +22,14 @@ interface NotificationTarget {
   type: NotificationType;
 }
 
+export interface NotificationClaimStore {
+  claim(
+    notification: Notification,
+    now: Date,
+    claimExpiresAt: Date,
+  ): Promise<boolean>;
+}
+
 export interface EventSyncResult {
   indexed: number;
   duplicates: number;
@@ -26,6 +39,7 @@ export interface EventSyncResult {
 
 const EXPIRATION_NOTICE_WINDOW_SECONDS = BigInt(7 * 24 * 60 * 60);
 const MAX_EXPIRATION_PASS_READS = BigInt(2_000);
+const NOTIFICATION_CLAIM_MS = 5 * 60 * 1_000;
 
 function notificationTargets(event: WrenPassEvent): NotificationTarget[] {
   if (event.eventType === "pass_purchased" && event.customer) {
@@ -75,6 +89,7 @@ export class EventSyncService {
     private readonly source: WrenPassEventSource,
     private readonly repositories: OffchainRepositories,
     private readonly lifecycle: LifecycleReader,
+    private readonly notificationClaims: NotificationClaimStore,
     private readonly email: Pick<EmailService, "send">,
     private readonly contractId: string,
     private readonly now: () => Date = () => new Date(),
@@ -135,7 +150,13 @@ export class EventSyncService {
       relatedEntityId,
       createdAt,
     });
-    await this.repositories.notifications.save(pending);
+    const claimedAt = this.now();
+    const claimed = await this.notificationClaims.claim(
+      pending,
+      claimedAt,
+      new Date(claimedAt.getTime() + NOTIFICATION_CLAIM_MS),
+    );
+    if (!claimed) return "skipped";
 
     try {
       const copy = emailCopy(target.type, relatedEntityId);

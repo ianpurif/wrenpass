@@ -66,6 +66,7 @@ export const notificationSchema = z.object({
   status: z.enum(["pending", "sent", "failed"]),
   relatedEntityId: entityIdSchema.optional(),
   failureReason: z.string().trim().max(500).optional(),
+  claimExpiresAt: isoTimestamp.optional(),
   createdAt: isoTimestamp,
   sentAt: isoTimestamp.optional(),
 });

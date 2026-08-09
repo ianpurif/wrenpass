@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Logo } from "@/components/layout/logo";
 import { buttonStyles } from "@/components/ui/button";
@@ -21,6 +21,18 @@ const navItems = [
 
 export function Navigation() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMenuOpen(false);
+      menuButtonRef.current?.focus();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [menuOpen]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-line/80 bg-canvas/90 backdrop-blur-lg">
@@ -46,6 +58,7 @@ export function Navigation() {
         </div>
 
         <button
+          ref={menuButtonRef}
           type="button"
           aria-controls="mobile-navigation"
           aria-expanded={menuOpen}

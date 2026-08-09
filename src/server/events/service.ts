@@ -9,6 +9,7 @@ import {
 import { createEmailService } from "@/server/email/email-service";
 import { EventSyncService } from "@/server/events/event-sync-service";
 import { StellarWrenPassEventSource } from "@/server/events/event-source";
+import { FirestoreNotificationClaimStore } from "@/server/events/firestore-notification-claim-store";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
 
 let eventSyncService: EventSyncService | undefined;
@@ -24,6 +25,7 @@ export function getEventSyncService(): EventSyncService {
         getPassCount: () => readContractPassCount(config),
         findPass: (passId) => readContractPass(config, passId),
       },
+      new FirestoreNotificationClaimStore(),
       createEmailService(),
       config.wrenPassContractId,
     );

@@ -1,5 +1,8 @@
 import type { Campaign, Pass } from "@/generated/wrenpass-contract/src";
-import { EventSyncService } from "@/server/events/event-sync-service";
+import {
+  EventSyncService,
+  type NotificationClaimStore,
+} from "@/server/events/event-sync-service";
 import type { WrenPassEvent } from "@/server/events/event-source";
 import type { DocumentStore } from "@/server/firestore/document-store";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
@@ -30,6 +33,34 @@ function createStore(): DocumentStore {
     remove: vi.fn(async (collection, id) => {
       documents.delete(key(collection, id));
     }),
+  };
+}
+
+function createClaimStore(
+  repositories: ReturnType<typeof createOffchainRepositories>,
+): NotificationClaimStore {
+  const activeClaims = new Set<string>();
+  return {
+    async claim(notification, now, claimExpiresAt) {
+      if (activeClaims.has(notification.id)) return false;
+      activeClaims.add(notification.id);
+      const existing = await repositories.notifications.findById(notification.id);
+      if (existing?.status === "sent") {
+        activeClaims.delete(notification.id);
+        return false;
+      }
+      if (existing?.claimExpiresAt && new Date(existing.claimExpiresAt) > now) {
+        activeClaims.delete(notification.id);
+        return false;
+      }
+      await repositories.notifications.save({
+        ...notification,
+        createdAt: existing?.createdAt ?? notification.createdAt,
+        claimExpiresAt: claimExpiresAt.toISOString(),
+      });
+      activeClaims.delete(notification.id);
+      return true;
+    },
   };
 }
 
@@ -69,6 +100,7 @@ describe("EventSyncService", () => {
       source,
       repositories,
       campaigns,
+      createClaimStore(repositories),
       email,
       testStellarConfig.wrenPassContractId,
       () => new Date("2026-08-09T10:01:00.000Z"),
@@ -159,6 +191,7 @@ describe("EventSyncService", () => {
       { readRetainedEvents: vi.fn().mockResolvedValue([]) },
       repositories,
       lifecycle,
+      createClaimStore(repositories),
       email,
       testStellarConfig.wrenPassContractId,
       () => new Date("2026-08-09T10:00:00.000Z"),
@@ -170,5 +203,39 @@ describe("EventSyncService", () => {
     await expect(
       repositories.notifications.findById(`expiring-1-${expiresAt}:pass_nearing_expiration:${owner}`),
     ).resolves.toMatchObject({ status: "sent", type: "pass_nearing_expiration" });
+  });
+
+  it("claims a notification once when sync requests overlap", async () => {
+    const repositories = createOffchainRepositories(createStore());
+    await repositories.userProfiles.save(
+      userProfileSchema.parse({
+        id: owner,
+        walletAddress: owner,
+        email: "owner@example.com",
+        createdAt: "2026-08-09T10:00:00.000Z",
+        updatedAt: "2026-08-09T10:00:00.000Z",
+      }),
+    );
+    const source = { readRetainedEvents: vi.fn().mockResolvedValue([redeemedEvent]) };
+    const lifecycle = {
+      findCampaign: vi.fn().mockResolvedValue(null),
+      getPassCount: vi.fn().mockResolvedValue(BigInt(0)),
+      findPass: vi.fn().mockResolvedValue(null),
+    };
+    const claims = createClaimStore(repositories);
+    const email = { send: vi.fn().mockResolvedValue("message-1") };
+    const service = new EventSyncService(
+      source,
+      repositories,
+      lifecycle,
+      claims,
+      email,
+      testStellarConfig.wrenPassContractId,
+      () => new Date("2026-08-09T10:01:00.000Z"),
+    );
+
+    await Promise.all([service.sync(), service.sync()]);
+
+    expect(email.send).toHaveBeenCalledTimes(1);
   });
 });

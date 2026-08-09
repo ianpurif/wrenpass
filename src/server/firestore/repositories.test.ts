@@ -79,4 +79,17 @@ describe("off-chain repositories", () => {
     );
     expect(store.read).not.toHaveBeenCalled();
   });
+
+  it("omits optional undefined values before writing to Firestore", async () => {
+    const store = createStore();
+    const repositories = createOffchainRepositories(store);
+
+    await repositories.userProfiles.save({ ...userProfile, displayName: undefined });
+
+    expect(store.write).toHaveBeenCalledWith(
+      "user_profiles",
+      userProfile.id,
+      expect.not.objectContaining({ displayName: expect.anything() }),
+    );
+  });
 });
