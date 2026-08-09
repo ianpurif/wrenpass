@@ -2,8 +2,13 @@ extern crate std;
 
 use super::*;
 use soroban_sdk::{
-    testutils::{Address as _, Events as _, Ledger as _, MockAuth, MockAuthInvoke},
-    Address, Env, Event, IntoVal,
+    symbol_short,
+    testutils::{
+        Address as _, AuthorizedFunction, AuthorizedInvocation, Events as _, Ledger as _, MockAuth,
+        MockAuthInvoke,
+    },
+    token::{StellarAssetClient, TokenClient},
+    Address, Env, Event, IntoVal, MuxedAddress,
 };
 
 const NOW: u64 = 1_000_000;
@@ -35,7 +40,8 @@ fn setup() -> (
     let contract_id = env.register(WrenPassContract, ());
     let client = WrenPassContractClient::new(&env, &contract_id);
     let platform = Address::generate(&env);
-    let payment_asset = Address::generate(&env);
+    let issuer = Address::generate(&env);
+    let payment_asset = env.register_stellar_asset_contract_v2(issuer).address();
     client.initialize(&platform, &payment_asset);
     (env, contract_id, client, platform, payment_asset)
 }
@@ -159,6 +165,9 @@ fn creates_campaign_with_unique_id_fixed_supply_and_event() {
     assert_eq!(campaign.max_supply, 100);
     assert_eq!(campaign.sold, 0);
     assert_eq!(campaign.redeemed, 0);
+    assert_eq!(campaign.merchant_released, 0);
+    assert_eq!(campaign.protected_funds, 0);
+    assert_eq!(campaign.platform_fees_paid, 0);
     assert_eq!(campaign.status, CampaignStatus::Draft);
     assert_eq!(client.remaining_supply(&first_id), 100);
 }
@@ -217,6 +226,23 @@ fn rejects_invalid_amount_supply_expiration_and_financial_rules() {
     assert_eq!(
         client.try_create_campaign(&merchant, &terms),
         Err(Ok(Error::InvalidFinancialRules))
+    );
+
+    let mut terms = default_terms();
+    terms.pass_price = 1;
+    terms.service_value = 2;
+    assert_eq!(
+        client.try_create_campaign(&merchant, &terms),
+        Err(Ok(Error::InvalidFinancialRules))
+    );
+
+    let mut terms = default_terms();
+    terms.pass_price = MAX_SAFE_PAYMENT_AMOUNT;
+    terms.service_value = terms.pass_price + 1;
+    terms.max_supply = 10_001;
+    assert_eq!(
+        client.try_create_campaign(&merchant, &terms),
+        Err(Ok(Error::InvalidAmount))
     );
 }
 
@@ -374,4 +400,334 @@ fn rejects_campaign_id_overflow() {
         client.try_create_campaign(&merchant, &default_terms()),
         Err(Ok(Error::Overflow))
     );
+}
+
+fn active_campaign(
+    max_supply: u32,
+) -> (
+    Env,
+    Address,
+    WrenPassContractClient<'static>,
+    Address,
+    Address,
+    Address,
+    Address,
+    u64,
+) {
+    let (env, contract_id, client, platform, payment_asset) = setup();
+    let merchant = Address::generate(&env);
+    let customer = Address::generate(&env);
+    let mut terms = default_terms();
+    terms.max_supply = max_supply;
+    let campaign_id = create(&client, &merchant, &terms);
+    client.publish_campaign(&campaign_id, &merchant);
+    (
+        env,
+        contract_id,
+        client,
+        platform,
+        payment_asset,
+        merchant,
+        customer,
+        campaign_id,
+    )
+}
+
+#[test]
+fn quotes_exact_distribution_and_assigns_rounding_to_merchant() {
+    let (env, _contract_id, client, _platform, _payment_asset) = setup();
+    let merchant = Address::generate(&env);
+    let mut terms = default_terms();
+    terms.pass_price = 101;
+    terms.service_value = 102;
+    let campaign_id = create(&client, &merchant, &terms);
+
+    assert_eq!(
+        client.quote_purchase(&campaign_id),
+        PurchaseAmounts {
+            total: 101,
+            merchant_release: 76,
+            protected_reserve: 20,
+            platform_fee: 5,
+        }
+    );
+}
+
+#[test]
+fn distribution_always_matches_the_exact_price() {
+    let rules = default_terms().financial_rules;
+    for total in [20_i128, 21, 99, 100, 101, 10_000_001, 50_000_000] {
+        let amounts = WrenPassContract::calculate_distribution(total, &rules).unwrap();
+        assert_eq!(
+            amounts.merchant_release + amounts.protected_reserve + amounts.platform_fee,
+            total
+        );
+    }
+
+    let no_fee = FinancialRules {
+        merchant_bps: 8_000,
+        reserve_bps: 2_000,
+        platform_fee_bps: 0,
+    };
+    assert_eq!(
+        WrenPassContract::calculate_distribution(5, &no_fee).unwrap(),
+        PurchaseAmounts {
+            total: 5,
+            merchant_release: 4,
+            protected_reserve: 1,
+            platform_fee: 0,
+        }
+    );
+}
+
+#[test]
+fn purchase_moves_configured_asset_assigns_pass_and_emits_event() {
+    let (env, contract_id, client, platform, payment_asset, merchant, customer, campaign_id) =
+        active_campaign(100);
+    let token = TokenClient::new(&env, &payment_asset);
+    let asset_admin = StellarAssetClient::new(&env, &payment_asset);
+    let price = default_terms().pass_price;
+    asset_admin.mint(&customer, &(price * 2));
+
+    let pass_id = client.purchase(&campaign_id, &customer);
+
+    assert_eq!(pass_id, 1);
+    assert_eq!(
+        env.events().all().filter_by_contract(&contract_id),
+        std::vec![PassPurchased {
+            campaign_id,
+            pass_id,
+            customer: customer.clone(),
+            total: price,
+            merchant_release: 37_500_000,
+            protected_reserve: 10_000_000,
+            platform_fee: 2_500_000,
+        }
+        .to_xdr(&env, &contract_id)]
+    );
+    assert_eq!(
+        env.auths(),
+        std::vec![(
+            customer.clone(),
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    contract_id.clone(),
+                    symbol_short!("purchase"),
+                    (campaign_id, customer.clone()).into_val(&env),
+                )),
+                sub_invocations: std::vec![
+                    AuthorizedInvocation {
+                        function: AuthorizedFunction::Contract((
+                            payment_asset.clone(),
+                            symbol_short!("transfer"),
+                            (
+                                customer.clone(),
+                                MuxedAddress::from(&contract_id),
+                                10_000_000_i128,
+                            )
+                                .into_val(&env),
+                        )),
+                        sub_invocations: std::vec![],
+                    },
+                    AuthorizedInvocation {
+                        function: AuthorizedFunction::Contract((
+                            payment_asset.clone(),
+                            symbol_short!("transfer"),
+                            (
+                                customer.clone(),
+                                MuxedAddress::from(&merchant),
+                                37_500_000_i128,
+                            )
+                                .into_val(&env),
+                        )),
+                        sub_invocations: std::vec![],
+                    },
+                    AuthorizedInvocation {
+                        function: AuthorizedFunction::Contract((
+                            payment_asset.clone(),
+                            symbol_short!("transfer"),
+                            (
+                                customer.clone(),
+                                MuxedAddress::from(&platform),
+                                2_500_000_i128,
+                            )
+                                .into_val(&env),
+                        )),
+                        sub_invocations: std::vec![],
+                    },
+                ],
+            },
+        )]
+    );
+
+    assert_eq!(token.balance(&customer), price);
+    assert_eq!(token.balance(&merchant), 37_500_000);
+    assert_eq!(token.balance(&contract_id), 10_000_000);
+    assert_eq!(token.balance(&platform), 2_500_000);
+
+    let campaign = client.get_campaign(&campaign_id).unwrap();
+    assert_eq!(campaign.sold, 1);
+    assert_eq!(campaign.merchant_released, 37_500_000);
+    assert_eq!(campaign.protected_funds, 10_000_000);
+    assert_eq!(campaign.platform_fees_paid, 2_500_000);
+    assert_eq!(client.remaining_supply(&campaign_id), 99);
+    assert_eq!(client.pass_count(), 1);
+    assert_eq!(
+        client.get_pass(&pass_id),
+        Some(Pass {
+            id: pass_id,
+            campaign_id,
+            owner: customer.clone(),
+            status: PassStatus::Active,
+            purchased_at: NOW,
+        })
+    );
+}
+
+#[test]
+fn rejects_insufficient_configured_asset_without_state_changes() {
+    let (env, contract_id, client, _platform, payment_asset, _merchant, customer, campaign_id) =
+        active_campaign(1);
+    let token = TokenClient::new(&env, &payment_asset);
+    let asset_admin = StellarAssetClient::new(&env, &payment_asset);
+    let price = default_terms().pass_price;
+    asset_admin.mint(&customer, &(price - 1));
+
+    assert_eq!(
+        client.try_purchase(&campaign_id, &customer),
+        Err(Ok(Error::InsufficientBalance))
+    );
+    assert_eq!(token.balance(&customer), price - 1);
+    assert_eq!(token.balance(&contract_id), 0);
+    assert_eq!(client.pass_count(), 0);
+    assert_eq!(client.get_campaign(&campaign_id).unwrap().sold, 0);
+}
+
+#[test]
+fn funds_in_a_different_asset_cannot_buy_a_pass() {
+    let (env, contract_id, client, _platform, configured_asset, _merchant, customer, campaign_id) =
+        active_campaign(1);
+    let wrong_issuer = Address::generate(&env);
+    let wrong_asset = env
+        .register_stellar_asset_contract_v2(wrong_issuer)
+        .address();
+    let wrong_admin = StellarAssetClient::new(&env, &wrong_asset);
+    let wrong_token = TokenClient::new(&env, &wrong_asset);
+    let configured_token = TokenClient::new(&env, &configured_asset);
+    let price = default_terms().pass_price;
+    wrong_admin.mint(&customer, &price);
+
+    assert_eq!(
+        client.try_purchase(&campaign_id, &customer),
+        Err(Ok(Error::InsufficientBalance))
+    );
+    assert_eq!(wrong_token.balance(&customer), price);
+    assert_eq!(configured_token.balance(&contract_id), 0);
+    assert_eq!(client.pass_count(), 0);
+}
+
+#[test]
+fn enforces_the_exact_supply_boundary() {
+    let (env, _contract_id, client, _platform, payment_asset, _merchant, customer, campaign_id) =
+        active_campaign(1);
+    let token = TokenClient::new(&env, &payment_asset);
+    let asset_admin = StellarAssetClient::new(&env, &payment_asset);
+    let price = default_terms().pass_price;
+    asset_admin.mint(&customer, &(price * 2));
+
+    assert_eq!(client.purchase(&campaign_id, &customer), 1);
+    assert_eq!(
+        client.try_purchase(&campaign_id, &customer),
+        Err(Ok(Error::SoldOut))
+    );
+    assert_eq!(token.balance(&customer), price);
+    assert_eq!(client.pass_count(), 1);
+    assert_eq!(client.remaining_supply(&campaign_id), 0);
+    assert_eq!(client.get_campaign(&campaign_id).unwrap().sold, 1);
+}
+
+#[test]
+fn paused_and_expired_campaigns_cannot_be_purchased() {
+    let (env, _contract_id, client, _platform, payment_asset, merchant, customer, campaign_id) =
+        active_campaign(2);
+    let asset_admin = StellarAssetClient::new(&env, &payment_asset);
+    let terms = default_terms();
+    asset_admin.mint(&customer, &(terms.pass_price * 2));
+
+    client.pause_campaign(&campaign_id, &merchant);
+    assert_eq!(
+        client.try_purchase(&campaign_id, &customer),
+        Err(Ok(Error::InvalidState))
+    );
+
+    client.resume_campaign(&campaign_id, &merchant);
+    env.ledger().set_timestamp(terms.expires_at);
+    assert_eq!(
+        client.try_purchase(&campaign_id, &customer),
+        Err(Ok(Error::CampaignExpired))
+    );
+    assert_eq!(client.pass_count(), 0);
+}
+
+#[test]
+fn purchase_requires_customer_authorization() {
+    let (env, _contract_id, client, _platform, payment_asset, _merchant, customer, campaign_id) =
+        active_campaign(1);
+    let token = TokenClient::new(&env, &payment_asset);
+    let asset_admin = StellarAssetClient::new(&env, &payment_asset);
+    let price = default_terms().pass_price;
+    asset_admin.mint(&customer, &price);
+    env.set_auths(&[]);
+
+    assert!(client.try_purchase(&campaign_id, &customer).is_err());
+    assert_eq!(token.balance(&customer), price);
+    assert_eq!(client.pass_count(), 0);
+    assert_eq!(client.get_campaign(&campaign_id).unwrap().sold, 0);
+}
+
+#[test]
+fn pass_ids_are_unique_across_campaigns_and_owners() {
+    let (env, _contract_id, client, _platform, payment_asset) = setup();
+    let merchant = Address::generate(&env);
+    let first_customer = Address::generate(&env);
+    let second_customer = Address::generate(&env);
+    let first_campaign = create(&client, &merchant, &default_terms());
+    let second_campaign = create(&client, &merchant, &default_terms());
+    client.publish_campaign(&first_campaign, &merchant);
+    client.publish_campaign(&second_campaign, &merchant);
+    let asset_admin = StellarAssetClient::new(&env, &payment_asset);
+    let price = default_terms().pass_price;
+    asset_admin.mint(&first_customer, &price);
+    asset_admin.mint(&second_customer, &price);
+
+    let first_pass = client.purchase(&first_campaign, &first_customer);
+    let second_pass = client.purchase(&second_campaign, &second_customer);
+
+    assert_eq!(first_pass, 1);
+    assert_eq!(second_pass, 2);
+    assert_eq!(client.get_pass(&first_pass).unwrap().owner, first_customer);
+    assert_eq!(
+        client.get_pass(&second_pass).unwrap().owner,
+        second_customer
+    );
+}
+
+#[test]
+fn rejects_pass_id_overflow_before_moving_funds() {
+    let (env, contract_id, client, _platform, payment_asset, _merchant, customer, campaign_id) =
+        active_campaign(1);
+    let token = TokenClient::new(&env, &payment_asset);
+    let asset_admin = StellarAssetClient::new(&env, &payment_asset);
+    let price = default_terms().pass_price;
+    asset_admin.mint(&customer, &price);
+    env.as_contract(&contract_id, || {
+        env.storage().instance().set(&DataKey::PassCount, &u64::MAX);
+    });
+
+    assert_eq!(
+        client.try_purchase(&campaign_id, &customer),
+        Err(Ok(Error::Overflow))
+    );
+    assert_eq!(token.balance(&customer), price);
+    assert_eq!(client.get_campaign(&campaign_id).unwrap().sold, 0);
 }

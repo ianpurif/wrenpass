@@ -1,7 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, Address, Env,
+    contract, contracterror, contractevent, contractimpl, contracttype, token::TokenClient,
+    Address, Env, MuxedAddress,
 };
 
 const BASIS_POINTS_TOTAL: u32 = 10_000;
@@ -23,6 +24,8 @@ pub enum Error {
     CampaignExpired = 10,
     Overflow = 11,
     InvalidConfiguration = 12,
+    SoldOut = 13,
+    InsufficientBalance = 14,
 }
 
 #[contracttype]
@@ -36,10 +39,28 @@ pub enum CampaignStatus {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PassStatus {
+    Active,
+    Redeemed,
+    Expired,
+    Refunded,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FinancialRules {
     pub merchant_bps: u32,
     pub reserve_bps: u32,
     pub platform_fee_bps: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PurchaseAmounts {
+    pub total: i128,
+    pub merchant_release: i128,
+    pub protected_reserve: i128,
+    pub platform_fee: i128,
 }
 
 #[contracttype]
@@ -71,6 +92,9 @@ pub struct Campaign {
     pub max_supply: u32,
     pub sold: u32,
     pub redeemed: u32,
+    pub merchant_released: i128,
+    pub protected_funds: i128,
+    pub platform_fees_paid: i128,
     pub expires_at: u64,
     pub financial_rules: FinancialRules,
     pub status: CampaignStatus,
@@ -78,10 +102,22 @@ pub struct Campaign {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Pass {
+    pub id: u64,
+    pub campaign_id: u64,
+    pub owner: Address,
+    pub status: PassStatus,
+    pub purchased_at: u64,
+}
+
+#[contracttype]
 enum DataKey {
     Config,
     CampaignCount,
     Campaign(u64),
+    PassCount,
+    Pass(u64),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -110,6 +146,21 @@ pub struct CampaignStatusChanged {
     pub current: CampaignStatus,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contractevent(topics = ["pass_purchased"])]
+pub struct PassPurchased {
+    #[topic]
+    pub campaign_id: u64,
+    #[topic]
+    pub pass_id: u64,
+    #[topic]
+    pub customer: Address,
+    pub total: i128,
+    pub merchant_release: i128,
+    pub protected_reserve: i128,
+    pub platform_fee: i128,
+}
+
 #[contract]
 pub struct WrenPassContract;
 
@@ -134,6 +185,7 @@ impl WrenPassContract {
         env.storage()
             .instance()
             .set(&DataKey::CampaignCount, &0_u64);
+        env.storage().instance().set(&DataKey::PassCount, &0_u64);
         Ok(())
     }
 
@@ -166,6 +218,9 @@ impl WrenPassContract {
             max_supply: terms.max_supply,
             sold: 0,
             redeemed: 0,
+            merchant_released: 0,
+            protected_funds: 0,
+            platform_fees_paid: 0,
             expires_at: terms.expires_at,
             financial_rules: terms.financial_rules.clone(),
             status: CampaignStatus::Draft,
@@ -213,6 +268,110 @@ impl WrenPassContract {
             .max_supply
             .checked_sub(campaign.sold)
             .ok_or(Error::Overflow)
+    }
+
+    pub fn quote_purchase(env: Env, campaign_id: u64) -> Result<PurchaseAmounts, Error> {
+        let campaign = Self::load_campaign(&env, campaign_id)?;
+        Self::calculate_distribution(campaign.pass_price, &campaign.financial_rules)
+    }
+
+    pub fn purchase(env: Env, campaign_id: u64, customer: Address) -> Result<u64, Error> {
+        let mut campaign = Self::load_campaign(&env, campaign_id)?;
+        if Self::effective_status(&env, &campaign) == CampaignStatus::Expired {
+            return Err(Error::CampaignExpired);
+        }
+        if campaign.status != CampaignStatus::Active {
+            return Err(Error::InvalidState);
+        }
+
+        let next_sold = campaign.sold.checked_add(1).ok_or(Error::Overflow)?;
+        if next_sold > campaign.max_supply {
+            return Err(Error::SoldOut);
+        }
+
+        let current_pass_id: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::PassCount)
+            .unwrap_or(0);
+        let pass_id = current_pass_id.checked_add(1).ok_or(Error::Overflow)?;
+        let amounts = Self::calculate_distribution(campaign.pass_price, &campaign.financial_rules)?;
+        let token = TokenClient::new(&env, &campaign.payment_asset);
+        if token.balance(&customer) < amounts.total {
+            return Err(Error::InsufficientBalance);
+        }
+
+        customer.require_auth();
+
+        campaign.sold = next_sold;
+        campaign.merchant_released = campaign
+            .merchant_released
+            .checked_add(amounts.merchant_release)
+            .ok_or(Error::Overflow)?;
+        campaign.protected_funds = campaign
+            .protected_funds
+            .checked_add(amounts.protected_reserve)
+            .ok_or(Error::Overflow)?;
+        campaign.platform_fees_paid = campaign
+            .platform_fees_paid
+            .checked_add(amounts.platform_fee)
+            .ok_or(Error::Overflow)?;
+
+        let pass = Pass {
+            id: pass_id,
+            campaign_id,
+            owner: customer.clone(),
+            status: PassStatus::Active,
+            purchased_at: env.ledger().timestamp(),
+        };
+        Self::save_campaign(&env, &campaign);
+        env.storage().instance().set(&DataKey::PassCount, &pass_id);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Pass(pass_id), &pass);
+
+        let contract_address = env.current_contract_address();
+        token.transfer(
+            &customer,
+            MuxedAddress::from(&contract_address),
+            &amounts.protected_reserve,
+        );
+        token.transfer(
+            &customer,
+            MuxedAddress::from(&campaign.merchant),
+            &amounts.merchant_release,
+        );
+        if amounts.platform_fee > 0 {
+            token.transfer(
+                &customer,
+                MuxedAddress::from(&campaign.platform),
+                &amounts.platform_fee,
+            );
+        }
+
+        PassPurchased {
+            campaign_id,
+            pass_id,
+            customer,
+            total: amounts.total,
+            merchant_release: amounts.merchant_release,
+            protected_reserve: amounts.protected_reserve,
+            platform_fee: amounts.platform_fee,
+        }
+        .publish(&env);
+
+        Ok(pass_id)
+    }
+
+    pub fn get_pass(env: Env, pass_id: u64) -> Option<Pass> {
+        env.storage().persistent().get(&DataKey::Pass(pass_id))
+    }
+
+    pub fn pass_count(env: Env) -> u64 {
+        env.storage()
+            .instance()
+            .get(&DataKey::PassCount)
+            .unwrap_or(0)
     }
 
     pub fn publish_campaign(env: Env, campaign_id: u64, merchant: Address) -> Result<(), Error> {
@@ -280,6 +439,10 @@ impl WrenPassContract {
         if terms.expires_at <= env.ledger().timestamp() {
             return Err(Error::InvalidExpiration);
         }
+        terms
+            .pass_price
+            .checked_mul(i128::from(terms.max_supply))
+            .ok_or(Error::InvalidAmount)?;
 
         let rules = &terms.financial_rules;
         let total = rules
@@ -290,8 +453,49 @@ impl WrenPassContract {
         if rules.merchant_bps == 0 || rules.reserve_bps == 0 || total != BASIS_POINTS_TOTAL {
             return Err(Error::InvalidFinancialRules);
         }
+        Self::calculate_distribution(terms.pass_price, rules)?;
 
         Ok(())
+    }
+
+    fn calculate_distribution(
+        total: i128,
+        rules: &FinancialRules,
+    ) -> Result<PurchaseAmounts, Error> {
+        let merchant_base = total
+            .checked_mul(i128::from(rules.merchant_bps))
+            .ok_or(Error::Overflow)?
+            / i128::from(BASIS_POINTS_TOTAL);
+        let protected_reserve = total
+            .checked_mul(i128::from(rules.reserve_bps))
+            .ok_or(Error::Overflow)?
+            / i128::from(BASIS_POINTS_TOTAL);
+        let platform_fee = total
+            .checked_mul(i128::from(rules.platform_fee_bps))
+            .ok_or(Error::Overflow)?
+            / i128::from(BASIS_POINTS_TOTAL);
+        let allocated = merchant_base
+            .checked_add(protected_reserve)
+            .and_then(|value| value.checked_add(platform_fee))
+            .ok_or(Error::Overflow)?;
+        let remainder = total.checked_sub(allocated).ok_or(Error::Overflow)?;
+        let merchant_release = merchant_base
+            .checked_add(remainder)
+            .ok_or(Error::Overflow)?;
+
+        if merchant_release <= 0
+            || protected_reserve <= 0
+            || (rules.platform_fee_bps > 0 && platform_fee <= 0)
+        {
+            return Err(Error::InvalidFinancialRules);
+        }
+
+        Ok(PurchaseAmounts {
+            total,
+            merchant_release,
+            protected_reserve,
+            platform_fee,
+        })
     }
 
     fn effective_status(env: &Env, campaign: &Campaign) -> CampaignStatus {
