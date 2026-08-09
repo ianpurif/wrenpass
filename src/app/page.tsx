@@ -140,7 +140,7 @@ export default function Home() {
 
       <section id="trust" className="scroll-mt-24 py-18 sm:py-22">
         <Container>
-          <Card className="overflow-hidden bg-ink p-7 text-white sm:p-10 lg:p-12">
+          <Card className="!bg-ink overflow-hidden p-7 text-white sm:p-10 lg:p-12">
             <div className="grid gap-10 lg:grid-cols-[1fr_auto] lg:items-end">
               <div className="max-w-2xl">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-mint">Designed around trust</p>

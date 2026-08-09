@@ -12,9 +12,6 @@ import { WalletBalanceStrip } from "@/components/wallet/wallet-balance-strip";
 import { WalletButton } from "@/components/wallet/wallet-button";
 
 const navItems = [
-  { href: "/#how-it-works", label: "How it works" },
-  { href: "/#for-merchants", label: "For merchants" },
-  { href: "/#trust", label: "Trust & safety" },
   { href: "/merchant", label: "Merchant dashboard" },
   { href: "/passes", label: "My passes" },
 ];
