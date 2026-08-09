@@ -10,6 +10,14 @@ function createStore(): DocumentStore {
 
   return {
     read: vi.fn(async (collection, id) => documents.get(key(collection, id)) ?? null),
+    findMany: vi.fn(async (collection, field, value) =>
+      [...documents.entries()]
+        .filter(([documentKey, document]) => {
+          if (!documentKey.startsWith(`${collection}/`)) return false;
+          return (document as Record<string, unknown>)[field] === value;
+        })
+        .map(([, document]) => document),
+    ),
     write: vi.fn(async (collection, id, data) => {
       documents.set(key(collection, id), data);
     }),
@@ -46,6 +54,20 @@ describe("off-chain repositories", () => {
       repositories.userProfiles.save({ ...userProfile, walletAddress: "" }),
     ).rejects.toThrow();
     expect(store.write).not.toHaveBeenCalled();
+  });
+
+  it("finds and validates documents by a controlled field", async () => {
+    const repositories = createOffchainRepositories(createStore());
+    await repositories.userProfiles.save(userProfile);
+    await repositories.userProfiles.save({
+      ...userProfile,
+      id: "user-2",
+      walletAddress: "GOTHER",
+    });
+
+    await expect(
+      repositories.userProfiles.findByField("walletAddress", userProfile.walletAddress),
+    ).resolves.toEqual([userProfile]);
   });
 
   it("rejects document IDs containing collection path separators", async () => {

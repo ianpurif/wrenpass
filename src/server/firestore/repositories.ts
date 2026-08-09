@@ -44,6 +44,11 @@ export class EntityRepository<T extends IdentifiedEntity> {
     return data === null ? null : this.schema.parse(data);
   }
 
+  async findByField(field: keyof T & string, value: string): Promise<T[]> {
+    const documents = await this.store.findMany(this.collectionName, field, value);
+    return documents.map((document) => this.schema.parse(document));
+  }
+
   async deleteById(id: string): Promise<void> {
     await this.store.remove(this.collectionName, entityIdSchema.parse(id));
   }

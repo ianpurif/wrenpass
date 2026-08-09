@@ -18,6 +18,8 @@ function validConfig(network: "testnet" | "mainnet" = "testnet") {
     NEXT_PUBLIC_STELLAR_ASSET_CODE: "USDC",
     NEXT_PUBLIC_STELLAR_ASSET_ISSUER: issuer,
     NEXT_PUBLIC_STELLAR_ASSET_CONTRACT_ID: new Asset("USDC", issuer).contractId(passphrase),
+    NEXT_PUBLIC_WRENPASS_CONTRACT_ID:
+      "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
   };
 }
 

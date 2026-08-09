@@ -9,6 +9,13 @@ export const entityIdSchema = z
 const isoTimestamp = z.string().datetime();
 const walletAddress = z.string().trim().min(1).max(128);
 const optionalUrl = z.url().optional();
+export const cloudinaryPublicIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(240)
+  .regex(/^[a-zA-Z0-9/_-]+$/)
+  .refine((value) => !value.includes("..") && !value.startsWith("/"));
 
 export const userProfileSchema = z.object({
   id: entityIdSchema,
@@ -25,6 +32,7 @@ export const merchantSchema = z.object({
   businessName: z.string().trim().min(1).max(140),
   description: z.string().trim().min(1).max(2_000),
   logoUrl: optionalUrl,
+  logoPublicId: cloudinaryPublicIdSchema.optional(),
   createdAt: isoTimestamp,
   updatedAt: isoTimestamp,
 });
@@ -36,6 +44,7 @@ export const campaignMetadataSchema = z.object({
   name: z.string().trim().min(1).max(140),
   serviceDescription: z.string().trim().min(1).max(4_000),
   imageUrl: optionalUrl,
+  imagePublicId: cloudinaryPublicIdSchema.optional(),
   createdAt: isoTimestamp,
   updatedAt: isoTimestamp,
 });

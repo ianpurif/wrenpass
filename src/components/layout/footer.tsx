@@ -14,10 +14,10 @@ export function Footer() {
           </p>
         </div>
         <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-ink-muted">
-          <Link className="hover:text-ink" href="#how-it-works">
+          <Link className="hover:text-ink" href="/#how-it-works">
             How it works
           </Link>
-          <Link className="hover:text-ink" href="#trust">
+          <Link className="hover:text-ink" href="/#trust">
             Trust & safety
           </Link>
           <span>Built on Stellar</span>
@@ -26,4 +26,3 @@ export function Footer() {
     </footer>
   );
 }
-

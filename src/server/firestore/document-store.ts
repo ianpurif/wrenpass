@@ -6,6 +6,7 @@ import { getFirestoreDb } from "@/server/firestore/firebase-admin";
 
 export interface DocumentStore {
   read(collection: string, id: string): Promise<unknown | null>;
+  findMany(collection: string, field: string, value: string): Promise<unknown[]>;
   write(collection: string, id: string, data: Record<string, unknown>): Promise<void>;
   remove(collection: string, id: string): Promise<void>;
 }
@@ -15,6 +16,11 @@ export class FirestoreDocumentStore implements DocumentStore {
   async read(collection: string, id: string): Promise<unknown | null> {
     const snapshot = await this.db.collection(collection).doc(id).get();
     return snapshot.exists ? snapshot.data() ?? null : null;
+  }
+
+  async findMany(collection: string, field: string, value: string): Promise<unknown[]> {
+    const snapshot = await this.db.collection(collection).where(field, "==", value).get();
+    return snapshot.docs.map((document) => document.data());
   }
 
   async write(

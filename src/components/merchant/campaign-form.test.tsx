@@ -1,0 +1,83 @@
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { CampaignForm } from "@/components/merchant/campaign-form";
+import type { StellarConfig } from "@/lib/stellar/config";
+
+const mocks = vi.hoisted(() => ({
+  createDraft: vi.fn(),
+  publish: vi.fn(),
+  saveCampaignMetadata: vi.fn(),
+  signTransaction: vi.fn(),
+}));
+
+vi.mock("@/components/wallet/wallet-provider", () => ({
+  useWallet: () => ({
+    address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    signTransaction: mocks.signTransaction,
+  }),
+}));
+
+vi.mock("@/features/merchant/api", () => ({
+  merchantApi: {
+    saveCampaignMetadata: mocks.saveCampaignMetadata,
+    uploadImage: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/stellar/wrenpass-client", () => ({
+  StellarCampaignContractWriter: class {
+    createDraft = mocks.createDraft;
+    publish = mocks.publish;
+  },
+}));
+
+const config: StellarConfig = {
+  network: "testnet",
+  networkPassphrase: "Test SDF Network ; September 2015",
+  rpcUrl: "https://soroban-testnet.stellar.org",
+  assetCode: "USDC",
+  assetIssuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+  assetContractId: "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+  wrenPassContractId: "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
+};
+
+describe("CampaignForm", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    mocks.createDraft.mockReset().mockResolvedValue(BigInt(12));
+    mocks.publish.mockReset().mockResolvedValue(undefined);
+    mocks.saveCampaignMetadata.mockReset().mockResolvedValue({});
+    mocks.signTransaction.mockReset();
+  });
+
+  it("creates a contract draft, stores metadata, and publishes in order", async () => {
+    const user = userEvent.setup();
+    const onPublished = vi.fn().mockResolvedValue(undefined);
+    render(<CampaignForm config={config} onPublished={onPublished} />);
+
+    await user.type(screen.getByLabelText("Campaign name"), "Five haircuts forward");
+    await user.type(
+      screen.getByLabelText("Service description"),
+      "One complete haircut service delivered at the merchant studio.",
+    );
+    await user.click(screen.getByRole("button", { name: "Create and publish campaign" }));
+
+    await waitFor(() => expect(mocks.publish).toHaveBeenCalledOnce());
+    expect(mocks.createDraft).toHaveBeenCalledOnce();
+    expect(mocks.saveCampaignMetadata).toHaveBeenCalledWith({
+      campaignId: "12",
+      name: "Five haircuts forward",
+      serviceDescription: "One complete haircut service delivered at the merchant studio.",
+    });
+    expect(mocks.createDraft.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.saveCampaignMetadata.mock.invocationCallOrder[0],
+    );
+    expect(mocks.saveCampaignMetadata.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.publish.mock.invocationCallOrder[0],
+    );
+    expect(onPublished).toHaveBeenCalledOnce();
+    expect(screen.getByText("Campaign #12 is live on Stellar Testnet.")).toBeInTheDocument();
+  });
+});

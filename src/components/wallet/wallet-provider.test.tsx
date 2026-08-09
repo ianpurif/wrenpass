@@ -20,6 +20,7 @@ const config: StellarConfig = {
   assetCode: "USDC",
   assetIssuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
   assetContractId: "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+  wrenPassContractId: "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
 };
 
 function createAdapter(overrides: Partial<WalletAdapter> = {}): WalletAdapter {
@@ -27,6 +28,10 @@ function createAdapter(overrides: Partial<WalletAdapter> = {}): WalletAdapter {
     connect: vi.fn().mockResolvedValue({ address, networkPassphrase: Networks.TESTNET }),
     restore: vi.fn().mockResolvedValue(null),
     signMessage: vi.fn().mockResolvedValue({ signature: "signed", signerAddress: address }),
+    signTransaction: vi.fn().mockResolvedValue({
+      signedTxXdr: "signed-transaction",
+      signerAddress: address,
+    }),
     disconnect: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };

@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { WalletAuthError } from "@/server/wallet-auth/auth-service";
+import { WALLET_SESSION_COOKIE } from "@/server/wallet-auth/request-session";
 import { getWalletAuthService } from "@/server/wallet-auth/service";
 
-const SESSION_COOKIE = "wrenpass_wallet_session";
 const sessionRequestSchema = z.object({
   challengeId: z.string().trim().min(32).max(100),
   signature: z.string().trim().min(80).max(200),
@@ -13,7 +13,7 @@ const sessionRequestSchema = z.object({
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const token = request.cookies.get(SESSION_COOKIE)?.value ?? "";
+  const token = request.cookies.get(WALLET_SESSION_COOKIE)?.value ?? "";
   const session = await getWalletAuthService().getSession(token);
 
   if (!session) {
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       { authenticated: true, address: session.address, expiresAt: session.expiresAt },
       { status: 201, headers: { "Cache-Control": "no-store" } },
     );
-    response.cookies.set(SESSION_COOKIE, session.token, {
+    response.cookies.set(WALLET_SESSION_COOKIE, session.token, {
       httpOnly: true,
       sameSite: "strict",
       secure: process.env.NODE_ENV === "production",
@@ -62,11 +62,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const token = request.cookies.get(SESSION_COOKIE)?.value ?? "";
+  const token = request.cookies.get(WALLET_SESSION_COOKIE)?.value ?? "";
   await getWalletAuthService().revokeSession(token);
 
   const response = NextResponse.json({ authenticated: false });
-  response.cookies.set(SESSION_COOKIE, "", {
+  response.cookies.set(WALLET_SESSION_COOKIE, "", {
     httpOnly: true,
     sameSite: "strict",
     secure: process.env.NODE_ENV === "production",

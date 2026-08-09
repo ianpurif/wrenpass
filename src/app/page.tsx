@@ -66,8 +66,8 @@ export default function Home() {
                 Explore the model
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
-              <Link className={buttonStyles({ variant: "secondary", size: "lg" })} href="#for-merchants">
-                Built for small businesses
+              <Link className={buttonStyles({ variant: "secondary", size: "lg" })} href="/merchant">
+                Create a campaign
               </Link>
             </div>
             <div className="mt-9 grid gap-3 sm:grid-cols-3">

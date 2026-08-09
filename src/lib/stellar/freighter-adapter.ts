@@ -57,6 +57,11 @@ export function createFreighterAdapter(config: StellarConfig): WalletAdapter {
       return { signature: result.signedMessage, signerAddress: result.signerAddress };
     },
 
+    async signTransaction(transactionXdr, address, networkPassphrase) {
+      const kit = await loadKit(config);
+      return kit.signTransaction(transactionXdr, { address, networkPassphrase });
+    },
+
     async disconnect() {
       const kit = await loadKit(config);
       await kit.disconnect();

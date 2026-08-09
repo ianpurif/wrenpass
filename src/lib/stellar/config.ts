@@ -24,6 +24,10 @@ const stellarConfigSchema = z.object({
     .string()
     .trim()
     .refine(StrKey.isValidContract, "asset contract ID must be a valid Stellar C-address"),
+  NEXT_PUBLIC_WRENPASS_CONTRACT_ID: z
+    .string()
+    .trim()
+    .refine(StrKey.isValidContract, "WrenPass contract ID must be a valid Stellar C-address"),
 });
 
 export type StellarNetwork = "testnet" | "mainnet";
@@ -35,6 +39,7 @@ export interface StellarConfig {
   assetCode: string;
   assetIssuer: string;
   assetContractId: string;
+  wrenPassContractId: string;
 }
 
 type StellarConfigInput = Record<keyof z.input<typeof stellarConfigSchema>, string | undefined>;
@@ -70,6 +75,7 @@ export function parseStellarConfig(input: StellarConfigInput): StellarConfig {
     assetCode: values.NEXT_PUBLIC_STELLAR_ASSET_CODE,
     assetIssuer: values.NEXT_PUBLIC_STELLAR_ASSET_ISSUER,
     assetContractId: values.NEXT_PUBLIC_STELLAR_ASSET_CONTRACT_ID,
+    wrenPassContractId: values.NEXT_PUBLIC_WRENPASS_CONTRACT_ID,
   };
 }
 
@@ -83,6 +89,7 @@ export function getStellarConfig(): StellarConfig {
     NEXT_PUBLIC_STELLAR_ASSET_ISSUER: process.env.NEXT_PUBLIC_STELLAR_ASSET_ISSUER,
     NEXT_PUBLIC_STELLAR_ASSET_CONTRACT_ID:
       process.env.NEXT_PUBLIC_STELLAR_ASSET_CONTRACT_ID,
+    NEXT_PUBLIC_WRENPASS_CONTRACT_ID: process.env.NEXT_PUBLIC_WRENPASS_CONTRACT_ID,
   });
 
   return cachedConfig;
