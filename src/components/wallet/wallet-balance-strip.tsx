@@ -2,52 +2,51 @@
 
 import { RefreshCw, ShieldCheck } from "lucide-react";
 
-import { Container } from "@/components/ui/container";
 import { useWallet } from "@/components/wallet/wallet-provider";
+import { cn } from "@/lib/cn";
 
-export function WalletBalanceStrip() {
+export function WalletBalanceStrip({ className }: { className?: string }) {
   const { balances, networkLabel, refreshBalances, status } = useWallet();
 
   if (status !== "connected" || !balances) return null;
 
   return (
-    <section
+    <div
+      role="region"
       aria-label="Wallet balances"
-      className="border-t border-forest/10 bg-mint-soft/80"
+      className={cn(
+        "grid min-w-0 grid-cols-2 gap-2 text-[11px] sm:flex sm:items-center",
+        className,
+      )}
     >
-      <Container className="flex min-h-12 flex-wrap items-center gap-x-5 gap-y-2 py-2 text-xs sm:justify-end">
-        <span className="mr-auto inline-flex items-center gap-1.5 font-bold text-forest">
+      <div className="col-span-2 inline-flex min-w-0 items-center justify-between gap-2 rounded-xl border border-forest/15 bg-mint-soft/80 px-2.5 py-1.5 font-bold text-forest sm:col-span-1 sm:rounded-full">
+        <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap">
           <ShieldCheck aria-hidden="true" className="size-3.5" />
           Verified · {networkLabel}
         </span>
-
-        <div className="flex items-baseline gap-1.5">
-          <span className="font-semibold uppercase tracking-[0.08em] text-ink-faint">XLM</span>
-          <strong className="text-sm text-ink">{balances.xlm} XLM</strong>
-        </div>
-
-        <span aria-hidden="true" className="hidden h-4 w-px bg-forest/15 sm:block" />
-
-        <div className="flex items-baseline gap-1.5">
-          <span className="font-semibold uppercase tracking-[0.08em] text-ink-faint">
-            {balances.asset.code}
-          </span>
-          <strong className="text-sm text-ink">
-            {balances.asset.hasTrustline
-              ? `${balances.asset.balance} ${balances.asset.code}`
-              : `${balances.asset.code} not added`}
-          </strong>
-        </div>
-
         <button
           type="button"
           aria-label="Refresh wallet balances"
-          className="grid size-8 shrink-0 place-items-center rounded-lg text-ink-muted transition hover:bg-white hover:text-forest focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
+          className="grid size-7 shrink-0 place-items-center rounded-lg text-ink-muted transition hover:bg-white hover:text-forest focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
           onClick={() => void refreshBalances()}
         >
           <RefreshCw aria-hidden="true" className="size-3.5" />
         </button>
-      </Container>
-    </section>
+      </div>
+
+      <div className="inline-flex min-w-0 items-baseline gap-1.5 rounded-xl border border-line bg-white px-2.5 py-1.5 sm:rounded-lg sm:border-transparent sm:bg-transparent sm:px-0 sm:py-0">
+        <span className="font-semibold uppercase tracking-[0.08em] text-ink-faint">XLM</span>
+        <strong className="min-w-0 truncate text-xs text-ink">{balances.xlm} XLM</strong>
+      </div>
+
+      <div className="inline-flex min-w-0 items-baseline gap-1.5 rounded-xl border border-line bg-white px-2.5 py-1.5 sm:rounded-lg sm:border-transparent sm:bg-transparent sm:px-0 sm:py-0">
+        <span className="font-semibold uppercase tracking-[0.08em] text-ink-faint">{balances.asset.code}</span>
+        <strong className="min-w-0 truncate text-xs text-ink">
+          {balances.asset.hasTrustline
+            ? `${balances.asset.balance} ${balances.asset.code}`
+            : `${balances.asset.code} not added`}
+        </strong>
+      </div>
+    </div>
   );
 }
