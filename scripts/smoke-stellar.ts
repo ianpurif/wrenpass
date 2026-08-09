@@ -1,12 +1,15 @@
 import { getStellarConfig } from "@/lib/stellar/config";
+import { readContractConfig } from "@/lib/stellar/wrenpass-client";
+import { assertPurchaseDistributionReady } from "@/server/stellar/purchase-readiness";
 import { StellarRpcGateway } from "@/server/stellar/rpc-gateway";
 
 async function main() {
   const config = getStellarConfig();
   const gateway = new StellarRpcGateway(config.rpcUrl);
-  const [networkPassphrase, issuerBalance] = await Promise.all([
+  const [networkPassphrase, issuerBalance, contractConfig] = await Promise.all([
     gateway.getNetworkPassphrase(),
     gateway.readAccountBalance(config.assetIssuer),
+    readContractConfig(config),
   ]);
 
   if (networkPassphrase !== config.networkPassphrase) {
@@ -17,10 +20,14 @@ async function main() {
     throw new Error("The configured asset issuer account does not exist on the selected network.");
   }
 
+  await assertPurchaseDistributionReady(config, contractConfig, gateway);
+
   console.log(`Stellar RPC network verified: ${config.network}`);
   console.log(`Configured asset verified: ${config.assetCode}`);
   console.log(`Issuer account is funded: yes`);
   console.log(`Asset contract matches asset and network: yes`);
+  console.log(`WrenPass contract payment asset matches configuration: yes`);
+  console.log(`Platform fee account can receive ${config.assetCode}: yes`);
 }
 
 main().catch((error: unknown) => {

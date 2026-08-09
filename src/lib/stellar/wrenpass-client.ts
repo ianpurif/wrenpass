@@ -4,6 +4,7 @@ import {
   Client,
   type Campaign,
   type CampaignTerms,
+  type ContractConfig,
   type Pass,
 } from "@/generated/wrenpass-contract/src";
 import type { StellarConfig } from "@/lib/stellar/config";
@@ -156,6 +157,11 @@ export async function readContractCampaign(
 ): Promise<Campaign | null> {
   const transaction = await createClient(config).get_campaign({ campaign_id: campaignId });
   return transaction.result ?? null;
+}
+
+export async function readContractConfig(config: StellarConfig): Promise<ContractConfig> {
+  const transaction = await createClient(config).get_config();
+  return unwrapContractResult(transaction.result);
 }
 
 export async function readContractPass(

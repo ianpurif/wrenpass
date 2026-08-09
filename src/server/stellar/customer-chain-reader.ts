@@ -36,6 +36,17 @@ function toRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
 }
 
+function ledgerCloseTimeToIso(value: string): string {
+  const numericSeconds = Number(value);
+  const date = Number.isFinite(numericSeconds)
+    ? new Date(numericSeconds * 1_000)
+    : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Stellar RPC returned an invalid ledger close time.");
+  }
+  return date.toISOString();
+}
+
 export function decodeCustomerActivity(
   events: Awaited<ReturnType<rpc.Server["getEvents"]>>["events"],
   walletAddress: string,
@@ -134,7 +145,7 @@ export class StellarCustomerChainReader implements CustomerChainReader {
 
     return {
       activity: decodeCustomerActivity(response.events, walletAddress),
-      startsAt: new Date(Number(response.oldestLedgerCloseTime) * 1_000).toISOString(),
+      startsAt: ledgerCloseTimeToIso(response.oldestLedgerCloseTime),
     };
   }
 }

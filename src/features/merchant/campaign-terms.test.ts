@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatUsdcAmount,
   parseUsdcAmount,
+  parseUsdcBalance,
   quoteCampaignInput,
   toCampaignTerms,
 } from "@/features/merchant/campaign-terms";
@@ -10,6 +11,7 @@ import {
 describe("campaign terms", () => {
   it("converts USDC values without floating-point arithmetic", () => {
     expect(parseUsdcAmount("5.25")).toBe(BigInt(52_500_000));
+    expect(parseUsdcBalance("0.0000000")).toBe(BigInt(0));
     expect(formatUsdcAmount(BigInt(52_500_000))).toBe("5.25");
     expect(quoteCampaignInput({ passPrice: "5", serviceValue: "6" })).toEqual({
       bonus: BigInt(10_000_000),

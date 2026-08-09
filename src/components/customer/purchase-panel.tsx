@@ -27,7 +27,15 @@ export function PurchasePanel({
   config: StellarConfig;
 }) {
   const router = useRouter();
-  const { address, balances, connect, refreshBalances, signTransaction, status } = useWallet();
+  const {
+    address,
+    balances,
+    connect,
+    error: walletError,
+    refreshBalances,
+    signTransaction,
+    status,
+  } = useWallet();
   const writer = useMemo(() => new StellarCustomerContractWriter(config), [config]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -115,6 +123,9 @@ export function PurchasePanel({
           {pending ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <WalletCards aria-hidden="true" className="size-4" />}
           {actionLabel}
         </Button>
+        {walletError && !connected && (
+          <p role="alert" className="mt-3 text-center text-sm font-semibold text-danger">{walletError}</p>
+        )}
         {error && !dialogOpen && <p role="alert" className="mt-3 text-center text-sm font-semibold text-danger">{error}</p>}
         {purchasedPassId && (
           <p role="status" className="mt-3 flex items-center justify-center gap-2 text-sm font-semibold text-forest">
