@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownLeft, CheckCircle2, Gift, History, LoaderCircle, RefreshCcw, RotateCcw, TicketCheck, WalletCards } from "lucide-react";
+import { ArrowDownLeft, CheckCircle2, ChevronDown, Gift, History, LoaderCircle, RefreshCcw, RotateCcw, TicketCheck, WalletCards } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CustomerPassCard } from "@/components/customer/customer-pass-card";
@@ -144,11 +144,20 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
 
       <RedemptionRequests config={config} onRedeemed={loadDashboard} />
 
-      <NotificationEmailForm />
-
       <section aria-labelledby="owned-passes-heading">
         <div><p className="eyebrow">Current ownership</p><h2 id="owned-passes-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-ink">Passes held by this wallet</h2></div>
-        <div className="mt-5 flex flex-wrap gap-2" role="tablist" aria-label="Pass status">
+        <div className="relative mt-5 sm:hidden">
+          <select
+            aria-label="Filter passes by status"
+            className="h-12 w-full appearance-none rounded-2xl border border-line bg-white px-4 pr-12 text-sm font-extrabold text-ink shadow-soft outline-none transition focus:border-forest focus:ring-4 focus:ring-forest/10"
+            value={selectedStatus}
+            onChange={(event) => setSelectedStatus(event.target.value as CustomerPassStatusDto)}
+          >
+            {passTabs.map((tab) => <option key={tab.status} value={tab.status}>{tab.label} ({passCounts[tab.status]})</option>)}
+          </select>
+          <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-forest" />
+        </div>
+        <div className="mt-5 hidden flex-wrap gap-2 sm:flex" role="tablist" aria-label="Pass status">
           {passTabs.map((tab) => (
             <button key={tab.status} role="tab" aria-selected={selectedStatus === tab.status} className={`rounded-xl px-4 py-2 text-sm font-bold transition ${selectedStatus === tab.status ? "bg-forest text-white" : "border border-line bg-white text-ink-muted hover:border-forest/30"}`} onClick={() => setSelectedStatus(tab.status)}>{tab.label} <span className="ml-1 opacity-70">{passCounts[tab.status]}</span></button>
           ))}
@@ -170,6 +179,8 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
           <Card className="p-6"><RotateCcw aria-hidden="true" className="size-5 text-forest" /><h3 className="mt-4 font-extrabold text-ink">Refunded passes</h3><ActivityList activity={dashboard.activity} emptyLabel="No retained refund events." kind="Refunded" /></Card>
         </div>
       </section>
+
+      <NotificationEmailForm />
     </div>
   );
 }

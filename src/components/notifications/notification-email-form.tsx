@@ -4,7 +4,6 @@ import { BellRing, CheckCircle2, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useWallet } from "@/components/wallet/wallet-provider";
 import { notificationApi } from "@/features/notifications/api";
@@ -50,19 +49,19 @@ export function NotificationEmailForm() {
   }
 
   return (
-    <Card className="p-6 sm:p-7">
-      <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-mint-soft text-forest"><BellRing aria-hidden="true" className="size-4" /></span>
-        <div><h2 className="font-extrabold text-ink">Essential email notifications</h2><p className="mt-1 text-sm leading-6 text-ink-muted">Optional. Receive purchase, gift, redemption, refund, and sold-out confirmations for this wallet.</p></div>
+    <section aria-labelledby="email-notifications-heading" className="border-t border-line pt-6">
+      <div className="flex items-start gap-2.5">
+        <BellRing aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-ink-faint" />
+        <div><h2 id="email-notifications-heading" className="text-sm font-bold text-ink-muted">Essential email notifications</h2><p className="mt-1 text-xs leading-5 text-ink-faint">Optional preferences for purchase, gift, redemption, refund, and sold-out confirmations.</p></div>
       </div>
-      <form className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={save}>
+      <form className="mt-4 flex max-w-2xl flex-col gap-3 sm:flex-row sm:items-end" onSubmit={save}>
         <Input className="min-w-0 flex-1" label="Notification email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
-        <Button disabled={saving || email === savedEmail} type="submit">
+        <Button disabled={saving || email === savedEmail} type="submit" variant="secondary">
           {saving ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : savedEmail === email && email ? <CheckCircle2 aria-hidden="true" className="size-4" /> : null}
           {savedEmail === email && email ? "Saved" : "Save email"}
         </Button>
       </form>
       {error && <p role="alert" className="mt-3 text-sm font-semibold text-danger">{error}</p>}
-    </Card>
+    </section>
   );
 }

@@ -135,8 +135,6 @@ export function MerchantWorkspace({ config }: { config: StellarConfig }) {
 
       {dashboard.merchant && <RedemptionScanner config={config} />}
 
-      <NotificationEmailForm />
-
       <section aria-labelledby="merchant-profile-heading">
         <Card className="grid overflow-hidden lg:grid-cols-[0.72fr_1.28fr]">
           <div className="bg-ink p-7 text-white sm:p-8">
@@ -187,6 +185,8 @@ export function MerchantWorkspace({ config }: { config: StellarConfig }) {
           </section>
         </>
       )}
+
+      <NotificationEmailForm />
     </div>
   );
 }
