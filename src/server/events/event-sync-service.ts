@@ -1,13 +1,15 @@
 import "server-only";
 
-import type { Campaign } from "@/generated/wrenpass-contract/src";
+import type { Campaign, Pass } from "@/generated/wrenpass-contract/src";
 import { buildNotificationEmail, type EmailService } from "@/server/email/email-service";
 import type { OffchainRepositories } from "@/server/firestore/repositories";
 import { indexedBlockchainEventSchema, notificationSchema, type NotificationType } from "@/server/models";
 import type { WrenPassEvent, WrenPassEventSource } from "@/server/events/event-source";
 
-interface CampaignReader {
+interface LifecycleReader {
   findCampaign(campaignId: bigint): Promise<Campaign | null>;
+  getPassCount(): Promise<bigint>;
+  findPass(passId: bigint): Promise<Pass | null>;
 }
 
 interface NotificationTarget {
@@ -21,6 +23,9 @@ export interface EventSyncResult {
   notificationsSent: number;
   notificationFailures: number;
 }
+
+const EXPIRATION_NOTICE_WINDOW_SECONDS = BigInt(7 * 24 * 60 * 60);
+const MAX_EXPIRATION_PASS_READS = BigInt(2_000);
 
 function notificationTargets(event: WrenPassEvent): NotificationTarget[] {
   if (event.eventType === "pass_purchased" && event.customer) {
@@ -69,11 +74,46 @@ export class EventSyncService {
   constructor(
     private readonly source: WrenPassEventSource,
     private readonly repositories: OffchainRepositories,
-    private readonly campaigns: CampaignReader,
+    private readonly lifecycle: LifecycleReader,
     private readonly email: Pick<EmailService, "send">,
     private readonly contractId: string,
     private readonly now: () => Date = () => new Date(),
   ) {}
+
+  private async deliverExpirationNotices(result: EventSyncResult): Promise<void> {
+    const passCount = await this.lifecycle.getPassCount();
+    if (passCount > MAX_EXPIRATION_PASS_READS) {
+      throw new Error("Expiration notification scan exceeded its safe direct-read limit.");
+    }
+
+    const nowEpochSeconds = BigInt(Math.floor(this.now().getTime() / 1_000));
+    const campaigns = new Map<string, Campaign | null>();
+    for (let passId = BigInt(1); passId <= passCount; passId += BigInt(1)) {
+      const pass = await this.lifecycle.findPass(passId);
+      if (!pass || pass.status.tag !== "Active") continue;
+
+      const campaignId = pass.campaign_id.toString();
+      if (!campaigns.has(campaignId)) {
+        campaigns.set(campaignId, await this.lifecycle.findCampaign(pass.campaign_id));
+      }
+      const campaign = campaigns.get(campaignId);
+      if (
+        !campaign ||
+        campaign.expires_at <= nowEpochSeconds ||
+        campaign.expires_at > nowEpochSeconds + EXPIRATION_NOTICE_WINDOW_SECONDS
+      ) {
+        continue;
+      }
+
+      const delivery = await this.deliver(
+        `expiring-${pass.id.toString()}-${campaign.expires_at.toString()}`,
+        pass.id.toString(),
+        { walletAddress: pass.owner, type: "pass_nearing_expiration" },
+      );
+      if (delivery === "sent") result.notificationsSent += 1;
+      if (delivery === "failed") result.notificationFailures += 1;
+    }
+  }
 
   private async deliver(
     eventId: string,
@@ -156,7 +196,7 @@ export class EventSyncService {
       }
 
       if (event.eventType === "pass_purchased") {
-        const campaign = await this.campaigns.findCampaign(BigInt(event.campaignId));
+        const campaign = await this.lifecycle.findCampaign(BigInt(event.campaignId));
         if (campaign && campaign.sold === campaign.max_supply) {
           const soldOutId = `sold-out-${event.campaignId}`;
           if (!(await this.repositories.indexedBlockchainEvents.findById(soldOutId))) {
@@ -183,6 +223,7 @@ export class EventSyncService {
         }
       }
     }
+    await this.deliverExpirationNotices(result);
     return result;
   }
 }
