@@ -1,7 +1,10 @@
 import { nativeToScVal, rpc, xdr } from "@stellar/stellar-sdk";
 import { describe, expect, it } from "vitest";
 
-import { decodeCustomerActivity } from "@/server/stellar/customer-chain-reader";
+import {
+  decodeCustomerActivity,
+  toRpcEventContractId,
+} from "@/server/stellar/customer-chain-reader";
 import { testCustomerAddress, testRecipientAddress } from "@/test/fixtures/customer";
 
 function mapValue(values: Record<string, xdr.ScVal>): xdr.ScVal {
@@ -39,6 +42,12 @@ function event(
 }
 
 describe("decodeCustomerActivity", () => {
+  it("converts a StrKey contract address to the hex ID required by the installed RPC client", () => {
+    expect(
+      toRpcEventContractId("CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D"),
+    ).toBe("0b546903c160a0dab0fd7c9412923fb67b55f2d601530256f428a0eb80079bff");
+  });
+
   it("decodes purchases and outgoing gifts for the authenticated wallet", () => {
     const events = [
       event(

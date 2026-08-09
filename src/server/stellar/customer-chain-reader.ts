@@ -1,6 +1,6 @@
 import "server-only";
 
-import { rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
+import { rpc, scValToNative, StrKey, xdr } from "@stellar/stellar-sdk";
 import type { Pass } from "@/generated/wrenpass-contract/src";
 import type { CustomerActivityDto } from "@/features/customer/dto";
 import type { StellarConfig } from "@/lib/stellar/config";
@@ -22,6 +22,10 @@ export interface CustomerChainReader {
 
 function eventTopic(name: string): string {
   return xdr.ScVal.scvSymbol(name).toXDR("base64");
+}
+
+export function toRpcEventContractId(contractId: string): string {
+  return StrKey.decodeContract(contractId).toString("hex");
 }
 
 function toBigInt(value: unknown): bigint | null {
@@ -133,7 +137,7 @@ export class StellarCustomerChainReader implements CustomerChainReader {
       filters: [
         {
           type: "contract",
-          contractIds: [this.config.wrenPassContractId],
+          contractIds: [toRpcEventContractId(this.config.wrenPassContractId)],
           topics: [
             [eventTopic("pass_purchased"), "**"],
             [eventTopic("pass_gifted"), "**"],
