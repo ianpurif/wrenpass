@@ -146,16 +146,23 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
 
       <section aria-labelledby="owned-passes-heading">
         <div><p className="eyebrow">Current ownership</p><h2 id="owned-passes-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-ink">Passes held by this wallet</h2></div>
-        <div className="relative mt-5 sm:hidden">
-          <select
-            aria-label="Filter passes by status"
-            className="h-12 w-full appearance-none rounded-2xl border border-line bg-white px-4 pr-12 text-sm font-extrabold text-ink shadow-soft outline-none transition focus:border-forest focus:ring-4 focus:ring-forest/10"
-            value={selectedStatus}
-            onChange={(event) => setSelectedStatus(event.target.value as CustomerPassStatusDto)}
-          >
-            {passTabs.map((tab) => <option key={tab.status} value={tab.status}>{tab.label} ({passCounts[tab.status]})</option>)}
-          </select>
-          <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-forest" />
+        <div className="mt-5 min-w-0 sm:hidden">
+          <label className="block text-xs font-bold uppercase tracking-[0.12em] text-ink-muted" htmlFor="mobile-pass-status">
+            Show passes
+          </label>
+          <div className="relative mt-2 min-w-0">
+            <select
+              id="mobile-pass-status"
+              className="block h-14 w-full min-w-0 touch-manipulation appearance-none rounded-2xl border border-line bg-white py-0 pl-4 pr-14 text-base font-bold text-ink shadow-sm outline-none transition focus:border-forest focus:ring-4 focus:ring-forest/10 active:bg-sage-soft"
+              value={selectedStatus}
+              onChange={(event) => setSelectedStatus(event.target.value as CustomerPassStatusDto)}
+            >
+              {passTabs.map((tab) => <option key={tab.status} value={tab.status}>{tab.label} passes ({passCounts[tab.status]})</option>)}
+            </select>
+            <span className="pointer-events-none absolute right-3 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-xl bg-sage-soft text-forest">
+              <ChevronDown aria-hidden="true" className="size-4" />
+            </span>
+          </div>
         </div>
         <div className="mt-5 hidden flex-wrap gap-2 sm:flex" role="tablist" aria-label="Pass status">
           {passTabs.map((tab) => (
