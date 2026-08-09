@@ -1,13 +1,5 @@
-import { MerchantWorkspace } from "@/components/merchant/merchant-workspace";
-import { Container } from "@/components/ui/container";
-import { getStellarConfig } from "@/lib/stellar/config";
+import { MerchantPageShell } from "@/components/merchant/merchant-page-shell";
 
 export default function MerchantPage() {
-  return (
-    <main id="main-content" className="py-10 sm:py-14">
-      <Container>
-        <MerchantWorkspace config={getStellarConfig()} />
-      </Container>
-    </main>
-  );
+  return <MerchantPageShell page="overview" />;
 }
