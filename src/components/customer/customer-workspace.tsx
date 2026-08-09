@@ -134,7 +134,7 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
   const visiblePasses = dashboard.passes.filter((pass) => pass.status === selectedStatus);
 
   return (
-    <div className="grid gap-8">
+    <div className="grid min-w-0 max-w-full gap-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div><p className="eyebrow">Customer passes</p><h1 className="mt-3 text-3xl font-extrabold tracking-[-0.035em] text-ink sm:text-4xl">Your WrenPass wallet</h1><p className="mt-2 text-sm font-semibold text-ink-muted">{shortenStellarAddress(address)} · {config.network === "testnet" ? "Stellar Testnet" : "Stellar Mainnet"}</p></div>
         <Button disabled={loading} size="sm" variant="secondary" onClick={() => void loadDashboard()}>{loading ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <RefreshCcw aria-hidden="true" className="size-4" />}Refresh on-chain data</Button>
@@ -144,16 +144,16 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
 
       <RedemptionRequests config={config} onRedeemed={loadDashboard} />
 
-      <section aria-labelledby="owned-passes-heading">
+      <section aria-labelledby="owned-passes-heading" className="min-w-0 max-w-full">
         <div><p className="eyebrow">Current ownership</p><h2 id="owned-passes-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-ink">Passes held by this wallet</h2></div>
-        <div className="mt-5 min-w-0 sm:hidden">
+        <div className="mt-5 w-full min-w-0 max-w-full overflow-hidden sm:hidden">
           <label className="block text-xs font-bold uppercase tracking-[0.12em] text-ink-muted" htmlFor="mobile-pass-status">
             Show passes
           </label>
-          <div className="relative mt-2 min-w-0">
+          <div className="relative mt-2 w-full min-w-0 max-w-full overflow-hidden">
             <select
               id="mobile-pass-status"
-              className="block h-14 w-full min-w-0 touch-manipulation appearance-none rounded-2xl border border-line bg-white py-0 pl-4 pr-14 text-base font-bold text-ink shadow-sm outline-none transition focus:border-forest focus:ring-4 focus:ring-forest/10 active:bg-sage-soft"
+              className="block h-14 w-full min-w-0 max-w-full touch-manipulation appearance-none truncate rounded-2xl border border-line bg-white py-0 pl-4 pr-14 text-base font-bold text-ink shadow-sm outline-none transition focus:border-forest focus:ring-4 focus:ring-forest/10 active:bg-sage-soft"
               value={selectedStatus}
               onChange={(event) => setSelectedStatus(event.target.value as CustomerPassStatusDto)}
             >
