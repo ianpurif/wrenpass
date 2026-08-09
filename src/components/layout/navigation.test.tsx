@@ -8,10 +8,6 @@ vi.mock("@/components/wallet/wallet-button", () => ({
   WalletButton: () => <button type="button">Connect Freighter</button>,
 }));
 
-vi.mock("@/components/wallet/wallet-balance-strip", () => ({
-  WalletBalanceStrip: () => null,
-}));
-
 describe("Navigation", () => {
   it("toggles the mobile menu with an accessible button", async () => {
     const user = userEvent.setup();

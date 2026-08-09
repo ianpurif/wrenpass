@@ -10,7 +10,6 @@ import {
   type WalletApi,
   type WalletAdapter,
 } from "@/components/wallet/wallet-provider";
-import { WalletBalanceStrip } from "@/components/wallet/wallet-balance-strip";
 
 const address = "GCLNZP3WX3GG4D2HC3L2VVXNYBSVHO2OPGGTDQ4YGBQOUXHHTM3FSBNH";
 const config: StellarConfig = {
@@ -62,7 +61,6 @@ function renderWallet(adapter: WalletAdapter, api: WalletApi) {
   return render(
     <WalletProvider config={config} adapter={adapter} api={api}>
       <WalletButton />
-      <WalletBalanceStrip />
     </WalletProvider>,
   );
 }
@@ -76,17 +74,21 @@ describe("WalletProvider", () => {
 
     await user.click(await screen.findByRole("button", { name: "Connect Freighter" }));
 
-    const disconnectButton = await screen.findByRole("button", { name: /Disconnect wallet/i });
-    expect(disconnectButton).toHaveTextContent(
+    const walletMenuButton = await screen.findByRole("button", { name: /Open wallet menu/i });
+    expect(walletMenuButton).toHaveTextContent(
       `${address.slice(0, 4)}…${address.slice(-4)}`,
     );
+    const revokeCallsAfterConnect = vi.mocked(api.revokeSession).mock.calls.length;
+    await user.click(walletMenuButton);
+    expect(screen.getByRole("dialog", { name: "Wallet details" })).toBeVisible();
     const balanceRegion = screen.getByRole("region", { name: "Wallet balances" });
     expect(balanceRegion).toHaveTextContent("12.5000000 XLM");
     expect(balanceRegion).toHaveTextContent("6.0000000 USDC");
     expect(api.createChallenge).toHaveBeenCalledWith(address);
     expect(adapter.signMessage).toHaveBeenCalledWith("Sign in", address, Networks.TESTNET);
 
-    await user.click(disconnectButton);
+    expect(api.revokeSession).toHaveBeenCalledTimes(revokeCallsAfterConnect);
+    await user.click(screen.getByRole("button", { name: "Disconnect Wallet" }));
     expect(await screen.findByRole("button", { name: "Connect Freighter" })).toBeInTheDocument();
     expect(api.revokeSession).toHaveBeenCalled();
     expect(adapter.disconnect).toHaveBeenCalled();
@@ -103,7 +105,7 @@ describe("WalletProvider", () => {
     });
     renderWallet(adapter, api);
 
-    expect(await screen.findByRole("button", { name: /Disconnect wallet/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Open wallet menu/i })).toBeInTheDocument();
     expect(api.readBalances).toHaveBeenCalledWith(address);
   });
 
@@ -150,7 +152,8 @@ describe("WalletProvider", () => {
     });
     renderWallet(adapter, api);
 
-    const balanceRegion = await screen.findByRole("region", { name: "Wallet balances" });
+    await userEvent.setup().click(await screen.findByRole("button", { name: /Open wallet menu/i }));
+    const balanceRegion = screen.getByRole("region", { name: "Wallet balances" });
     expect(balanceRegion).toHaveTextContent("USDC not added");
     expect(balanceRegion).not.toHaveTextContent("0.0000000 USDC");
   });

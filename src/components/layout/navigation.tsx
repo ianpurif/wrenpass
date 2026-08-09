@@ -8,7 +8,6 @@ import { useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/layout/logo";
 import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
-import { WalletBalanceStrip } from "@/components/wallet/wallet-balance-strip";
 import { WalletButton } from "@/components/wallet/wallet-button";
 
 const navItems = [
@@ -33,12 +32,12 @@ export function Navigation() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-line/80 bg-canvas/90 backdrop-blur-lg">
-      <Container className="flex min-w-0 h-18 items-center justify-between gap-4">
+      <Container className="flex h-18 min-w-0 items-center justify-between gap-4">
         <Link href="/" aria-label="WrenPass home">
           <Logo />
         </Link>
 
-        <nav aria-label="Primary navigation" className="hidden items-center gap-1 lg:flex">
+        <nav aria-label="Primary navigation" className="hidden items-center gap-1 md:flex">
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -50,8 +49,7 @@ export function Navigation() {
           ))}
         </nav>
 
-        <div className="hidden min-w-0 items-center gap-3 lg:flex">
-          <WalletBalanceStrip />
+        <div className="hidden md:block">
           <WalletButton />
         </div>
 
@@ -61,21 +59,19 @@ export function Navigation() {
           aria-controls="mobile-navigation"
           aria-expanded={menuOpen}
           aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
-          className="grid size-11 shrink-0 place-items-center rounded-xl text-ink transition hover:bg-sage-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest lg:hidden"
+          className="grid size-11 shrink-0 place-items-center rounded-xl text-ink transition hover:bg-sage-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest md:hidden"
           onClick={() => setMenuOpen((current) => !current)}
         >
           {menuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
       </button>
       </Container>
 
-      <WalletBalanceStrip className="w-full border-t border-line/80 bg-canvas/90 px-5 py-2 backdrop-blur-lg lg:hidden" />
-
       <AnimatePresence>
         {menuOpen && (
           <motion.nav
             id="mobile-navigation"
             aria-label="Mobile navigation"
-            className="border-t border-line bg-canvas px-5 pb-5 pt-3 lg:hidden"
+            className="border-t border-line bg-canvas px-5 pb-5 pt-3 md:hidden"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
