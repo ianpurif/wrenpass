@@ -1,9 +1,9 @@
 import { nativeToScVal, rpc, xdr } from "@stellar/stellar-sdk";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   decodeCustomerActivity,
-  toRpcEventContractId,
+  readEventPages,
 } from "@/server/stellar/customer-chain-reader";
 import { testCustomerAddress, testRecipientAddress } from "@/test/fixtures/customer";
 
@@ -42,12 +42,6 @@ function event(
 }
 
 describe("decodeCustomerActivity", () => {
-  it("converts a StrKey contract address to the hex ID required by the installed RPC client", () => {
-    expect(
-      toRpcEventContractId("CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D"),
-    ).toBe("0b546903c160a0dab0fd7c9412923fb67b55f2d601530256f428a0eb80079bff");
-  });
-
   it("decodes purchases and outgoing gifts for the authenticated wallet", () => {
     const events = [
       event(
@@ -83,5 +77,49 @@ describe("decodeCustomerActivity", () => {
     expect(decodeCustomerActivity(events, testCustomerAddress)).toEqual([
       expect.objectContaining({ id: "received", kind: "Received", counterparty: testRecipientAddress }),
     ]);
+  });
+});
+
+describe("readEventPages", () => {
+  it("continues across empty RPC scan pages and deduplicates boundary events", async () => {
+    const purchased = event(
+      "pass_purchased",
+      testCustomerAddress,
+      mapValue({ total: nativeToScVal(BigInt(50_000_000), { type: "i128" }) }),
+      "purchase",
+    );
+    const getEvents = vi
+      .fn()
+      .mockResolvedValueOnce({
+        cursor: "page-1",
+        events: [],
+        oldestLedgerCloseTime: "2026-08-01T00:00:00Z",
+      })
+      .mockResolvedValueOnce({
+        cursor: "page-2",
+        events: [purchased],
+        oldestLedgerCloseTime: "2026-08-01T00:00:00Z",
+      })
+      .mockResolvedValueOnce({
+        cursor: "page-2",
+        events: [purchased],
+        oldestLedgerCloseTime: "2026-08-01T00:00:00Z",
+      });
+
+    await expect(
+      readEventPages(
+        { getEvents },
+        { startLedger: 1, filters: [], limit: 10_000 },
+      ),
+    ).resolves.toEqual({
+      events: [purchased],
+      oldestLedgerCloseTime: "2026-08-01T00:00:00Z",
+    });
+    expect(getEvents).toHaveBeenCalledTimes(3);
+    expect(getEvents).toHaveBeenLastCalledWith({
+      cursor: "page-2",
+      filters: [],
+      limit: 10_000,
+    });
   });
 });

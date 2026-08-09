@@ -1,6 +1,6 @@
 import "server-only";
 
-import { rpc, scValToNative, StrKey, xdr } from "@stellar/stellar-sdk";
+import { rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
 import type { Pass } from "@/generated/wrenpass-contract/src";
 import type { CustomerActivityDto } from "@/features/customer/dto";
 import type { StellarConfig } from "@/lib/stellar/config";
@@ -14,6 +14,18 @@ interface ActivityWindow {
   startsAt: string;
 }
 
+interface EventPage {
+  cursor: string;
+  events: rpc.Api.EventResponse[];
+  oldestLedgerCloseTime: string;
+}
+
+interface EventPageReader {
+  getEvents(request: rpc.Api.GetEventsRequest): Promise<EventPage>;
+}
+
+const MAX_EVENT_PAGES = 25;
+
 export interface CustomerChainReader {
   getPassCount(): Promise<bigint>;
   findPass(passId: bigint): Promise<Pass | null>;
@@ -24,8 +36,28 @@ function eventTopic(name: string): string {
   return xdr.ScVal.scvSymbol(name).toXDR("base64");
 }
 
-export function toRpcEventContractId(contractId: string): string {
-  return StrKey.decodeContract(contractId).toString("hex");
+export async function readEventPages(
+  reader: EventPageReader,
+  request: Extract<rpc.Api.GetEventsRequest, { startLedger: number }>,
+): Promise<{ events: rpc.Api.EventResponse[]; oldestLedgerCloseTime: string }> {
+  let page = await reader.getEvents(request);
+  const oldestLedgerCloseTime = page.oldestLedgerCloseTime;
+  const eventsById = new Map(page.events.map((event) => [event.id, event]));
+
+  for (let pageNumber = 1; pageNumber <= MAX_EVENT_PAGES; pageNumber += 1) {
+    const previousCursor = page.cursor;
+    page = await reader.getEvents({
+      cursor: previousCursor,
+      filters: request.filters,
+      limit: request.limit,
+    });
+    for (const event of page.events) eventsById.set(event.id, event);
+    if (page.cursor === previousCursor) {
+      return { events: [...eventsById.values()], oldestLedgerCloseTime };
+    }
+  }
+
+  throw new Error("Stellar RPC event pagination exceeded the safe page limit.");
 }
 
 function toBigInt(value: unknown): bigint | null {
@@ -132,12 +164,12 @@ export class StellarCustomerChainReader implements CustomerChainReader {
     const health = await this.server.getHealth();
     const safeRetentionWindow = Math.max(1, health.ledgerRetentionWindow - 100);
     const startLedger = Math.max(1, health.latestLedger - safeRetentionWindow);
-    const response = await this.server.getEvents({
+    const response = await readEventPages(this.server, {
       startLedger,
       filters: [
         {
           type: "contract",
-          contractIds: [toRpcEventContractId(this.config.wrenPassContractId)],
+          contractIds: [this.config.wrenPassContractId],
           topics: [
             [eventTopic("pass_purchased"), "**"],
             [eventTopic("pass_gifted"), "**"],
