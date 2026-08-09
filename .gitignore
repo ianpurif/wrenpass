@@ -8,6 +8,11 @@ out/
 # testing
 coverage/
 
+# Rust and Soroban build output
+contracts/target/
+contracts/wasm/
+contracts/**/test_snapshots/
+
 # local environment files
 .env*
 !.env.example
@@ -23,4 +28,3 @@ yarn-error.log*
 Thumbs.db
 *.tsbuildinfo
 next-env.d.ts
-

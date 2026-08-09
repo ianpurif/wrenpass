@@ -1581,3 +1581,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Repository validation commands
+
+- `pnpm contract:fmt` checks Rust formatting.
+- `pnpm contract:clippy` treats Rust lint warnings as errors.
+- `pnpm contract:test` runs the local Soroban contract suite.
+- `pnpm contract:build` builds the deployable Wasm without network access.
+- Run `pnpm typecheck` and `pnpm build` sequentially because both use generated Next.js types.
