@@ -26,6 +26,10 @@ pub enum Error {
     InvalidConfiguration = 12,
     SoldOut = 13,
     InsufficientBalance = 14,
+    PassNotActive = 15,
+    PassExpired = 16,
+    RefundNotAvailable = 17,
+    InvalidRecipient = 18,
 }
 
 #[contracttype]
@@ -35,6 +39,7 @@ pub enum CampaignStatus {
     Active,
     Paused,
     Expired,
+    Cancelled,
 }
 
 #[contracttype]
@@ -92,9 +97,12 @@ pub struct Campaign {
     pub max_supply: u32,
     pub sold: u32,
     pub redeemed: u32,
+    pub refunded: u32,
     pub merchant_released: i128,
     pub protected_funds: i128,
     pub platform_fees_paid: i128,
+    pub cancellation_shortfall: i128,
+    pub cancellation_funds: i128,
     pub expires_at: u64,
     pub financial_rules: FinancialRules,
     pub status: CampaignStatus,
@@ -109,6 +117,7 @@ pub struct Pass {
     pub owner: Address,
     pub status: PassStatus,
     pub purchased_at: u64,
+    pub purchase_amounts: PurchaseAmounts,
 }
 
 #[contracttype]
@@ -159,6 +168,54 @@ pub struct PassPurchased {
     pub merchant_release: i128,
     pub protected_reserve: i128,
     pub platform_fee: i128,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contractevent(topics = ["pass_gifted"])]
+pub struct PassGifted {
+    #[topic]
+    pub campaign_id: u64,
+    #[topic]
+    pub pass_id: u64,
+    #[topic]
+    pub previous_owner: Address,
+    pub recipient: Address,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contractevent(topics = ["pass_redeemed"])]
+pub struct PassRedeemed {
+    #[topic]
+    pub campaign_id: u64,
+    #[topic]
+    pub pass_id: u64,
+    #[topic]
+    pub owner: Address,
+    pub merchant: Address,
+    pub reserve_released: i128,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contractevent(topics = ["pass_refunded"])]
+pub struct PassRefunded {
+    #[topic]
+    pub campaign_id: u64,
+    #[topic]
+    pub pass_id: u64,
+    #[topic]
+    pub owner: Address,
+    pub amount: i128,
+    pub full_refund: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contractevent(topics = ["campaign_cancelled"])]
+pub struct CampaignCancelled {
+    #[topic]
+    pub campaign_id: u64,
+    #[topic]
+    pub merchant: Address,
+    pub replenished: i128,
 }
 
 #[contract]
@@ -218,9 +275,12 @@ impl WrenPassContract {
             max_supply: terms.max_supply,
             sold: 0,
             redeemed: 0,
+            refunded: 0,
             merchant_released: 0,
             protected_funds: 0,
             platform_fees_paid: 0,
+            cancellation_shortfall: 0,
+            cancellation_funds: 0,
             expires_at: terms.expires_at,
             financial_rules: terms.financial_rules.clone(),
             status: CampaignStatus::Draft,
@@ -316,6 +376,10 @@ impl WrenPassContract {
             .platform_fees_paid
             .checked_add(amounts.platform_fee)
             .ok_or(Error::Overflow)?;
+        campaign.cancellation_shortfall = campaign
+            .cancellation_shortfall
+            .checked_add(Self::released_portion(&amounts)?)
+            .ok_or(Error::Overflow)?;
 
         let pass = Pass {
             id: pass_id,
@@ -323,6 +387,7 @@ impl WrenPassContract {
             owner: customer.clone(),
             status: PassStatus::Active,
             purchased_at: env.ledger().timestamp(),
+            purchase_amounts: amounts.clone(),
         };
         Self::save_campaign(&env, &campaign);
         env.storage().instance().set(&DataKey::PassCount, &pass_id);
@@ -363,8 +428,234 @@ impl WrenPassContract {
         Ok(pass_id)
     }
 
+    pub fn gift_pass(
+        env: Env,
+        pass_id: u64,
+        owner: Address,
+        recipient: Address,
+    ) -> Result<(), Error> {
+        let mut pass = Self::load_pass(&env, pass_id)?;
+        if pass.status != PassStatus::Active {
+            return Err(Error::PassNotActive);
+        }
+        if pass.owner != owner {
+            return Err(Error::Unauthorized);
+        }
+        if owner == recipient {
+            return Err(Error::InvalidRecipient);
+        }
+
+        let campaign = Self::load_campaign(&env, pass.campaign_id)?;
+        match Self::effective_status(&env, &campaign) {
+            CampaignStatus::Cancelled => return Err(Error::InvalidState),
+            CampaignStatus::Expired => return Err(Error::PassExpired),
+            _ => {}
+        }
+
+        owner.require_auth();
+        pass.owner = recipient.clone();
+        Self::save_pass(&env, &pass);
+
+        PassGifted {
+            campaign_id: pass.campaign_id,
+            pass_id,
+            previous_owner: owner,
+            recipient,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn redeem_pass(
+        env: Env,
+        pass_id: u64,
+        merchant: Address,
+        owner: Address,
+    ) -> Result<(), Error> {
+        let mut pass = Self::load_pass(&env, pass_id)?;
+        if pass.status != PassStatus::Active {
+            return Err(Error::PassNotActive);
+        }
+        if pass.owner != owner {
+            return Err(Error::Unauthorized);
+        }
+
+        let mut campaign = Self::load_campaign(&env, pass.campaign_id)?;
+        if campaign.merchant != merchant {
+            return Err(Error::Unauthorized);
+        }
+        match Self::effective_status(&env, &campaign) {
+            CampaignStatus::Cancelled => return Err(Error::InvalidState),
+            CampaignStatus::Expired => return Err(Error::PassExpired),
+            _ => {}
+        }
+
+        let contract_address = env.current_contract_address();
+        let token = TokenClient::new(&env, &campaign.payment_asset);
+        let reserve = pass.purchase_amounts.protected_reserve;
+        if token.balance(&contract_address) < reserve {
+            return Err(Error::InsufficientBalance);
+        }
+
+        merchant.require_auth();
+        if owner != merchant {
+            owner.require_auth();
+        }
+
+        let released = Self::released_portion(&pass.purchase_amounts)?;
+        campaign.redeemed = campaign.redeemed.checked_add(1).ok_or(Error::Overflow)?;
+        campaign.merchant_released = campaign
+            .merchant_released
+            .checked_add(reserve)
+            .ok_or(Error::Overflow)?;
+        campaign.protected_funds = campaign
+            .protected_funds
+            .checked_sub(reserve)
+            .ok_or(Error::Overflow)?;
+        campaign.cancellation_shortfall = campaign
+            .cancellation_shortfall
+            .checked_sub(released)
+            .ok_or(Error::Overflow)?;
+        pass.status = PassStatus::Redeemed;
+        Self::save_campaign(&env, &campaign);
+        Self::save_pass(&env, &pass);
+
+        token.transfer(
+            &contract_address,
+            MuxedAddress::from(&campaign.merchant),
+            &reserve,
+        );
+
+        PassRedeemed {
+            campaign_id: pass.campaign_id,
+            pass_id,
+            owner,
+            merchant,
+            reserve_released: reserve,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn refund_pass(env: Env, pass_id: u64, owner: Address) -> Result<i128, Error> {
+        let mut pass = Self::load_pass(&env, pass_id)?;
+        if pass.status != PassStatus::Active {
+            return Err(Error::PassNotActive);
+        }
+        if pass.owner != owner {
+            return Err(Error::Unauthorized);
+        }
+
+        let mut campaign = Self::load_campaign(&env, pass.campaign_id)?;
+        let full_refund = campaign.status == CampaignStatus::Cancelled;
+        let refund_amount = if full_refund {
+            pass.purchase_amounts.total
+        } else if env.ledger().timestamp() >= campaign.expires_at {
+            pass.purchase_amounts.protected_reserve
+        } else {
+            return Err(Error::RefundNotAvailable);
+        };
+
+        let contract_address = env.current_contract_address();
+        let token = TokenClient::new(&env, &campaign.payment_asset);
+        if token.balance(&contract_address) < refund_amount {
+            return Err(Error::InsufficientBalance);
+        }
+
+        owner.require_auth();
+        let released = Self::released_portion(&pass.purchase_amounts)?;
+        campaign.refunded = campaign.refunded.checked_add(1).ok_or(Error::Overflow)?;
+        campaign.protected_funds = campaign
+            .protected_funds
+            .checked_sub(pass.purchase_amounts.protected_reserve)
+            .ok_or(Error::Overflow)?;
+        campaign.cancellation_shortfall = campaign
+            .cancellation_shortfall
+            .checked_sub(released)
+            .ok_or(Error::Overflow)?;
+        if full_refund {
+            campaign.cancellation_funds = campaign
+                .cancellation_funds
+                .checked_sub(released)
+                .ok_or(Error::Overflow)?;
+        }
+        pass.status = PassStatus::Refunded;
+        Self::save_campaign(&env, &campaign);
+        Self::save_pass(&env, &pass);
+
+        token.transfer(
+            &contract_address,
+            MuxedAddress::from(&owner),
+            &refund_amount,
+        );
+
+        PassRefunded {
+            campaign_id: pass.campaign_id,
+            pass_id,
+            owner,
+            amount: refund_amount,
+            full_refund,
+        }
+        .publish(&env);
+        Ok(refund_amount)
+    }
+
+    pub fn cancel_campaign(env: Env, campaign_id: u64, merchant: Address) -> Result<i128, Error> {
+        let mut campaign = Self::load_campaign(&env, campaign_id)?;
+        if campaign.merchant != merchant {
+            return Err(Error::Unauthorized);
+        }
+        if Self::effective_status(&env, &campaign) == CampaignStatus::Expired {
+            return Err(Error::CampaignExpired);
+        }
+        match campaign.status {
+            CampaignStatus::Draft | CampaignStatus::Active | CampaignStatus::Paused => {}
+            _ => return Err(Error::InvalidState),
+        }
+
+        let replenished = campaign.cancellation_shortfall;
+        let token = TokenClient::new(&env, &campaign.payment_asset);
+        if replenished > 0 && token.balance(&merchant) < replenished {
+            return Err(Error::InsufficientBalance);
+        }
+
+        merchant.require_auth();
+        campaign.status = CampaignStatus::Cancelled;
+        campaign.cancellation_funds = campaign
+            .cancellation_funds
+            .checked_add(replenished)
+            .ok_or(Error::Overflow)?;
+        Self::save_campaign(&env, &campaign);
+
+        if replenished > 0 {
+            token.transfer(
+                &merchant,
+                MuxedAddress::from(&env.current_contract_address()),
+                &replenished,
+            );
+        }
+
+        CampaignCancelled {
+            campaign_id,
+            merchant,
+            replenished,
+        }
+        .publish(&env);
+        Ok(replenished)
+    }
+
     pub fn get_pass(env: Env, pass_id: u64) -> Option<Pass> {
-        env.storage().persistent().get(&DataKey::Pass(pass_id))
+        let mut pass = Self::load_pass(&env, pass_id).ok()?;
+        if pass.status == PassStatus::Active {
+            if let Ok(campaign) = Self::load_campaign(&env, pass.campaign_id) {
+                if campaign.status != CampaignStatus::Cancelled
+                    && env.ledger().timestamp() >= campaign.expires_at
+                {
+                    pass.status = PassStatus::Expired;
+                }
+            }
+        }
+        Some(pass)
     }
 
     pub fn pass_count(env: Env) -> u64 {
@@ -424,6 +715,19 @@ impl WrenPassContract {
         env.storage()
             .persistent()
             .set(&DataKey::Campaign(campaign.id), campaign);
+    }
+
+    fn load_pass(env: &Env, pass_id: u64) -> Result<Pass, Error> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Pass(pass_id))
+            .ok_or(Error::NotFound)
+    }
+
+    fn save_pass(env: &Env, pass: &Pass) {
+        env.storage()
+            .persistent()
+            .set(&DataKey::Pass(pass.id), pass);
     }
 
     fn validate_terms(env: &Env, terms: &CampaignTerms) -> Result<(), Error> {
@@ -498,8 +802,17 @@ impl WrenPassContract {
         })
     }
 
+    fn released_portion(amounts: &PurchaseAmounts) -> Result<i128, Error> {
+        amounts
+            .merchant_release
+            .checked_add(amounts.platform_fee)
+            .ok_or(Error::Overflow)
+    }
+
     fn effective_status(env: &Env, campaign: &Campaign) -> CampaignStatus {
-        if env.ledger().timestamp() >= campaign.expires_at {
+        if campaign.status == CampaignStatus::Cancelled {
+            CampaignStatus::Cancelled
+        } else if env.ledger().timestamp() >= campaign.expires_at {
             CampaignStatus::Expired
         } else {
             campaign.status.clone()

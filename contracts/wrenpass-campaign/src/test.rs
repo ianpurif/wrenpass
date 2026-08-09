@@ -8,7 +8,7 @@ use soroban_sdk::{
         MockAuthInvoke,
     },
     token::{StellarAssetClient, TokenClient},
-    Address, Env, Event, IntoVal, MuxedAddress,
+    Address, Env, Event, IntoVal, MuxedAddress, Symbol,
 };
 
 const NOW: u64 = 1_000_000;
@@ -165,9 +165,12 @@ fn creates_campaign_with_unique_id_fixed_supply_and_event() {
     assert_eq!(campaign.max_supply, 100);
     assert_eq!(campaign.sold, 0);
     assert_eq!(campaign.redeemed, 0);
+    assert_eq!(campaign.refunded, 0);
     assert_eq!(campaign.merchant_released, 0);
     assert_eq!(campaign.protected_funds, 0);
     assert_eq!(campaign.platform_fees_paid, 0);
+    assert_eq!(campaign.cancellation_shortfall, 0);
+    assert_eq!(campaign.cancellation_funds, 0);
     assert_eq!(campaign.status, CampaignStatus::Draft);
     assert_eq!(client.remaining_supply(&first_id), 100);
 }
@@ -580,8 +583,16 @@ fn purchase_moves_configured_asset_assigns_pass_and_emits_event() {
             owner: customer.clone(),
             status: PassStatus::Active,
             purchased_at: NOW,
+            purchase_amounts: PurchaseAmounts {
+                total: price,
+                merchant_release: 37_500_000,
+                protected_reserve: 10_000_000,
+                platform_fee: 2_500_000,
+            },
         })
     );
+    assert_eq!(campaign.cancellation_shortfall, 40_000_000);
+    assert_eq!(campaign.cancellation_funds, 0);
 }
 
 #[test]
@@ -730,4 +741,480 @@ fn rejects_pass_id_overflow_before_moving_funds() {
     );
     assert_eq!(token.balance(&customer), price);
     assert_eq!(client.get_campaign(&campaign_id).unwrap().sold, 0);
+}
+
+fn mint_and_purchase(
+    env: &Env,
+    client: &WrenPassContractClient,
+    payment_asset: &Address,
+    campaign_id: u64,
+    customer: &Address,
+) -> u64 {
+    StellarAssetClient::new(env, payment_asset).mint(customer, &default_terms().pass_price);
+    client.purchase(&campaign_id, customer)
+}
+
+#[test]
+fn gifts_an_active_pass_without_creating_another_pass() {
+    let (env, contract_id, client, _platform, payment_asset, _merchant, owner, campaign_id) =
+        active_campaign(2);
+    let recipient = Address::generate(&env);
+    let pass_id = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+
+    client.gift_pass(&pass_id, &owner, &recipient);
+    let auths = env.auths();
+    let events = env.events().all().filter_by_contract(&contract_id);
+
+    assert_eq!(client.pass_count(), 1);
+    assert_eq!(client.get_pass(&pass_id).unwrap().owner, recipient.clone());
+    assert_eq!(
+        auths,
+        std::vec![(
+            owner.clone(),
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    contract_id.clone(),
+                    symbol_short!("gift_pass"),
+                    (pass_id, owner.clone(), recipient.clone()).into_val(&env),
+                )),
+                sub_invocations: std::vec![],
+            },
+        )]
+    );
+    assert_eq!(
+        events,
+        std::vec![PassGifted {
+            campaign_id,
+            pass_id,
+            previous_owner: owner,
+            recipient,
+        }
+        .to_xdr(&env, &contract_id)]
+    );
+}
+
+#[test]
+fn rejects_gifts_from_non_owners_and_to_the_same_owner() {
+    let (env, _contract_id, client, _platform, payment_asset, _merchant, owner, campaign_id) =
+        active_campaign(1);
+    let other = Address::generate(&env);
+    let pass_id = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+
+    assert_eq!(
+        client.try_gift_pass(&pass_id, &other, &owner),
+        Err(Ok(Error::Unauthorized))
+    );
+    assert_eq!(
+        client.try_gift_pass(&pass_id, &owner, &owner),
+        Err(Ok(Error::InvalidRecipient))
+    );
+    env.set_auths(&[]);
+    assert!(client.try_gift_pass(&pass_id, &owner, &other).is_err());
+    assert_eq!(client.get_pass(&pass_id).unwrap().owner, owner);
+}
+
+#[test]
+fn redemption_requires_the_campaign_merchant_and_current_owner() {
+    let (env, contract_id, client, _platform, payment_asset, merchant, owner, campaign_id) =
+        active_campaign(1);
+    let wrong_merchant = Address::generate(&env);
+    let wrong_owner = Address::generate(&env);
+    let pass_id = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+
+    assert_eq!(
+        client.try_redeem_pass(&pass_id, &wrong_merchant, &owner),
+        Err(Ok(Error::Unauthorized))
+    );
+    assert_eq!(
+        client.try_redeem_pass(&pass_id, &merchant, &wrong_owner),
+        Err(Ok(Error::Unauthorized))
+    );
+
+    env.mock_auths(&[MockAuth {
+        address: &merchant,
+        invoke: &MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "redeem_pass",
+            args: (pass_id, merchant.clone(), owner.clone()).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    assert!(client.try_redeem_pass(&pass_id, &merchant, &owner).is_err());
+    assert_eq!(
+        client.get_pass(&pass_id).unwrap().status,
+        PassStatus::Active
+    );
+
+    env.mock_auths(&[MockAuth {
+        address: &owner,
+        invoke: &MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "redeem_pass",
+            args: (pass_id, merchant.clone(), owner.clone()).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    assert!(client.try_redeem_pass(&pass_id, &merchant, &owner).is_err());
+    assert_eq!(
+        client.get_pass(&pass_id).unwrap().status,
+        PassStatus::Active
+    );
+}
+
+#[test]
+fn redemption_releases_the_reserve_and_cannot_happen_twice() {
+    let (env, contract_id, client, _platform, payment_asset, merchant, owner, campaign_id) =
+        active_campaign(1);
+    let token = TokenClient::new(&env, &payment_asset);
+    let pass_id = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+
+    client.redeem_pass(&pass_id, &merchant, &owner);
+    let auths = env.auths();
+    let events = env.events().all().filter_by_contract(&contract_id);
+
+    assert_eq!(
+        client.get_pass(&pass_id).unwrap().status,
+        PassStatus::Redeemed
+    );
+    assert_eq!(token.balance(&contract_id), 0);
+    assert_eq!(token.balance(&merchant), 47_500_000);
+    let campaign = client.get_campaign(&campaign_id).unwrap();
+    assert_eq!(campaign.redeemed, 1);
+    assert_eq!(campaign.refunded, 0);
+    assert_eq!(campaign.merchant_released, 47_500_000);
+    assert_eq!(campaign.protected_funds, 0);
+    assert_eq!(campaign.cancellation_shortfall, 0);
+    let redeem_invocation = AuthorizedInvocation {
+        function: AuthorizedFunction::Contract((
+            contract_id.clone(),
+            Symbol::new(&env, "redeem_pass"),
+            (pass_id, merchant.clone(), owner.clone()).into_val(&env),
+        )),
+        sub_invocations: std::vec![],
+    };
+    assert_eq!(
+        auths,
+        std::vec![
+            (merchant.clone(), redeem_invocation.clone()),
+            (owner.clone(), redeem_invocation),
+        ]
+    );
+    assert_eq!(
+        events,
+        std::vec![PassRedeemed {
+            campaign_id,
+            pass_id,
+            owner: owner.clone(),
+            merchant: merchant.clone(),
+            reserve_released: 10_000_000,
+        }
+        .to_xdr(&env, &contract_id)]
+    );
+    assert_eq!(
+        client.try_redeem_pass(&pass_id, &merchant, &owner),
+        Err(Ok(Error::PassNotActive))
+    );
+}
+
+#[test]
+fn a_failed_token_release_rolls_back_redemption_state() {
+    let (env, contract_id, client, _platform, payment_asset, merchant, owner, campaign_id) =
+        active_campaign(1);
+    let token = TokenClient::new(&env, &payment_asset);
+    let asset_admin = StellarAssetClient::new(&env, &payment_asset);
+    let pass_id = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+    let merchant_balance = token.balance(&merchant);
+    asset_admin.mint(&merchant, &(i128::MAX - merchant_balance));
+
+    assert!(client.try_redeem_pass(&pass_id, &merchant, &owner).is_err());
+
+    assert_eq!(
+        client.get_pass(&pass_id).unwrap().status,
+        PassStatus::Active
+    );
+    let campaign = client.get_campaign(&campaign_id).unwrap();
+    assert_eq!(campaign.redeemed, 0);
+    assert_eq!(campaign.merchant_released, 37_500_000);
+    assert_eq!(campaign.protected_funds, 10_000_000);
+    assert_eq!(campaign.cancellation_shortfall, 40_000_000);
+    assert_eq!(token.balance(&contract_id), 10_000_000);
+    assert_eq!(token.balance(&merchant), i128::MAX);
+}
+
+#[test]
+fn pausing_sales_does_not_block_gifting_or_fulfillment() {
+    let (env, _contract_id, client, _platform, payment_asset, merchant, owner, campaign_id) =
+        active_campaign(1);
+    let recipient = Address::generate(&env);
+    let pass_id = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+    client.pause_campaign(&campaign_id, &merchant);
+
+    client.gift_pass(&pass_id, &owner, &recipient);
+    client.redeem_pass(&pass_id, &merchant, &recipient);
+
+    assert_eq!(
+        client.get_campaign(&campaign_id).unwrap().status,
+        CampaignStatus::Paused
+    );
+    assert_eq!(
+        client.get_pass(&pass_id).unwrap().status,
+        PassStatus::Redeemed
+    );
+}
+
+#[test]
+fn redeemed_and_expired_passes_cannot_be_gifted_or_redeemed() {
+    let (env, _contract_id, client, _platform, payment_asset, merchant, owner, campaign_id) =
+        active_campaign(2);
+    let recipient = Address::generate(&env);
+    let redeemed_pass = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+    client.redeem_pass(&redeemed_pass, &merchant, &owner);
+    assert_eq!(
+        client.try_gift_pass(&redeemed_pass, &owner, &recipient),
+        Err(Ok(Error::PassNotActive))
+    );
+
+    let expired_owner = Address::generate(&env);
+    let expired_pass =
+        mint_and_purchase(&env, &client, &payment_asset, campaign_id, &expired_owner);
+    env.ledger().set_timestamp(default_terms().expires_at);
+    assert_eq!(
+        client.get_pass(&expired_pass).unwrap().status,
+        PassStatus::Expired
+    );
+    assert_eq!(
+        client.try_gift_pass(&expired_pass, &expired_owner, &recipient),
+        Err(Ok(Error::PassExpired))
+    );
+    assert_eq!(
+        client.try_redeem_pass(&expired_pass, &merchant, &expired_owner),
+        Err(Ok(Error::PassExpired))
+    );
+}
+
+#[test]
+fn expiration_allows_only_the_protected_reserve_to_be_refunded() {
+    let (env, contract_id, client, _platform, payment_asset, merchant, owner, campaign_id) =
+        active_campaign(1);
+    let token = TokenClient::new(&env, &payment_asset);
+    let pass_id = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+
+    assert_eq!(
+        client.try_refund_pass(&pass_id, &owner),
+        Err(Ok(Error::RefundNotAvailable))
+    );
+    env.ledger().set_timestamp(default_terms().expires_at);
+    env.set_auths(&[]);
+    assert!(client.try_refund_pass(&pass_id, &owner).is_err());
+    assert_eq!(client.get_campaign(&campaign_id).unwrap().refunded, 0);
+    env.mock_all_auths();
+    assert_eq!(client.refund_pass(&pass_id, &owner), 10_000_000);
+    let auths = env.auths();
+    let events = env.events().all().filter_by_contract(&contract_id);
+
+    assert_eq!(
+        client.get_pass(&pass_id).unwrap().status,
+        PassStatus::Refunded
+    );
+    assert_eq!(token.balance(&owner), 10_000_000);
+    assert_eq!(token.balance(&merchant), 37_500_000);
+    assert_eq!(token.balance(&contract_id), 0);
+    let campaign = client.get_campaign(&campaign_id).unwrap();
+    assert_eq!(campaign.status, CampaignStatus::Expired);
+    assert_eq!(campaign.refunded, 1);
+    assert_eq!(campaign.protected_funds, 0);
+    assert_eq!(campaign.cancellation_shortfall, 0);
+    assert_eq!(
+        auths,
+        std::vec![(
+            owner.clone(),
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    contract_id.clone(),
+                    Symbol::new(&env, "refund_pass"),
+                    (pass_id, owner.clone()).into_val(&env),
+                )),
+                sub_invocations: std::vec![],
+            },
+        )]
+    );
+    assert_eq!(
+        events,
+        std::vec![PassRefunded {
+            campaign_id,
+            pass_id,
+            owner: owner.clone(),
+            amount: 10_000_000,
+            full_refund: false,
+        }
+        .to_xdr(&env, &contract_id)]
+    );
+    assert_eq!(
+        client.try_refund_pass(&pass_id, &owner),
+        Err(Ok(Error::PassNotActive))
+    );
+    let recipient = Address::generate(&env);
+    assert_eq!(
+        client.try_gift_pass(&pass_id, &owner, &recipient),
+        Err(Ok(Error::PassNotActive))
+    );
+}
+
+#[test]
+fn cancellation_requires_full_replenishment_before_full_refunds() {
+    let (env, contract_id, client, platform, payment_asset, merchant, owner, campaign_id) =
+        active_campaign(1);
+    let token = TokenClient::new(&env, &payment_asset);
+    let asset_admin = StellarAssetClient::new(&env, &payment_asset);
+    let pass_id = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+
+    assert_eq!(
+        client.try_cancel_campaign(&campaign_id, &merchant),
+        Err(Ok(Error::InsufficientBalance))
+    );
+    assert_eq!(
+        client.get_campaign(&campaign_id).unwrap().status,
+        CampaignStatus::Active
+    );
+    assert_eq!(token.balance(&contract_id), 10_000_000);
+
+    asset_admin.mint(&merchant, &2_500_000);
+    assert_eq!(client.cancel_campaign(&campaign_id, &merchant), 40_000_000);
+    let auths = env.auths();
+    let events = env.events().all().filter_by_contract(&contract_id);
+    let cancelled = client.get_campaign(&campaign_id).unwrap();
+    assert_eq!(cancelled.status, CampaignStatus::Cancelled);
+    assert_eq!(cancelled.cancellation_shortfall, 40_000_000);
+    assert_eq!(cancelled.cancellation_funds, 40_000_000);
+    assert_eq!(token.balance(&contract_id), 50_000_000);
+    assert_eq!(token.balance(&merchant), 0);
+    assert_eq!(token.balance(&platform), 2_500_000);
+    assert_eq!(
+        auths,
+        std::vec![(
+            merchant.clone(),
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    contract_id.clone(),
+                    Symbol::new(&env, "cancel_campaign"),
+                    (campaign_id, merchant.clone()).into_val(&env),
+                )),
+                sub_invocations: std::vec![AuthorizedInvocation {
+                    function: AuthorizedFunction::Contract((
+                        payment_asset.clone(),
+                        symbol_short!("transfer"),
+                        (
+                            merchant.clone(),
+                            MuxedAddress::from(&contract_id),
+                            40_000_000_i128,
+                        )
+                            .into_val(&env),
+                    )),
+                    sub_invocations: std::vec![],
+                }],
+            },
+        )]
+    );
+    assert_eq!(
+        events,
+        std::vec![CampaignCancelled {
+            campaign_id,
+            merchant: merchant.clone(),
+            replenished: 40_000_000,
+        }
+        .to_xdr(&env, &contract_id)]
+    );
+
+    assert_eq!(client.refund_pass(&pass_id, &owner), 50_000_000);
+    assert_eq!(token.balance(&owner), 50_000_000);
+    assert_eq!(token.balance(&contract_id), 0);
+    let refunded = client.get_campaign(&campaign_id).unwrap();
+    assert_eq!(refunded.refunded, 1);
+    assert_eq!(refunded.protected_funds, 0);
+    assert_eq!(refunded.cancellation_shortfall, 0);
+    assert_eq!(refunded.cancellation_funds, 0);
+}
+
+#[test]
+fn cancellation_is_merchant_only_pre_expiry_and_blocks_active_pass_actions() {
+    let (env, _contract_id, client, _platform, payment_asset, merchant, owner, campaign_id) =
+        active_campaign(1);
+    let other = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let pass_id = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+    StellarAssetClient::new(&env, &payment_asset).mint(&merchant, &2_500_000);
+
+    assert_eq!(
+        client.try_cancel_campaign(&campaign_id, &other),
+        Err(Ok(Error::Unauthorized))
+    );
+    env.set_auths(&[]);
+    assert!(client.try_cancel_campaign(&campaign_id, &merchant).is_err());
+    assert_eq!(
+        client.get_campaign(&campaign_id).unwrap().status,
+        CampaignStatus::Active
+    );
+    env.mock_all_auths();
+    client.cancel_campaign(&campaign_id, &merchant);
+    assert_eq!(
+        client.try_purchase(&campaign_id, &owner),
+        Err(Ok(Error::InvalidState))
+    );
+    assert_eq!(
+        client.try_gift_pass(&pass_id, &owner, &recipient),
+        Err(Ok(Error::InvalidState))
+    );
+    assert_eq!(
+        client.try_redeem_pass(&pass_id, &merchant, &owner),
+        Err(Ok(Error::InvalidState))
+    );
+
+    let (env, _contract_id, client, _platform, _payment_asset, merchant, _owner, campaign_id) =
+        active_campaign(1);
+    env.ledger().set_timestamp(default_terms().expires_at);
+    assert_eq!(
+        client.try_cancel_campaign(&campaign_id, &merchant),
+        Err(Ok(Error::CampaignExpired))
+    );
+}
+
+#[test]
+fn redeemed_passes_are_excluded_from_the_cancellation_requirement() {
+    let (env, contract_id, client, _platform, payment_asset, merchant, owner, campaign_id) =
+        active_campaign(1);
+    let token = TokenClient::new(&env, &payment_asset);
+    let pass_id = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+    client.redeem_pass(&pass_id, &merchant, &owner);
+
+    assert_eq!(client.cancel_campaign(&campaign_id, &merchant), 0);
+    let campaign = client.get_campaign(&campaign_id).unwrap();
+    assert_eq!(campaign.status, CampaignStatus::Cancelled);
+    assert_eq!(campaign.cancellation_shortfall, 0);
+    assert_eq!(campaign.cancellation_funds, 0);
+    assert_eq!(token.balance(&contract_id), 0);
+    assert_eq!(
+        client.try_refund_pass(&pass_id, &owner),
+        Err(Ok(Error::PassNotActive))
+    );
+}
+
+#[test]
+fn the_current_owner_after_a_gift_receives_the_refund() {
+    let (env, _contract_id, client, _platform, payment_asset, merchant, owner, campaign_id) =
+        active_campaign(1);
+    let recipient = Address::generate(&env);
+    let token = TokenClient::new(&env, &payment_asset);
+    let asset_admin = StellarAssetClient::new(&env, &payment_asset);
+    let pass_id = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+    client.gift_pass(&pass_id, &owner, &recipient);
+    asset_admin.mint(&merchant, &2_500_000);
+    client.cancel_campaign(&campaign_id, &merchant);
+
+    assert_eq!(
+        client.try_refund_pass(&pass_id, &owner),
+        Err(Ok(Error::Unauthorized))
+    );
+    assert_eq!(client.refund_pass(&pass_id, &recipient), 50_000_000);
+    assert_eq!(token.balance(&owner), 0);
+    assert_eq!(token.balance(&recipient), 50_000_000);
 }
