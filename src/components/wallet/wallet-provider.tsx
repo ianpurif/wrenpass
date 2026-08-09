@@ -43,6 +43,11 @@ export interface WalletAdapter {
     address: string,
     networkPassphrase: string,
   ): Promise<{ signedTxXdr: string; signerAddress?: string }>;
+  signAuthEntry(
+    authEntryXdr: string,
+    address: string,
+    networkPassphrase: string,
+  ): Promise<{ signedAuthEntry: string; signerAddress?: string }>;
   disconnect(): Promise<void>;
 }
 
@@ -68,6 +73,9 @@ interface WalletContextValue {
   signTransaction(
     transactionXdr: string,
   ): Promise<{ signedTxXdr: string; signerAddress?: string }>;
+  signAuthEntry(
+    authEntryXdr: string,
+  ): Promise<{ signedAuthEntry: string; signerAddress?: string }>;
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
@@ -283,6 +291,25 @@ export function WalletProvider({
     [adapter, address, config.networkPassphrase, status],
   );
 
+  const signAuthEntry = useCallback(
+    async (authEntryXdr: string) => {
+      if (!address || status !== "connected") {
+        throw new Error("Connect and authenticate Freighter before approving redemption.");
+      }
+
+      const signed = await adapter.signAuthEntry(
+        authEntryXdr,
+        address,
+        config.networkPassphrase,
+      );
+      if (signed.signerAddress && signed.signerAddress !== address) {
+        throw new Error("Freighter signed with a different account. Please reconnect the intended wallet.");
+      }
+      return signed;
+    },
+    [adapter, address, config.networkPassphrase, status],
+  );
+
   return (
     <WalletContext.Provider
       value={{
@@ -294,6 +321,7 @@ export function WalletProvider({
         connect,
         disconnect,
         refreshBalances,
+        signAuthEntry,
         signTransaction,
       }}
     >

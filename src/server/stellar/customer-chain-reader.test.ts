@@ -78,6 +78,18 @@ describe("decodeCustomerActivity", () => {
       expect.objectContaining({ id: "received", kind: "Received", counterparty: testRecipientAddress }),
     ]);
   });
+
+  it("decodes redemption and refund lifecycle events for the owner", () => {
+    const events = [
+      event("pass_redeemed", testCustomerAddress, mapValue({}), "redeemed"),
+      event("pass_refunded", testCustomerAddress, mapValue({}), "refunded"),
+    ];
+
+    expect(decodeCustomerActivity(events, testCustomerAddress)).toEqual([
+      expect.objectContaining({ id: "redeemed", kind: "Redeemed" }),
+      expect.objectContaining({ id: "refunded", kind: "Refunded" }),
+    ]);
+  });
 });
 
 describe("readEventPages", () => {

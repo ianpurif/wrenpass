@@ -6,11 +6,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CampaignCard } from "@/components/merchant/campaign-card";
 import { CampaignForm } from "@/components/merchant/campaign-form";
 import { MerchantProfileForm } from "@/components/merchant/profile-form";
+import { RedemptionScanner } from "@/components/merchant/redemption-scanner";
+import { NotificationEmailForm } from "@/components/notifications/notification-email-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ErrorState, LoadingState } from "@/components/ui/feedback-state";
 import { useWallet } from "@/components/wallet/wallet-provider";
 import { merchantApi } from "@/features/merchant/api";
+import { notificationApi } from "@/features/notifications/api";
 import { displayUsdc, shortenStellarAddress } from "@/features/merchant/display";
 import type { MerchantDashboardDto } from "@/features/merchant/dto";
 import type { StellarConfig } from "@/lib/stellar/config";
@@ -21,6 +24,7 @@ export function MerchantWorkspace({ config }: { config: StellarConfig }) {
   const [loadedAddress, setLoadedAddress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
 
   const loadDashboard = useCallback(async () => {
     if (!address) {
@@ -31,6 +35,12 @@ export function MerchantWorkspace({ config }: { config: StellarConfig }) {
     setError(null);
     try {
       setDashboard(await merchantApi.getDashboard());
+      try {
+        await notificationApi.syncEvents();
+        setSyncWarning(null);
+      } catch {
+        setSyncWarning("On-chain data is current, but durable event and email sync will retry later.");
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load the dashboard.");
     } finally {
@@ -47,6 +57,10 @@ export function MerchantWorkspace({ config }: { config: StellarConfig }) {
         setDashboard(nextDashboard);
         setLoadedAddress(address);
         setError(null);
+        void notificationApi.syncEvents().then(
+          () => active && setSyncWarning(null),
+          () => active && setSyncWarning("On-chain data is current, but durable event and email sync will retry later."),
+        );
       },
       (loadError: unknown) => {
         if (!active) return;
@@ -117,6 +131,11 @@ export function MerchantWorkspace({ config }: { config: StellarConfig }) {
       </div>
 
       {error && <ErrorState description={error} onRetry={() => void loadDashboard()} />}
+      {syncWarning && <p role="status" className="rounded-2xl border border-coral/25 bg-coral-soft p-4 text-sm font-semibold text-ink-muted">{syncWarning}</p>}
+
+      {dashboard.merchant && <RedemptionScanner config={config} />}
+
+      <NotificationEmailForm />
 
       <section aria-labelledby="merchant-profile-heading">
         <Card className="grid overflow-hidden lg:grid-cols-[0.72fr_1.28fr]">

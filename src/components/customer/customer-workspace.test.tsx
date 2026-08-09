@@ -10,7 +10,7 @@ import {
   testStellarConfig,
 } from "@/test/fixtures/customer";
 
-const mocks = vi.hoisted(() => ({ getDashboard: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getDashboard: vi.fn(), syncEvents: vi.fn() }));
 
 vi.mock("@/components/wallet/wallet-provider", () => ({
   useWallet: () => ({
@@ -23,8 +23,13 @@ vi.mock("@/components/wallet/wallet-provider", () => ({
 vi.mock("@/components/customer/customer-pass-card", () => ({
   CustomerPassCard: ({ pass }: { pass: { id: string } }) => <div>Owned pass {pass.id}</div>,
 }));
+vi.mock("@/components/customer/redemption-requests", () => ({ RedemptionRequests: () => null }));
+vi.mock("@/components/notifications/notification-email-form", () => ({ NotificationEmailForm: () => null }));
 vi.mock("@/features/customer/api", () => ({
   customerApi: { getDashboard: mocks.getDashboard },
+}));
+vi.mock("@/features/notifications/api", () => ({
+  notificationApi: { syncEvents: mocks.syncEvents },
 }));
 
 describe("CustomerWorkspace", () => {
@@ -38,6 +43,7 @@ describe("CustomerWorkspace", () => {
         { id: "received", kind: "Received", campaignId: "1", passId: "4", occurredAt: "2026-08-09T08:02:00.000Z", transactionHash: "c".repeat(64), counterparty: testRecipientAddress },
       ],
     });
+    mocks.syncEvents.mockResolvedValue({ indexed: 0, duplicates: 0, notificationsSent: 0, notificationFailures: 0 });
 
     const user = userEvent.setup();
     render(<CustomerWorkspace config={testStellarConfig} />);
@@ -46,6 +52,8 @@ describe("CustomerWorkspace", () => {
     expect(screen.getByText("Purchase history")).toBeInTheDocument();
     expect(screen.getByText("Gifted passes")).toBeInTheDocument();
     expect(screen.getByText("Received passes")).toBeInTheDocument();
+    expect(screen.getByText("Redeemed passes")).toBeInTheDocument();
+    expect(screen.getByText("Refunded passes")).toBeInTheDocument();
     expect(screen.getByText("5 USDC")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Redeemed 1" }));

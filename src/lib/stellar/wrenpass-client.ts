@@ -1,3 +1,4 @@
+import { Address, rpc, scValToNative } from "@stellar/stellar-sdk";
 import type { ClientOptions } from "@stellar/stellar-sdk/contract";
 
 import {
@@ -10,6 +11,7 @@ import {
 import type { StellarConfig } from "@/lib/stellar/config";
 
 type SignTransaction = NonNullable<ClientOptions["signTransaction"]>;
+type SignAuthEntry = NonNullable<ClientOptions["signAuthEntry"]>;
 
 const contractErrorMessages: Record<string, string> = {
   CampaignExpired: "This campaign has expired.",
@@ -148,6 +150,155 @@ export class StellarCustomerContractWriter implements CustomerContractWriter {
     });
     const sent = await transaction.signAndSend();
     unwrapContractResult(sent.result);
+  }
+}
+
+export interface RedemptionTransactionDetails {
+  passId: bigint;
+  merchant: string;
+  owner: string;
+}
+
+function inspectRedemptionTransaction(
+  transaction: Awaited<ReturnType<Client["fromJSON"]["redeem_pass"]>>,
+): RedemptionTransactionDetails {
+  const built = transaction.built;
+  if (!built || built.operations.length !== 1 || built.source === undefined) {
+    throw new Error("The redemption transaction is incomplete.");
+  }
+  const operation = built.operations[0];
+  if (operation.type !== "invokeHostFunction") {
+    throw new Error("The redemption transaction has an unsupported operation.");
+  }
+
+  const invocation = operation.func.invokeContract();
+  const contractId = Address.fromScAddress(invocation.contractAddress()).toString();
+  const method = Buffer.from(invocation.functionName()).toString("utf8");
+  if (contractId !== transaction.options.contractId || method !== "redeem_pass") {
+    throw new Error("The redemption transaction targets the wrong contract action.");
+  }
+
+  const args = invocation.args().map((argument) => scValToNative(argument) as unknown);
+  if (
+    typeof args[0] !== "bigint" ||
+    typeof args[1] !== "string" ||
+    typeof args[2] !== "string"
+  ) {
+    throw new Error("The redemption transaction arguments are invalid.");
+  }
+
+  return { passId: args[0], merchant: args[1], owner: args[2] };
+}
+
+function expectAddressSet(actual: string[], expected: string[], message: string): void {
+  if (actual.length !== expected.length || actual.some((value) => !expected.includes(value))) {
+    throw new Error(message);
+  }
+}
+
+export class StellarRedemptionContractWriter {
+  constructor(private readonly config: StellarConfig) {}
+
+  async prepareMerchantAuthorization(input: {
+    passId: bigint;
+    merchant: string;
+    owner: string;
+    signAuthEntry: SignAuthEntry;
+  }): Promise<{ serializedTransaction: string; expiresAtLedger: number }> {
+    const client = createClient(this.config, { publicKey: input.owner });
+    const transaction = await client.redeem_pass({
+      pass_id: input.passId,
+      merchant: input.merchant,
+      owner: input.owner,
+    });
+    expectAddressSet(
+      transaction.needsNonInvokerSigningBy(),
+      [input.merchant],
+      "The contract did not request the expected merchant approval.",
+    );
+
+    const latestLedger = await new rpc.Server(this.config.rpcUrl).getLatestLedger();
+    const expiresAtLedger = latestLedger.sequence + 60;
+    await transaction.signAuthEntries({
+      address: input.merchant,
+      expiration: expiresAtLedger,
+      signAuthEntry: input.signAuthEntry,
+    });
+    expectAddressSet(
+      transaction.needsNonInvokerSigningBy({ includeAlreadySigned: true }),
+      [input.merchant],
+      "The prepared transaction contains an unexpected authorization signer.",
+    );
+    expectAddressSet(
+      transaction.needsNonInvokerSigningBy(),
+      [],
+      "The merchant approval was not attached to the transaction.",
+    );
+
+    return { serializedTransaction: transaction.toJSON(), expiresAtLedger };
+  }
+
+  async verifyMerchantAuthorization(input: {
+    serializedTransaction: string;
+    passId: bigint;
+    merchant: string;
+    owner: string;
+    expiresAtLedger: number;
+  }): Promise<void> {
+    const client = createClient(this.config, { publicKey: input.owner });
+    const transaction = client.fromJSON.redeem_pass(input.serializedTransaction);
+    const details = inspectRedemptionTransaction(transaction);
+    if (
+      transaction.built?.source !== input.owner ||
+      details.passId !== input.passId ||
+      details.merchant !== input.merchant ||
+      details.owner !== input.owner
+    ) {
+      throw new Error("The prepared redemption does not match the requested pass.");
+    }
+    expectAddressSet(
+      transaction.needsNonInvokerSigningBy({ includeAlreadySigned: true }),
+      [input.merchant],
+      "The prepared transaction was not authorized by the campaign merchant.",
+    );
+    expectAddressSet(
+      transaction.needsNonInvokerSigningBy(),
+      [],
+      "The prepared transaction is missing merchant authorization.",
+    );
+
+    const latestLedger = await new rpc.Server(this.config.rpcUrl).getLatestLedger();
+    if (input.expiresAtLedger <= latestLedger.sequence) {
+      throw new Error("The merchant approval has expired. Scan the pass again.");
+    }
+    await transaction.simulate();
+  }
+
+  async approveAndSubmit(input: {
+    serializedTransaction: string;
+    owner: string;
+    signTransaction: SignTransaction;
+  }): Promise<{ transactionHash: string }> {
+    const client = createClient(this.config, {
+      publicKey: input.owner,
+      signTransaction: input.signTransaction,
+    });
+    const transaction = client.fromJSON.redeem_pass(input.serializedTransaction);
+    if (transaction.built?.source !== input.owner) {
+      throw new Error("This redemption request belongs to a different pass owner.");
+    }
+    expectAddressSet(
+      transaction.needsNonInvokerSigningBy(),
+      [],
+      "The campaign merchant has not approved this redemption.",
+    );
+
+    await transaction.simulate();
+    const sent = await transaction.signAndSend();
+    unwrapContractResult(sent.result);
+    const transactionHash = sent.sendTransactionResponse?.hash;
+    if (!transactionHash) throw new Error("Stellar accepted redemption without returning its hash.");
+    return { transactionHash };
   }
 }
 

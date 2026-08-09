@@ -1,7 +1,7 @@
 import type { PublicCampaignDto } from "@/features/merchant/dto";
 
 export type CustomerPassStatusDto = "Active" | "Redeemed" | "Expired" | "Refunded";
-export type CustomerActivityKind = "Purchased" | "Gifted" | "Received";
+export type CustomerActivityKind = "Purchased" | "Gifted" | "Received" | "Redeemed" | "Refunded";
 
 export interface CustomerPassDto {
   id: string;

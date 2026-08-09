@@ -9,11 +9,13 @@ import {
   indexedBlockchainEventSchema,
   merchantSchema,
   notificationSchema,
+  redemptionRequestSchema,
   userProfileSchema,
   type CampaignMetadata,
   type IndexedBlockchainEvent,
   type Merchant,
   type Notification,
+  type RedemptionRequest,
   type UserProfile,
 } from "@/server/models";
 
@@ -60,6 +62,7 @@ export interface OffchainRepositories {
   campaignMetadata: EntityRepository<CampaignMetadata>;
   notifications: EntityRepository<Notification>;
   indexedBlockchainEvents: EntityRepository<IndexedBlockchainEvent>;
+  redemptionRequests: EntityRepository<RedemptionRequest>;
 }
 
 export function createOffchainRepositories(
@@ -77,6 +80,11 @@ export function createOffchainRepositories(
     indexedBlockchainEvents: new EntityRepository(
       "indexed_blockchain_events",
       indexedBlockchainEventSchema,
+      store,
+    ),
+    redemptionRequests: new EntityRepository(
+      "redemption_requests",
+      redemptionRequestSchema,
       store,
     ),
   };

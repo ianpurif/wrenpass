@@ -1,10 +1,11 @@
 "use client";
 
-import { CalendarClock, ExternalLink, Gift, ShieldCheck, TicketCheck } from "lucide-react";
+import { CalendarClock, ExternalLink, Gift, QrCode, ShieldCheck, TicketCheck } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import { GiftPassDialog } from "@/components/customer/gift-pass-dialog";
+import { PassQrDialog } from "@/components/customer/pass-qr-dialog";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { CustomerPassDto } from "@/features/customer/dto";
@@ -34,6 +35,7 @@ export function CustomerPassCard({
   onGifted(): Promise<void>;
 }) {
   const [giftOpen, setGiftOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const campaign = pass.campaign;
   const bonus = campaign
     ? BigInt(campaign.onchain.serviceValue) - BigInt(campaign.onchain.passPrice)
@@ -82,9 +84,14 @@ export function CustomerPassCard({
               </Link>
             )}
             {pass.status === "Active" && (
-              <Button size="sm" onClick={() => setGiftOpen(true)}>
-                <Gift aria-hidden="true" className="size-3.5" /> Gift pass
-              </Button>
+              <>
+                <Button size="sm" variant="secondary" onClick={() => setQrOpen(true)}>
+                  <QrCode aria-hidden="true" className="size-3.5" /> Show QR
+                </Button>
+                <Button size="sm" onClick={() => setGiftOpen(true)}>
+                  <Gift aria-hidden="true" className="size-3.5" /> Gift pass
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -96,6 +103,7 @@ export function CustomerPassCard({
         onGifted={onGifted}
         onOpenChange={setGiftOpen}
       />
+      <PassQrDialog config={config} open={qrOpen} passId={pass.id} onOpenChange={setQrOpen} />
     </>
   );
 }

@@ -139,6 +139,20 @@ export function decodeCustomerActivity(
           counterparty: previousOwner,
         });
       }
+      continue;
+    }
+
+    if (name === "pass_redeemed" || name === "pass_refunded") {
+      const owner = toAddress(topics[3]);
+      if (owner !== walletAddress) continue;
+      activity.push({
+        id: event.id,
+        kind: name === "pass_redeemed" ? "Redeemed" : "Refunded",
+        campaignId: campaignId.toString(),
+        passId: passId.toString(),
+        occurredAt: event.ledgerClosedAt,
+        transactionHash: event.txHash,
+      });
     }
   }
 
@@ -173,6 +187,8 @@ export class StellarCustomerChainReader implements CustomerChainReader {
           topics: [
             [eventTopic("pass_purchased"), "**"],
             [eventTopic("pass_gifted"), "**"],
+            [eventTopic("pass_redeemed"), "**"],
+            [eventTopic("pass_refunded"), "**"],
           ],
         },
       ],

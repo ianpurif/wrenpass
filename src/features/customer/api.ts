@@ -20,7 +20,7 @@ const customerPassSchema = z.object({
 });
 const activitySchema = z.object({
   id: z.string(),
-  kind: z.enum(["Purchased", "Gifted", "Received"]),
+  kind: z.enum(["Purchased", "Gifted", "Received", "Redeemed", "Refunded"]),
   campaignId: integerStringSchema,
   passId: integerStringSchema,
   occurredAt: z.string().datetime(),

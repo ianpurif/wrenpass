@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { MerchantWorkspace } from "@/components/merchant/merchant-workspace";
 import type { StellarConfig } from "@/lib/stellar/config";
 
-const mocks = vi.hoisted(() => ({ getDashboard: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getDashboard: vi.fn(), syncEvents: vi.fn() }));
 
 vi.mock("@/components/wallet/wallet-provider", () => ({
   useWallet: () => ({
@@ -21,9 +21,14 @@ vi.mock("@/components/merchant/campaign-form", () => ({
 vi.mock("@/components/merchant/profile-form", () => ({
   MerchantProfileForm: () => <div>Profile form</div>,
 }));
+vi.mock("@/components/merchant/redemption-scanner", () => ({ RedemptionScanner: () => <div>Redemption scanner</div> }));
+vi.mock("@/components/notifications/notification-email-form", () => ({ NotificationEmailForm: () => null }));
 
 vi.mock("@/features/merchant/api", () => ({
   merchantApi: { getDashboard: mocks.getDashboard },
+}));
+vi.mock("@/features/notifications/api", () => ({
+  notificationApi: { syncEvents: mocks.syncEvents },
 }));
 
 const config: StellarConfig = {
@@ -38,6 +43,7 @@ const config: StellarConfig = {
 
 describe("MerchantWorkspace", () => {
   it("derives financial totals from current on-chain campaign fields", async () => {
+    mocks.syncEvents.mockResolvedValue({ indexed: 0, duplicates: 0, notificationsSent: 0, notificationFailures: 0 });
     mocks.getDashboard.mockResolvedValue({
       merchant: {
         id: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",

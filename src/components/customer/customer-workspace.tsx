@@ -1,14 +1,17 @@
 "use client";
 
-import { ArrowDownLeft, Gift, History, LoaderCircle, RefreshCcw, TicketCheck, WalletCards } from "lucide-react";
+import { ArrowDownLeft, CheckCircle2, Gift, History, LoaderCircle, RefreshCcw, RotateCcw, TicketCheck, WalletCards } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CustomerPassCard } from "@/components/customer/customer-pass-card";
+import { RedemptionRequests } from "@/components/customer/redemption-requests";
+import { NotificationEmailForm } from "@/components/notifications/notification-email-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ErrorState, LoadingState } from "@/components/ui/feedback-state";
 import { useWallet } from "@/components/wallet/wallet-provider";
 import { customerApi } from "@/features/customer/api";
+import { notificationApi } from "@/features/notifications/api";
 import type {
   CustomerActivityDto,
   CustomerDashboardDto,
@@ -58,6 +61,7 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
   const [selectedStatus, setSelectedStatus] = useState<CustomerPassStatusDto>("Active");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
 
   const loadDashboard = useCallback(async () => {
     if (!address) return;
@@ -66,6 +70,12 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
     try {
       setDashboard(await customerApi.getDashboard());
       setLoadedAddress(address);
+      try {
+        await notificationApi.syncEvents();
+        setSyncWarning(null);
+      } catch {
+        setSyncWarning("On-chain data is current, but durable event and email sync will retry later.");
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load your passes.");
     } finally {
@@ -82,6 +92,10 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
         setDashboard(nextDashboard);
         setLoadedAddress(address);
         setError(null);
+        void notificationApi.syncEvents().then(
+          () => active && setSyncWarning(null),
+          () => active && setSyncWarning("On-chain data is current, but durable event and email sync will retry later."),
+        );
       },
       (loadError: unknown) => {
         if (!active) return;
@@ -126,6 +140,11 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
         <Button disabled={loading} size="sm" variant="secondary" onClick={() => void loadDashboard()}>{loading ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <RefreshCcw aria-hidden="true" className="size-4" />}Refresh on-chain data</Button>
       </div>
       {error && <ErrorState description={error} onRetry={() => void loadDashboard()} />}
+      {syncWarning && <p role="status" className="rounded-2xl border border-coral/25 bg-coral-soft p-4 text-sm font-semibold text-ink-muted">{syncWarning}</p>}
+
+      <RedemptionRequests config={config} onRedeemed={loadDashboard} />
+
+      <NotificationEmailForm />
 
       <section aria-labelledby="owned-passes-heading">
         <div><p className="eyebrow">Current ownership</p><h2 id="owned-passes-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-ink">Passes held by this wallet</h2></div>
@@ -142,11 +161,13 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
       </section>
 
       <section aria-labelledby="activity-heading">
-        <div><p className="eyebrow">Recent contract events</p><h2 id="activity-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-ink">Purchase and transfer history</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">This live RPC view covers events retained since {new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(dashboard.activityWindowStartsAt))}. Phase 9 adds durable, idempotent event indexing.</p></div>
-        <div className="mt-6 grid gap-5 lg:grid-cols-3">
+        <div><p className="eyebrow">Recent contract events</p><h2 id="activity-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-ink">Purchase and transfer history</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">This live RPC view covers events retained since {new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(dashboard.activityWindowStartsAt))}. WrenPass also stores idempotent event records for operational sync and notifications.</p></div>
+        <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           <Card className="p-6"><History aria-hidden="true" className="size-5 text-forest" /><h3 className="mt-4 font-extrabold text-ink">Purchase history</h3><ActivityList activity={dashboard.activity} emptyLabel="No retained purchase events." kind="Purchased" /></Card>
           <Card className="p-6"><Gift aria-hidden="true" className="size-5 text-forest" /><h3 className="mt-4 font-extrabold text-ink">Gifted passes</h3><ActivityList activity={dashboard.activity} emptyLabel="No retained outgoing gifts." kind="Gifted" /></Card>
           <Card className="p-6"><ArrowDownLeft aria-hidden="true" className="size-5 text-forest" /><h3 className="mt-4 font-extrabold text-ink">Received passes</h3><ActivityList activity={dashboard.activity} emptyLabel="No retained received gifts." kind="Received" /></Card>
+          <Card className="p-6"><CheckCircle2 aria-hidden="true" className="size-5 text-forest" /><h3 className="mt-4 font-extrabold text-ink">Redeemed passes</h3><ActivityList activity={dashboard.activity} emptyLabel="No retained redemption events." kind="Redeemed" /></Card>
+          <Card className="p-6"><RotateCcw aria-hidden="true" className="size-5 text-forest" /><h3 className="mt-4 font-extrabold text-ink">Refunded passes</h3><ActivityList activity={dashboard.activity} emptyLabel="No retained refund events." kind="Refunded" /></Card>
         </div>
       </section>
     </div>

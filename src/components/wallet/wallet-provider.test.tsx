@@ -32,6 +32,10 @@ function createAdapter(overrides: Partial<WalletAdapter> = {}): WalletAdapter {
       signedTxXdr: "signed-transaction",
       signerAddress: address,
     }),
+    signAuthEntry: vi.fn().mockResolvedValue({
+      signedAuthEntry: "signed-auth-entry",
+      signerAddress: address,
+    }),
     disconnect: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
