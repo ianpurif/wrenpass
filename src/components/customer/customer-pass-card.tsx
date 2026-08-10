@@ -12,10 +12,10 @@ import { displayExpiration, displayUsdc } from "@/features/merchant/display";
 import type { StellarConfig } from "@/lib/stellar/config";
 
 const statusStyles = {
-  Active: { dot: "bg-forest", text: "text-forest" },
-  Redeemed: { dot: "bg-ink-faint", text: "text-ink-muted" },
-  Expired: { dot: "bg-ink-faint", text: "text-ink-muted" },
-  Refunded: { dot: "bg-coral", text: "text-coral-strong" },
+  Active: { dot: "bg-forest", text: "text-forest", badge: "border-mint/70 bg-mint-soft" },
+  Redeemed: { dot: "bg-ink-faint", text: "text-ink-muted", badge: "border-line bg-canvas" },
+  Expired: { dot: "bg-ink-faint", text: "text-ink-muted", badge: "border-line bg-canvas" },
+  Refunded: { dot: "bg-coral", text: "text-coral-strong", badge: "border-coral/30 bg-coral-soft" },
 } as const;
 
 function displayPurchasedAt(epochSeconds: string): string {
@@ -60,19 +60,17 @@ export function CustomerPassCard({
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-ink-faint">WrenPass #{pass.id}</p>
-                    <h3 className="mt-1 truncate font-bold text-ink">
-                      {campaign?.metadata.name ?? `Campaign #${pass.campaignId}`}
-                    </h3>
-                    {campaign && <p className="mt-0.5 truncate text-xs text-ink-muted">{campaign.merchant.businessName}</p>}
-                  </div>
-                  <span className={`inline-flex shrink-0 items-center gap-2 self-start text-xs font-bold ${statusClasses.text}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-semibold text-ink-faint">WrenPass #{pass.id}</p>
+                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.68rem] font-bold ${statusClasses.badge} ${statusClasses.text}`}>
                     <span aria-hidden="true" className={`size-1.5 rounded-full ${statusClasses.dot}`} />
                     {pass.status}
                   </span>
                 </div>
+                <h3 className="mt-1 truncate font-bold text-ink">
+                  {campaign?.metadata.name ?? `Campaign #${pass.campaignId}`}
+                </h3>
+                {campaign && <p className="mt-0.5 truncate text-xs text-ink-muted">{campaign.merchant.businessName}</p>}
               </div>
             </div>
 

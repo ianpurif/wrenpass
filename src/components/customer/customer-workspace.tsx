@@ -24,6 +24,8 @@ const passTabs: Array<{ label: string; status: CustomerPassStatusDto }> = [
   { label: "Refunded", status: "Refunded" },
 ];
 
+type WorkspaceSection = "owned" | "activity";
+
 const activityLabels: Record<CustomerActivityDto["kind"], string> = {
   Purchased: "Purchased",
   Gifted: "Gifted",
@@ -98,6 +100,7 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
   const [dashboard, setDashboard] = useState<CustomerDashboardDto | null>(null);
   const [loadedAddress, setLoadedAddress] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<CustomerPassStatusDto>("Active");
+  const [selectedSection, setSelectedSection] = useState<WorkspaceSection>("owned");
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<{ address: string; message: string } | null>(null);
   const requestId = useRef(0);
@@ -202,9 +205,23 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
         </Button>
       </header>
 
-      <nav aria-label="My passes sections" className="mt-5 grid grid-cols-2 rounded-xl border border-line bg-white p-1 text-center text-xs font-bold text-ink-muted sm:inline-grid sm:w-auto sm:grid-cols-2 sm:text-sm">
-        <a className="rounded-lg px-3 py-2 hover:bg-sage-soft hover:text-ink" href="#owned-passes">Passes</a>
-        <a className="rounded-lg px-3 py-2 hover:bg-sage-soft hover:text-ink" href="#activity">Activity</a>
+      <nav aria-label="My passes sections" className="mt-5 grid grid-cols-2 rounded-xl border border-line bg-white p-1 text-center text-xs font-bold text-ink-muted sm:inline-grid sm:w-auto sm:grid-cols-2 sm:text-sm" role="tablist">
+        {[
+          { id: "owned" as const, label: "Owned Passes", controls: "owned-passes" },
+          { id: "activity" as const, label: "Activity", controls: "activity" },
+        ].map((tab) => (
+          <button
+            aria-controls={tab.controls}
+            aria-selected={selectedSection === tab.id}
+            className={`rounded-lg px-3 py-2.5 transition ${selectedSection === tab.id ? "bg-forest text-white shadow-sm" : "hover:bg-sage-soft hover:text-ink"}`}
+            key={tab.id}
+            role="tab"
+            type="button"
+            onClick={() => setSelectedSection(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </nav>
 
       <div className="mt-7 grid gap-8">
@@ -224,62 +241,66 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
           </div>
         </section>
 
-        <RedemptionRequests config={config} onRedeemed={loadDashboard} />
+        {selectedSection === "owned" ? (
+          <>
+            <RedemptionRequests config={config} onRedeemed={loadDashboard} />
 
-        <section id="owned-passes" aria-labelledby="owned-passes-heading" className="min-w-0 scroll-mt-28">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <section id="owned-passes" aria-labelledby="owned-passes-heading" className="min-w-0">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 id="owned-passes-heading" className="text-lg font-bold tracking-tight text-ink">Owned passes</h2>
+                  <p className="mt-1 text-sm text-ink-muted">Passes currently held by this wallet, grouped by status.</p>
+                </div>
+                <div className="sm:hidden">
+                  <label className="sr-only" htmlFor="mobile-pass-status">Pass status</label>
+                  <select
+                    id="mobile-pass-status"
+                    className="h-11 w-full min-w-0 rounded-lg border border-line bg-white px-3 text-sm font-bold text-ink outline-none focus:border-forest focus:ring-3 focus:ring-forest/10"
+                    value={selectedStatus}
+                    onChange={(event) => setSelectedStatus(event.target.value as CustomerPassStatusDto)}
+                  >
+                    {passTabs.map((tab) => <option key={tab.status} value={tab.status}>{tab.label} ({passCounts[tab.status]})</option>)}
+                  </select>
+                </div>
+                <div className="hidden flex-wrap gap-1 rounded-lg border border-line bg-white p-1 sm:flex" role="tablist" aria-label="Pass status">
+                  {passTabs.map((tab) => (
+                    <button
+                      key={tab.status}
+                      role="tab"
+                      aria-selected={selectedStatus === tab.status}
+                      className={`rounded-md px-3 py-1.5 text-sm font-bold transition ${selectedStatus === tab.status ? "bg-forest text-white" : "text-ink-muted hover:bg-sage-soft hover:text-ink"}`}
+                      onClick={() => setSelectedStatus(tab.status)}
+                    >
+                      {tab.label} <span className="ml-1 opacity-70">{passCounts[tab.status]}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {visiblePasses.length ? (
+                <div className="mt-4 grid gap-3">
+                  {visiblePasses.map((pass) => <CustomerPassCard config={config} key={pass.id} pass={pass} onGifted={loadDashboard} />)}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-2xl border border-dashed border-line bg-white px-6 py-10 text-center">
+                  <TicketCheck aria-hidden="true" className="mx-auto size-5 text-forest" />
+                  <p className="mt-3 font-semibold text-ink">No {selectedStatus.toLowerCase()} passes</p>
+                  <p className="mt-1 text-sm text-ink-muted">Passes in this state will appear from current on-chain ownership.</p>
+                </div>
+              )}
+            </section>
+          </>
+        ) : (
+          <section id="activity" aria-labelledby="activity-heading">
             <div>
-              <h2 id="owned-passes-heading" className="text-lg font-bold tracking-tight text-ink">Owned passes</h2>
-              <p className="mt-1 text-sm text-ink-muted">Passes currently held by this wallet, grouped by status.</p>
+              <h2 id="activity-heading" className="text-lg font-bold tracking-tight text-ink">Recent activity</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-muted">
+                Retained contract events since {new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(dashboard.activityWindowStartsAt))}.
+              </p>
             </div>
-            <div className="sm:hidden">
-              <label className="sr-only" htmlFor="mobile-pass-status">Pass status</label>
-              <select
-                id="mobile-pass-status"
-                className="h-11 w-full min-w-0 rounded-lg border border-line bg-white px-3 text-sm font-bold text-ink outline-none focus:border-forest focus:ring-3 focus:ring-forest/10"
-                value={selectedStatus}
-                onChange={(event) => setSelectedStatus(event.target.value as CustomerPassStatusDto)}
-              >
-                {passTabs.map((tab) => <option key={tab.status} value={tab.status}>{tab.label} ({passCounts[tab.status]})</option>)}
-              </select>
-            </div>
-            <div className="hidden flex-wrap gap-1 rounded-lg border border-line bg-white p-1 sm:flex" role="tablist" aria-label="Pass status">
-              {passTabs.map((tab) => (
-                <button
-                  key={tab.status}
-                  role="tab"
-                  aria-selected={selectedStatus === tab.status}
-                  className={`rounded-md px-3 py-1.5 text-sm font-bold transition ${selectedStatus === tab.status ? "bg-forest text-white" : "text-ink-muted hover:bg-sage-soft hover:text-ink"}`}
-                  onClick={() => setSelectedStatus(tab.status)}
-                >
-                  {tab.label} <span className="ml-1 opacity-70">{passCounts[tab.status]}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {visiblePasses.length ? (
-            <div className="mt-4 grid gap-3">
-              {visiblePasses.map((pass) => <CustomerPassCard config={config} key={pass.id} pass={pass} onGifted={loadDashboard} />)}
-            </div>
-          ) : (
-            <div className="mt-4 rounded-2xl border border-dashed border-line bg-white px-6 py-10 text-center">
-              <TicketCheck aria-hidden="true" className="mx-auto size-5 text-forest" />
-              <p className="mt-3 font-semibold text-ink">No {selectedStatus.toLowerCase()} passes</p>
-              <p className="mt-1 text-sm text-ink-muted">Passes in this state will appear from current on-chain ownership.</p>
-            </div>
-          )}
-        </section>
-
-        <section id="activity" aria-labelledby="activity-heading" className="scroll-mt-28">
-          <div>
-            <h2 id="activity-heading" className="text-lg font-bold tracking-tight text-ink">Recent activity</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-muted">
-              Retained contract events since {new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(dashboard.activityWindowStartsAt))}.
-            </p>
-          </div>
-          <div className="mt-4"><ActivityTable activity={dashboard.activity} /></div>
-        </section>
+            <div className="mt-4"><ActivityTable activity={dashboard.activity} /></div>
+          </section>
+        )}
 
       </div>
     </div>
