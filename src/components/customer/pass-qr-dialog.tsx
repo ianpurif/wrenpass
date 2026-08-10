@@ -32,13 +32,21 @@ export function PassQrDialog({
       onOpenChange={onOpenChange}
     >
       <div className="grid justify-items-center gap-5 text-center">
-        <div className="rounded-3xl border border-line bg-white p-5 shadow-sm">
+        <div className="w-full max-w-[18rem] rounded-[2rem] border border-forest/15 bg-sage-soft p-3 shadow-[0_18px_45px_rgba(23,36,31,0.12)] sm:p-4">
           <QRCodeSVG
             aria-label={`Redemption QR for WrenPass ${passId}`}
             bgColor="#ffffff"
             fgColor="#153d32"
-            level="Q"
-            size={240}
+            className="block h-auto w-full overflow-hidden rounded-[1.35rem] border border-line bg-white"
+            imageSettings={{
+              src: "/logo.png",
+              height: 60,
+              width: 60,
+              excavate: true,
+            }}
+            level="H"
+            marginSize={4}
+            size={256}
             title={`WrenPass ${passId}`}
             value={payload}
           />
