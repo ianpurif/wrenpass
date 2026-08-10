@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronDown, LoaderCircle, LogOut, RefreshCw, ShieldCheck, WalletCards } from "lucide-react";
+import { Check, ChevronDown, Copy, LoaderCircle, LogOut, RefreshCw, Settings2, ShieldCheck, WalletCards } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { useWallet } from "@/components/wallet/wallet-provider";
 import { cn } from "@/lib/cn";
 
 function shortenAddress(address: string): string {
-  return `${address.slice(0, 4)}…${address.slice(-4)}`;
+  return `${address.slice(0, 7)}...${address.slice(-7)}`;
 }
 
 export function WalletButton({ className }: { className?: string }) {
@@ -23,9 +24,16 @@ export function WalletButton({ className }: { className?: string }) {
     status,
   } = useWallet();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [addressCopied, setAddressCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const copyResetRef = useRef<number | null>(null);
   const pending = status === "checking" || status === "connecting";
+
+  useEffect(() => () => {
+    if (copyResetRef.current) window.clearTimeout(copyResetRef.current);
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -49,6 +57,20 @@ export function WalletButton({ className }: { className?: string }) {
   const assetBalance = balances?.asset.hasTrustline
     ? `${balances.asset.balance} ${assetCode}`
     : `${assetCode} not added`;
+
+  async function copyAddress() {
+    if (!address) return;
+    setCopyError(null);
+    try {
+      await navigator.clipboard.writeText(address);
+      setAddressCopied(true);
+      if (copyResetRef.current) window.clearTimeout(copyResetRef.current);
+      copyResetRef.current = window.setTimeout(() => setAddressCopied(false), 1_500);
+    } catch {
+      setAddressCopied(false);
+      setCopyError("Could not copy the wallet address.");
+    }
+  }
 
   return (
     <div className={cn("relative", className)} ref={rootRef}>
@@ -97,7 +119,18 @@ export function WalletButton({ className }: { className?: string }) {
                 </div>
 
                 <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">Connected wallet</p>
-                <p className="mt-1 break-all font-mono text-xs leading-5 text-ink-muted">{address}</p>
+                <button
+                  type="button"
+                  aria-label="Copy full wallet address"
+                  className="mt-1 flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-sage-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
+                  onClick={() => void copyAddress()}
+                >
+                  <span className="min-w-0 truncate font-mono text-xs text-ink-muted">{shortenAddress(address)}</span>
+                  <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-bold text-forest">
+                    {addressCopied ? <Check aria-hidden="true" className="size-3.5" /> : <Copy aria-hidden="true" className="size-3.5" />}
+                    {addressCopied ? "Copied" : "Copy"}
+                  </span>
+                </button>
 
                 <div aria-label="Wallet balances" className="mt-4 grid grid-cols-2 gap-2" role="region">
                   <div className="min-w-0 rounded-xl border border-line bg-canvas p-3">
@@ -111,9 +144,18 @@ export function WalletButton({ className }: { className?: string }) {
                 </div>
 
                 {error && <p role="alert" className="mt-3 text-xs font-semibold leading-5 text-danger">{error}</p>}
+                {copyError && <p role="alert" className="mt-3 text-xs font-semibold leading-5 text-danger">{copyError}</p>}
               </div>
 
-              <div className="border-t border-line bg-canvas p-3">
+              <div className="grid gap-2 border-t border-line bg-canvas p-3">
+                <Link
+                  className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-line bg-white px-3.5 text-sm font-semibold text-ink transition-colors hover:border-forest/35 hover:bg-mint-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
+                  href="/merchant/business-identity"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <Settings2 aria-hidden="true" className="size-4" />
+                  Business Profile
+                </Link>
                 <Button
                   className="w-full"
                   size="sm"

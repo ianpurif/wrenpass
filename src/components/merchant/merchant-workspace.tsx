@@ -1,12 +1,11 @@
 "use client";
 
 import {
-  CircleGauge,
+  ArrowLeft,
   LoaderCircle,
   Plus,
   RefreshCcw,
   ScanLine,
-  Settings2,
   Store,
 } from "lucide-react";
 import Link from "next/link";
@@ -31,13 +30,6 @@ export type MerchantWorkspacePage =
   | "business-identity"
   | "redeem-pass"
   | "create-campaign";
-
-const merchantNavigation = [
-  { href: "/merchant", label: "Overview", page: "overview", icon: CircleGauge },
-  { href: "/merchant/business-identity", label: "Business profile", page: "business-identity", icon: Settings2 },
-  { href: "/merchant/redeem-pass", label: "Redeem pass", page: "redeem-pass", icon: ScanLine },
-  { href: "/merchant/create-campaign", label: "New campaign", page: "create-campaign", icon: Plus },
-] as const;
 
 const pageCopy: Record<MerchantWorkspacePage, { label: string; title: string; description: string }> = {
   overview: {
@@ -197,59 +189,22 @@ export function MerchantWorkspace({
     : activePageCopy.title;
 
   return (
-    <div className="min-w-0 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10 xl:grid-cols-[14rem_minmax(0,1fr)] xl:gap-12">
-      <aside className="hidden lg:block">
-        <div className="sticky top-24">
-          <p className="px-3 text-xs font-bold uppercase tracking-[0.14em] text-ink-faint">Merchant workspace</p>
-          <nav aria-label="Merchant workspace" className="mt-4 grid gap-1">
-            {merchantNavigation.map(({ href, icon: Icon, label, page: navPage }) => (
-              <Link
-                key={href}
-                aria-current={page === navPage ? "page" : undefined}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
-                  page === navPage
-                    ? "bg-white text-forest shadow-sm"
-                    : "text-ink-muted hover:bg-white/70 hover:text-ink"
-                }`}
-                href={href}
-              >
-                <Icon aria-hidden="true" className="size-4" />
-                {label}
-              </Link>
-            ))}
-          </nav>
-          <div className="mt-7 border-t border-line px-3 pt-5 text-xs leading-5 text-ink-faint">
-            <p className="font-semibold text-ink-muted">{config.network === "testnet" ? "Stellar Testnet" : "Stellar Mainnet"}</p>
-            <p className="mt-1 font-mono">{shortenStellarAddress(address)}</p>
-          </div>
-        </div>
-      </aside>
-
-      <div className="min-w-0">
-        <nav
-          aria-label="Merchant workspace"
-          className="mb-7 grid grid-cols-2 gap-1 rounded-xl border border-line bg-white p-1 sm:grid-cols-4 lg:hidden"
-        >
-          {merchantNavigation.map(({ href, label, page: navPage }) => (
-            <Link
-              key={href}
-              aria-current={page === navPage ? "page" : undefined}
-              className={`rounded-lg px-3 py-2 text-center text-xs font-bold transition sm:text-sm ${
-                page === navPage ? "bg-forest text-white" : "text-ink-muted hover:bg-sage-soft hover:text-ink"
-              }`}
-              href={href}
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
-
+    <div className="min-w-0">
+        {page !== "overview" && (
+          <Link
+            className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-ink-muted transition hover:text-forest"
+            href="/merchant"
+          >
+            <ArrowLeft aria-hidden="true" className="size-4" />
+            Merchant overview
+          </Link>
+        )}
         <header className="flex flex-col gap-5 border-b border-line pb-7 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-coral-strong">{activePageCopy.label}</p>
             <h1 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-ink sm:text-3xl">{dashboardTitle}</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted">{activePageCopy.description}</p>
-            <p className="mt-2 text-xs font-semibold text-ink-faint lg:hidden">
+            <p className="mt-2 text-xs font-semibold text-ink-faint">
               {shortenStellarAddress(address)} · {config.network === "testnet" ? "Testnet" : "Mainnet"}
             </p>
           </div>
@@ -369,7 +324,6 @@ export function MerchantWorkspace({
             ) : <MerchantSetupRequired />
           )}
         </div>
-      </div>
     </div>
   );
 }

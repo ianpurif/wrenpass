@@ -76,7 +76,7 @@ describe("WalletProvider", () => {
 
     const walletMenuButton = await screen.findByRole("button", { name: /Open wallet menu/i });
     expect(walletMenuButton).toHaveTextContent(
-      `${address.slice(0, 4)}…${address.slice(-4)}`,
+      `${address.slice(0, 7)}...${address.slice(-7)}`,
     );
     const revokeCallsAfterConnect = vi.mocked(api.revokeSession).mock.calls.length;
     await user.click(walletMenuButton);
@@ -84,6 +84,12 @@ describe("WalletProvider", () => {
     const balanceRegion = screen.getByRole("region", { name: "Wallet balances" });
     expect(balanceRegion).toHaveTextContent("12.5000000 XLM");
     expect(balanceRegion).toHaveTextContent("6.0000000 USDC");
+    expect(screen.getByRole("link", { name: "Business Profile" })).toHaveAttribute("href", "/merchant/business-identity");
+    const copyAddressButton = screen.getByRole("button", { name: "Copy full wallet address" });
+    expect(copyAddressButton).toHaveTextContent(`${address.slice(0, 7)}...${address.slice(-7)}`);
+    await user.click(copyAddressButton);
+    expect(copyAddressButton).toHaveTextContent("Copied");
+    expect(await navigator.clipboard.readText()).toBe(address);
     expect(api.createChallenge).toHaveBeenCalledWith(address);
     expect(adapter.signMessage).toHaveBeenCalledWith("Sign in", address, Networks.TESTNET);
 
