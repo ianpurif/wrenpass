@@ -19,6 +19,7 @@
   --color-danger: #b64343;
   --color-danger-strong: #923535;
   --color-danger-soft: #fff1f1;
+  --radius-card: 3px;
   --shadow-soft: 0 18px 50px rgba(34, 58, 47, 0.08);
   --shadow-button: 0 8px 20px rgba(35, 99, 71, 0.18);
   --shadow-dialog: 0 30px 90px rgba(23, 36, 31, 0.24);

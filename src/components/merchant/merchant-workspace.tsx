@@ -56,7 +56,7 @@ const pageCopy: Record<MerchantWorkspacePage, { label: string; title: string; de
 
 function MerchantSetupRequired() {
   return (
-    <section className="rounded-2xl border border-line bg-white p-6 sm:p-8" aria-labelledby="merchant-setup-heading">
+    <section className="rounded-card border border-line bg-white p-6 sm:p-8" aria-labelledby="merchant-setup-heading">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-coral-strong">Setup required</p>
@@ -146,7 +146,7 @@ export function MerchantWorkspace({
 
   if (status !== "connected" || !address) {
     return (
-      <section className="mx-auto max-w-xl rounded-2xl border border-line bg-white p-8 text-center sm:p-10">
+      <section className="mx-auto max-w-xl rounded-card border border-line bg-white p-8 text-center sm:p-10">
         <Store aria-hidden="true" className="mx-auto size-6 text-forest" />
         <h2 className="mt-5 text-xl font-bold tracking-tight text-ink">Connect your merchant wallet</h2>
         <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
@@ -221,7 +221,7 @@ export function MerchantWorkspace({
           {page === "overview" && (
             dashboard.merchant ? (
               <>
-                <section aria-label="Campaign performance" className="overflow-hidden rounded-2xl border border-line bg-white">
+                <section aria-label="Campaign performance" className="overflow-hidden rounded-card border border-line bg-white">
                   <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
                     {stats.map(({ label, value }, index) => (
                       <div
@@ -248,14 +248,14 @@ export function MerchantWorkspace({
                     <span className="text-sm font-semibold text-ink-faint">{dashboard.campaigns.length} total</span>
                   </div>
                   {dashboard.campaigns.length ? (
-                    <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-white">
+                    <div className="mt-4 overflow-hidden rounded-card border border-line bg-white">
                       <div className={`${campaignTableGridClass} hidden gap-4 border-b border-line bg-canvas px-5 py-3 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-ink-faint lg:grid`}>
                         <span>Campaign</span><span>Status</span><span>Supply</span><span>Raised</span><span className="text-right">Actions</span>
                       </div>
                       {dashboard.campaigns.map((campaign) => <CampaignCard campaign={campaign} key={campaign.onchain.id} />)}
                     </div>
                   ) : (
-                    <div className="mt-4 rounded-2xl border border-dashed border-line bg-white px-6 py-10 text-center">
+                    <div className="mt-4 rounded-card border border-dashed border-line bg-white px-6 py-10 text-center">
                       <p className="font-bold text-ink">No campaigns yet</p>
                       <p className="mt-1 text-sm text-ink-muted">Create a campaign when your service offer is ready.</p>
                       <Link className={buttonStyles({ className: "mt-5", size: "sm" })} href="/merchant/create-campaign">New campaign</Link>
@@ -268,7 +268,7 @@ export function MerchantWorkspace({
 
           {page === "business-identity" && (
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-              <section aria-labelledby="merchant-profile-heading" className="rounded-2xl border border-line bg-white">
+              <section aria-labelledby="merchant-profile-heading" className="rounded-card border border-line bg-white">
                 <div className="border-b border-line px-6 py-5 sm:px-7">
                   <h2 id="merchant-profile-heading" className="font-bold text-ink">Public business details</h2>
                   <p className="mt-1 text-sm leading-6 text-ink-muted">Used on every campaign page shared with customers.</p>
@@ -280,7 +280,7 @@ export function MerchantWorkspace({
                   />
                 </div>
               </section>
-              <aside className="self-start rounded-2xl border border-line bg-white p-6 xl:sticky xl:top-24">
+              <aside className="self-start rounded-card border border-line bg-white p-6 xl:sticky xl:top-24">
                 <h2 className="text-sm font-bold text-ink">Profile use</h2>
                 <ul className="mt-3 grid gap-2 text-sm leading-6 text-ink-muted">
                   <li>Shown on public campaign pages</li>
@@ -296,7 +296,7 @@ export function MerchantWorkspace({
 
           {page === "create-campaign" && (
             dashboard.merchant ? (
-              <section aria-labelledby="create-campaign-heading" className="rounded-2xl border border-line bg-white">
+              <section aria-labelledby="create-campaign-heading" className="rounded-card border border-line bg-white">
                 <div className="border-b border-line px-6 py-5 sm:px-7">
                   <h2 id="create-campaign-heading" className="font-bold text-ink">Campaign terms</h2>
                   <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-muted">

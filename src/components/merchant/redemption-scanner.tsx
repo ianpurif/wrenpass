@@ -86,7 +86,7 @@ export function RedemptionScanner({ config }: { config: StellarConfig }) {
 
   return (
     <section aria-labelledby="redeem-pass-heading" className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-      <div className="rounded-2xl border border-line bg-white">
+      <div className="rounded-card border border-line bg-white">
         <div className="border-b border-line px-6 py-5 sm:px-7">
           <h2 id="redeem-pass-heading" className="font-bold text-ink">Scan customer QR</h2>
           <p className="mt-1 text-sm leading-6 text-ink-muted">Use the camera or upload a QR image from this device.</p>
@@ -122,7 +122,7 @@ export function RedemptionScanner({ config }: { config: StellarConfig }) {
         </div>
       </div>
 
-      <aside className="self-start rounded-2xl border border-line bg-white p-6 xl:sticky xl:top-24">
+      <aside className="self-start rounded-card border border-line bg-white p-6 xl:sticky xl:top-24">
         <h2 className="text-sm font-bold text-ink">Redemption flow</h2>
         <ol className="mt-4 grid gap-5">
           {[

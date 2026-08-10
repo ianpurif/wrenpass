@@ -248,7 +248,7 @@ export function CampaignForm({
           </section>
         </div>
 
-        <aside className="rounded-xl border border-line bg-workspace p-5 xl:sticky xl:top-24">
+        <aside className="rounded-card border border-line bg-workspace p-5 xl:sticky xl:top-24">
           <h3 className="text-sm font-bold text-ink">Offer summary</h3>
           {quote ? (
             <dl className="mt-4 divide-y divide-line border-y border-line">

@@ -80,7 +80,7 @@ export function RedemptionRequests({
   if (!requests.length && !error) return null;
 
   return (
-    <section aria-labelledby="redemption-requests-heading" className="overflow-hidden rounded-2xl border border-coral/35 bg-white">
+    <section aria-labelledby="redemption-requests-heading" className="overflow-hidden rounded-card border border-coral/35 bg-white">
       <div className="border-b border-coral/20 bg-coral-soft px-5 py-4 sm:px-6">
         <div className="flex items-start gap-3">
           <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-coral-strong" />

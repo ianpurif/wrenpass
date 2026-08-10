@@ -37,7 +37,7 @@ const activityLabels: Record<CustomerActivityDto["kind"], string> = {
 function ActivityTable({ activity }: { activity: CustomerActivityDto[] }) {
   if (!activity.length) {
     return (
-      <div className="rounded-xl border border-dashed border-line bg-white px-6 py-10 text-center">
+      <div className="rounded-card border border-dashed border-line bg-white px-6 py-10 text-center">
         <p className="font-semibold text-ink">No recent activity</p>
         <p className="mt-1 text-sm text-ink-muted">Retained purchase, transfer, redemption, and refund events appear here.</p>
       </div>
@@ -49,7 +49,7 @@ function ActivityTable({ activity }: { activity: CustomerActivityDto[] }) {
   );
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-white">
+    <div className="overflow-hidden rounded-card border border-line bg-white">
       <div className="hidden grid-cols-[0.75fr_0.75fr_0.85fr_minmax(0,1fr)_1fr] gap-4 border-b border-line bg-canvas px-5 py-3 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-ink-faint md:grid">
         <span>Type</span><span>Pass</span><span>Campaign</span><span>Details</span><span>Date</span>
       </div>
@@ -166,7 +166,7 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
 
   if (status !== "connected" || !address) {
     return (
-      <section className="mx-auto max-w-xl rounded-2xl border border-line bg-white p-8 text-center sm:p-10">
+      <section className="mx-auto max-w-xl rounded-card border border-line bg-white p-8 text-center sm:p-10">
         <WalletCards aria-hidden="true" className="mx-auto size-6 text-forest" />
         <h2 className="mt-5 text-xl font-bold tracking-tight text-ink">Connect your customer wallet</h2>
         <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
@@ -227,7 +227,7 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
       <div className="mt-7 grid gap-8">
         {error && <ErrorState description={error} onRetry={() => void loadDashboard()} />}
 
-        <section aria-label="Pass status summary" className="overflow-hidden rounded-2xl border border-line bg-white">
+        <section aria-label="Pass status summary" className="overflow-hidden rounded-card border border-line bg-white">
           <div className="grid grid-cols-2 sm:grid-cols-4">
             {passTabs.map((tab, index) => (
               <div
@@ -282,7 +282,7 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
                   {visiblePasses.map((pass) => <CustomerPassCard config={config} key={pass.id} pass={pass} onGifted={loadDashboard} />)}
                 </div>
               ) : (
-                <div className="mt-4 rounded-2xl border border-dashed border-line bg-white px-6 py-10 text-center">
+                <div className="mt-4 rounded-card border border-dashed border-line bg-white px-6 py-10 text-center">
                   <TicketCheck aria-hidden="true" className="mx-auto size-5 text-forest" />
                   <p className="mt-3 font-semibold text-ink">No {selectedStatus.toLowerCase()} passes</p>
                   <p className="mt-1 text-sm text-ink-muted">Passes in this state will appear from current on-chain ownership.</p>

@@ -43,7 +43,7 @@ export function CustomerPassCard({
 
   return (
     <>
-      <article className="rounded-2xl border border-line bg-white p-5 sm:p-6">
+      <article className="rounded-card border border-line bg-white p-5 sm:p-6">
         <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="min-w-0">
             <div className="flex min-w-0 items-start gap-3">
