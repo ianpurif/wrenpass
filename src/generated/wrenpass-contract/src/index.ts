@@ -61,7 +61,8 @@ export const Errors = {
   15: {message:"PassNotActive"},
   16: {message:"PassExpired"},
   17: {message:"RefundNotAvailable"},
-  18: {message:"InvalidRecipient"}
+  18: {message:"InvalidRecipient"},
+  19: {message:"InvalidPageSize"}
 }
 
 
@@ -126,6 +127,14 @@ export interface PurchaseAmounts {
 }
 
 
+
+
+export interface IndexMigrationStatus {
+  campaign_cursor: u64;
+  campaigns_complete: boolean;
+  pass_cursor: u64;
+  passes_complete: boolean;
+}
 
 
 export interface Client {
@@ -205,6 +214,26 @@ export interface Client {
   resume_campaign: ({campaign_id, merchant}: {campaign_id: u64, merchant: string}, options?: MethodOptions) => Promise<AssembledTransaction<Result<void>>>
 
   /**
+   * Construct and simulate a storage_version transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  storage_version: (options?: MethodOptions) => Promise<AssembledTransaction<u32>>
+
+  /**
+   * Construct and simulate a get_owner_passes transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  get_owner_passes: ({owner, cursor, limit}: {owner: string, cursor: u64, limit: u32}, options?: MethodOptions) => Promise<AssembledTransaction<Result<Array<Pass>>>>
+
+  /**
+   * Construct and simulate a maintain_storage transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  maintain_storage: ({campaign_ids, pass_ids}: {campaign_ids: Array<u64>, pass_ids: Array<u64>}, options?: MethodOptions) => Promise<AssembledTransaction<Result<void>>>
+
+  /**
+   * Construct and simulate a owner_pass_count transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  owner_pass_count: ({owner}: {owner: string}, options?: MethodOptions) => Promise<AssembledTransaction<u64>>
+
+  /**
    * Construct and simulate a publish_campaign transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   publish_campaign: ({campaign_id, merchant}: {campaign_id: u64, merchant: string}, options?: MethodOptions) => Promise<AssembledTransaction<Result<void>>>
@@ -213,6 +242,31 @@ export interface Client {
    * Construct and simulate a remaining_supply transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   remaining_supply: ({campaign_id}: {campaign_id: u64}, options?: MethodOptions) => Promise<AssembledTransaction<Result<u32>>>
+
+  /**
+   * Construct and simulate a migrate_pass_index transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  migrate_pass_index: ({limit}: {limit: u32}, options?: MethodOptions) => Promise<AssembledTransaction<Result<IndexMigrationStatus>>>
+
+  /**
+   * Construct and simulate a get_merchant_campaigns transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  get_merchant_campaigns: ({merchant, cursor, limit}: {merchant: string, cursor: u64, limit: u32}, options?: MethodOptions) => Promise<AssembledTransaction<Result<Array<Campaign>>>>
+
+  /**
+   * Construct and simulate a index_migration_status transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  index_migration_status: (options?: MethodOptions) => Promise<AssembledTransaction<IndexMigrationStatus>>
+
+  /**
+   * Construct and simulate a migrate_campaign_index transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  migrate_campaign_index: ({limit}: {limit: u32}, options?: MethodOptions) => Promise<AssembledTransaction<Result<IndexMigrationStatus>>>
+
+  /**
+   * Construct and simulate a merchant_campaign_count transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  merchant_campaign_count: ({merchant}: {merchant: string}, options?: MethodOptions) => Promise<AssembledTransaction<u64>>
 
 }
 export class Client extends ContractClient {
@@ -233,7 +287,7 @@ export class Client extends ContractClient {
   constructor(public readonly options: ContractClientOptions) {
     super(
       new ContractSpec([ "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",
-        "AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAAEgAAAAAAAAASQWxyZWFkeUluaXRpYWxpemVkAAAAAAABAAAAAAAAAA5Ob3RJbml0aWFsaXplZAAAAAAAAgAAAAAAAAAITm90Rm91bmQAAAADAAAAAAAAAAxVbmF1dGhvcml6ZWQAAAAEAAAAAAAAAA1JbnZhbGlkQW1vdW50AAAAAAAABQAAAAAAAAANSW52YWxpZFN1cHBseQAAAAAAAAYAAAAAAAAAEUludmFsaWRFeHBpcmF0aW9uAAAAAAAABwAAAAAAAAAVSW52YWxpZEZpbmFuY2lhbFJ1bGVzAAAAAAAACAAAAAAAAAAMSW52YWxpZFN0YXRlAAAACQAAAAAAAAAPQ2FtcGFpZ25FeHBpcmVkAAAAAAoAAAAAAAAACE92ZXJmbG93AAAACwAAAAAAAAAUSW52YWxpZENvbmZpZ3VyYXRpb24AAAAMAAAAAAAAAAdTb2xkT3V0AAAAAA0AAAAAAAAAE0luc3VmZmljaWVudEJhbGFuY2UAAAAADgAAAAAAAAANUGFzc05vdEFjdGl2ZQAAAAAAAA8AAAAAAAAAC1Bhc3NFeHBpcmVkAAAAABAAAAAAAAAAElJlZnVuZE5vdEF2YWlsYWJsZQAAAAAAEQAAAAAAAAAQSW52YWxpZFJlY2lwaWVudAAAABI=",
+        "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",
@@ -250,6 +304,7 @@ export class Client extends ContractClient {
         "AAAAAAAAAAAAAAAIZ2V0X3Bhc3MAAAABAAAAAAAAAAdwYXNzX2lkAAAAAAYAAAABAAAD6AAAB9AAAAAEUGFzcw==",
         "AAAAAAAAAAAAAAAIcHVyY2hhc2UAAAACAAAAAAAAAAtjYW1wYWlnbl9pZAAAAAAGAAAAAAAAAAhjdXN0b21lcgAAABMAAAABAAAD6QAAAAYAAAAD",
         "AAAAAAAAAAAAAAAJZ2lmdF9wYXNzAAAAAAAAAwAAAAAAAAAHcGFzc19pZAAAAAAGAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAACXJlY2lwaWVudAAAAAAAABMAAAABAAAD6QAAAAIAAAAD",
+        "AAAAAQAAAAAAAAAAAAAAFEluZGV4TWlncmF0aW9uU3RhdHVzAAAABAAAAAAAAAAPY2FtcGFpZ25fY3Vyc29yAAAAAAYAAAAAAAAAEmNhbXBhaWduc19jb21wbGV0ZQAAAAAAAQAAAAAAAAALcGFzc19jdXJzb3IAAAAABgAAAAAAAAAPcGFzc2VzX2NvbXBsZXRlAAAAAAE=",
         "AAAAAAAAAAAAAAAKZ2V0X2NvbmZpZwAAAAAAAAAAAAEAAAPpAAAH0AAAAA5Db250cmFjdENvbmZpZwAAAAAAAw==",
         "AAAAAAAAAAAAAAAKaW5pdGlhbGl6ZQAAAAAAAgAAAAAAAAAIcGxhdGZvcm0AAAATAAAAAAAAAA1wYXltZW50X2Fzc2V0AAAAAAAAEwAAAAEAAAPpAAAAAgAAAAM=",
         "AAAAAAAAAAAAAAAKcGFzc19jb3VudAAAAAAAAAAAAAEAAAAG",
@@ -263,8 +318,17 @@ export class Client extends ContractClient {
         "AAAAAAAAAAAAAAAPY2FuY2VsX2NhbXBhaWduAAAAAAIAAAAAAAAAC2NhbXBhaWduX2lkAAAAAAYAAAAAAAAACG1lcmNoYW50AAAAEwAAAAEAAAPpAAAACwAAAAM=",
         "AAAAAAAAAAAAAAAPY3JlYXRlX2NhbXBhaWduAAAAAAIAAAAAAAAACG1lcmNoYW50AAAAEwAAAAAAAAAFdGVybXMAAAAAAAfQAAAADUNhbXBhaWduVGVybXMAAAAAAAABAAAD6QAAAAYAAAAD",
         "AAAAAAAAAAAAAAAPcmVzdW1lX2NhbXBhaWduAAAAAAIAAAAAAAAAC2NhbXBhaWduX2lkAAAAAAYAAAAAAAAACG1lcmNoYW50AAAAEwAAAAEAAAPpAAAAAgAAAAM=",
+        "AAAAAAAAAAAAAAAPc3RvcmFnZV92ZXJzaW9uAAAAAAAAAAABAAAABA==",
+        "AAAAAAAAAAAAAAAQZ2V0X293bmVyX3Bhc3NlcwAAAAMAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAGY3Vyc29yAAAAAAAGAAAAAAAAAAVsaW1pdAAAAAAAAAQAAAABAAAD6QAAA+oAAAfQAAAABFBhc3MAAAAD",
+        "AAAAAAAAAAAAAAAQbWFpbnRhaW5fc3RvcmFnZQAAAAIAAAAAAAAADGNhbXBhaWduX2lkcwAAA+oAAAAGAAAAAAAAAAhwYXNzX2lkcwAAA+oAAAAGAAAAAQAAA+kAAAACAAAAAw==",
+        "AAAAAAAAAAAAAAAQb3duZXJfcGFzc19jb3VudAAAAAEAAAAAAAAABW93bmVyAAAAAAAAEwAAAAEAAAAG",
         "AAAAAAAAAAAAAAAQcHVibGlzaF9jYW1wYWlnbgAAAAIAAAAAAAAAC2NhbXBhaWduX2lkAAAAAAYAAAAAAAAACG1lcmNoYW50AAAAEwAAAAEAAAPpAAAAAgAAAAM=",
-        "AAAAAAAAAAAAAAAQcmVtYWluaW5nX3N1cHBseQAAAAEAAAAAAAAAC2NhbXBhaWduX2lkAAAAAAYAAAABAAAD6QAAAAQAAAAD" ]),
+        "AAAAAAAAAAAAAAAQcmVtYWluaW5nX3N1cHBseQAAAAEAAAAAAAAAC2NhbXBhaWduX2lkAAAAAAYAAAABAAAD6QAAAAQAAAAD",
+        "AAAAAAAAAAAAAAASbWlncmF0ZV9wYXNzX2luZGV4AAAAAAABAAAAAAAAAAVsaW1pdAAAAAAAAAQAAAABAAAD6QAAB9AAAAAUSW5kZXhNaWdyYXRpb25TdGF0dXMAAAAD",
+        "AAAAAAAAAAAAAAAWZ2V0X21lcmNoYW50X2NhbXBhaWducwAAAAAAAwAAAAAAAAAIbWVyY2hhbnQAAAATAAAAAAAAAAZjdXJzb3IAAAAAAAYAAAAAAAAABWxpbWl0AAAAAAAABAAAAAEAAAPpAAAD6gAAB9AAAAAIQ2FtcGFpZ24AAAAD",
+        "AAAAAAAAAAAAAAAWaW5kZXhfbWlncmF0aW9uX3N0YXR1cwAAAAAAAAAAAAEAAAfQAAAAFEluZGV4TWlncmF0aW9uU3RhdHVz",
+        "AAAAAAAAAAAAAAAWbWlncmF0ZV9jYW1wYWlnbl9pbmRleAAAAAAAAQAAAAAAAAAFbGltaXQAAAAAAAAEAAAAAQAAA+kAAAfQAAAAFEluZGV4TWlncmF0aW9uU3RhdHVzAAAAAw==",
+        "AAAAAAAAAAAAAAAXbWVyY2hhbnRfY2FtcGFpZ25fY291bnQAAAAAAQAAAAAAAAAIbWVyY2hhbnQAAAATAAAAAQAAAAY=" ]),
       options
     )
   }
@@ -284,7 +348,16 @@ export class Client extends ContractClient {
         cancel_campaign: this.txFromJSON<Result<i128>>,
         create_campaign: this.txFromJSON<Result<u64>>,
         resume_campaign: this.txFromJSON<Result<void>>,
+        storage_version: this.txFromJSON<u32>,
+        get_owner_passes: this.txFromJSON<Result<Array<Pass>>>,
+        maintain_storage: this.txFromJSON<Result<void>>,
+        owner_pass_count: this.txFromJSON<u64>,
         publish_campaign: this.txFromJSON<Result<void>>,
-        remaining_supply: this.txFromJSON<Result<u32>>
+        remaining_supply: this.txFromJSON<Result<u32>>,
+        migrate_pass_index: this.txFromJSON<Result<IndexMigrationStatus>>,
+        get_merchant_campaigns: this.txFromJSON<Result<Array<Campaign>>>,
+        index_migration_status: this.txFromJSON<IndexMigrationStatus>,
+        migrate_campaign_index: this.txFromJSON<Result<IndexMigrationStatus>>,
+        merchant_campaign_count: this.txFromJSON<u64>
   }
 }

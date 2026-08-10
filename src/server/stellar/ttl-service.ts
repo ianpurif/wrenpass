@@ -4,7 +4,6 @@ import { Address, nativeToScVal, rpc, xdr } from "@stellar/stellar-sdk";
 
 import type { StellarConfig } from "@/lib/stellar/config";
 
-const MAX_TRACKED_ENTRIES = BigInt(2_000);
 const LEDGER_ENTRY_BATCH_SIZE = 200;
 export const MIN_SAFE_TTL_LEDGERS = 250_000;
 
@@ -28,57 +27,88 @@ function enumStorageKey(name: "Campaign" | "Pass" | "Review", id: bigint): xdr.S
   ]);
 }
 
+export function* iterateReviewLedgerKeys(
+  contractId: string,
+  reviewCount: bigint,
+): Generator<xdr.LedgerKey> {
+  if (reviewCount < BigInt(0)) {
+    throw new Error("Review entry count cannot be negative.");
+  }
+
+  const contractAddress = Address.fromString(contractId).toScAddress();
+  yield contractDataKey(contractAddress, xdr.ScVal.scvLedgerKeyContractInstance());
+  for (let id = BigInt(1); id <= reviewCount; id += BigInt(1)) {
+    yield contractDataKey(contractAddress, enumStorageKey("Review", id));
+  }
+}
+
 export function createReviewLedgerKeys(
   contractId: string,
   reviewCount: bigint,
 ): xdr.LedgerKey[] {
-  if (reviewCount < BigInt(0)) {
-    throw new Error("Review entry count cannot be negative.");
-  }
-  if (reviewCount > MAX_TRACKED_ENTRIES) {
-    throw new Error("Review contract TTL validation exceeded its safe entry limit.");
-  }
-
-  const contractAddress = Address.fromString(contractId).toScAddress();
-  const keys = [
-    contractDataKey(contractAddress, xdr.ScVal.scvLedgerKeyContractInstance()),
-  ];
-  for (let id = BigInt(1); id <= reviewCount; id += BigInt(1)) {
-    keys.push(contractDataKey(contractAddress, enumStorageKey("Review", id)));
-  }
-  return keys;
+  return [...iterateReviewLedgerKeys(contractId, reviewCount)];
 }
 
 async function assertLedgerKeysTtlReady(
   rpcUrl: string,
-  keys: xdr.LedgerKey[],
+  keys: Iterable<xdr.LedgerKey>,
   entryLabel: string,
 ): Promise<{ entryCount: number; minimumRemainingLedgers: number }> {
   const server = new rpc.Server(rpcUrl);
   const latestLedger = await server.getLatestLedger();
-  const entries = [];
-  for (let index = 0; index < keys.length; index += LEDGER_ENTRY_BATCH_SIZE) {
-    const response = await server.getLedgerEntries(
-      ...keys.slice(index, index + LEDGER_ENTRY_BATCH_SIZE),
-    );
-    entries.push(...response.entries);
-  }
+  let entryCount = 0;
+  let minimumRemainingLedgers = Number.POSITIVE_INFINITY;
+  let batch: xdr.LedgerKey[] = [];
 
-  if (entries.length !== keys.length) {
-    throw new Error(`One or more ${entryLabel} entries are missing or archived.`);
+  const inspectBatch = async () => {
+    if (batch.length === 0) return;
+    const response = await server.getLedgerEntries(...batch);
+    if (response.entries.length !== batch.length) {
+      throw new Error(`One or more ${entryLabel} entries are missing or archived.`);
+    }
+    if (response.entries.some((entry) => entry.liveUntilLedgerSeq === undefined)) {
+      throw new Error(`Stellar RPC did not return TTL data for every ${entryLabel} entry.`);
+    }
+    entryCount += response.entries.length;
+    minimumRemainingLedgers = Math.min(
+      minimumRemainingLedgers,
+      ...response.entries.map(
+        (entry) => entry.liveUntilLedgerSeq! - latestLedger.sequence,
+      ),
+    );
+    batch = [];
+  };
+
+  for (const key of keys) {
+    batch.push(key);
+    if (batch.length === LEDGER_ENTRY_BATCH_SIZE) await inspectBatch();
   }
-  if (entries.some((entry) => entry.liveUntilLedgerSeq === undefined)) {
-    throw new Error(`Stellar RPC did not return TTL data for every ${entryLabel} entry.`);
-  }
-  const minimumRemainingLedgers = Math.min(
-    ...entries.map((entry) => entry.liveUntilLedgerSeq! - latestLedger.sequence),
-  );
+  await inspectBatch();
   if (minimumRemainingLedgers < MIN_SAFE_TTL_LEDGERS) {
     throw new Error(
       `${entryLabel} TTL is below the ${MIN_SAFE_TTL_LEDGERS}-ledger release threshold. Extend the tracked entries before release.`,
     );
   }
-  return { entryCount: entries.length, minimumRemainingLedgers };
+  return { entryCount, minimumRemainingLedgers };
+}
+
+export function* iterateWrenPassLedgerKeys(
+  contractId: string,
+  campaignCount: bigint,
+  passCount: bigint,
+): Generator<xdr.LedgerKey> {
+  if (campaignCount < BigInt(0) || passCount < BigInt(0)) {
+    throw new Error("Contract entry counts cannot be negative.");
+  }
+
+  const contractAddress = Address.fromString(contractId).toScAddress();
+  yield contractDataKey(contractAddress, xdr.ScVal.scvLedgerKeyContractInstance());
+  for (let id = BigInt(1); id <= campaignCount; id += BigInt(1)) {
+    yield contractDataKey(contractAddress, enumStorageKey("Campaign", id));
+  }
+  for (let id = BigInt(1); id <= passCount; id += BigInt(1)) {
+    yield contractDataKey(contractAddress, enumStorageKey("Pass", id));
+  }
 }
 
 export function createWrenPassLedgerKeys(
@@ -86,24 +116,7 @@ export function createWrenPassLedgerKeys(
   campaignCount: bigint,
   passCount: bigint,
 ): xdr.LedgerKey[] {
-  if (campaignCount < BigInt(0) || passCount < BigInt(0)) {
-    throw new Error("Contract entry counts cannot be negative.");
-  }
-  if (campaignCount + passCount > MAX_TRACKED_ENTRIES) {
-    throw new Error("Contract TTL validation exceeded its safe entry limit.");
-  }
-
-  const contractAddress = Address.fromString(contractId).toScAddress();
-  const keys = [
-    contractDataKey(contractAddress, xdr.ScVal.scvLedgerKeyContractInstance()),
-  ];
-  for (let id = BigInt(1); id <= campaignCount; id += BigInt(1)) {
-    keys.push(contractDataKey(contractAddress, enumStorageKey("Campaign", id)));
-  }
-  for (let id = BigInt(1); id <= passCount; id += BigInt(1)) {
-    keys.push(contractDataKey(contractAddress, enumStorageKey("Pass", id)));
-  }
-  return keys;
+  return [...iterateWrenPassLedgerKeys(contractId, campaignCount, passCount)];
 }
 
 export async function assertWrenPassTtlReady(
@@ -111,11 +124,7 @@ export async function assertWrenPassTtlReady(
   campaignCount: bigint,
   passCount: bigint,
 ): Promise<{ entryCount: number; minimumRemainingLedgers: number }> {
-  const keys = createWrenPassLedgerKeys(
-    config.wrenPassContractId,
-    campaignCount,
-    passCount,
-  );
+  const keys = iterateWrenPassLedgerKeys(config.wrenPassContractId, campaignCount, passCount);
   return assertLedgerKeysTtlReady(config.rpcUrl, keys, "WrenPass contract");
 }
 
@@ -125,7 +134,7 @@ export async function assertReviewTtlReady(
 ): Promise<{ entryCount: number; minimumRemainingLedgers: number }> {
   return assertLedgerKeysTtlReady(
     config.rpcUrl,
-    createReviewLedgerKeys(config.reviewContractId, reviewCount),
+    iterateReviewLedgerKeys(config.reviewContractId, reviewCount),
     "WrenPass review contract",
   );
 }

@@ -6,6 +6,7 @@ import {
   type Campaign,
   type CampaignTerms,
   type ContractConfig,
+  type IndexMigrationStatus,
   type Pass,
 } from "@/generated/wrenpass-contract/src";
 import type { StellarConfig } from "@/lib/stellar/config";
@@ -16,6 +17,7 @@ type SignAuthEntry = NonNullable<ClientOptions["signAuthEntry"]>;
 const contractErrorMessages: Record<string, string> = {
   CampaignExpired: "This campaign has expired.",
   InsufficientBalance: "Your USDC balance is too low for this purchase.",
+  InvalidPageSize: "The requested on-chain page size is not supported.",
   InvalidRecipient: "Choose a different recipient wallet.",
   InvalidState: "This action is not available in the campaign's current state.",
   PassExpired: "This pass has expired and cannot be gifted.",
@@ -331,4 +333,56 @@ export async function readContractPassCount(config: StellarConfig): Promise<bigi
 export async function readContractCampaignCount(config: StellarConfig): Promise<bigint> {
   const transaction = await createClient(config).campaign_count();
   return transaction.result;
+}
+
+export async function readContractStorageVersion(config: StellarConfig): Promise<number> {
+  const transaction = await createClient(config).storage_version();
+  return transaction.result;
+}
+
+export async function readContractIndexMigrationStatus(
+  config: StellarConfig,
+): Promise<IndexMigrationStatus> {
+  const transaction = await createClient(config).index_migration_status();
+  return transaction.result;
+}
+
+export async function readContractMerchantCampaignCount(
+  config: StellarConfig,
+  merchant: string,
+): Promise<bigint> {
+  const transaction = await createClient(config).merchant_campaign_count({ merchant });
+  return transaction.result;
+}
+
+export async function readContractMerchantCampaigns(
+  config: StellarConfig,
+  merchant: string,
+  cursor: bigint,
+  limit: number,
+): Promise<Campaign[]> {
+  const transaction = await createClient(config).get_merchant_campaigns({
+    merchant,
+    cursor,
+    limit,
+  });
+  return unwrapContractResult(transaction.result);
+}
+
+export async function readContractOwnerPassCount(
+  config: StellarConfig,
+  owner: string,
+): Promise<bigint> {
+  const transaction = await createClient(config).owner_pass_count({ owner });
+  return transaction.result;
+}
+
+export async function readContractOwnerPasses(
+  config: StellarConfig,
+  owner: string,
+  cursor: bigint,
+  limit: number,
+): Promise<Pass[]> {
+  const transaction = await createClient(config).get_owner_passes({ owner, cursor, limit });
+  return unwrapContractResult(transaction.result);
 }

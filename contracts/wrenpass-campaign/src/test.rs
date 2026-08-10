@@ -4,6 +4,7 @@ use super::*;
 use soroban_sdk::{
     symbol_short,
     testutils::{
+        storage::{Instance as _, Persistent as _},
         Address as _, AuthorizedFunction, AuthorizedInvocation, Events as _, Ledger as _, MockAuth,
         MockAuthInvoke,
     },
@@ -74,6 +75,10 @@ fn initialization_is_authorized_and_one_time_only() {
             payment_asset,
         }
     );
+    assert_eq!(client.storage_version(), CURRENT_STORAGE_VERSION);
+    let migration = client.index_migration_status();
+    assert!(migration.campaigns_complete);
+    assert!(migration.passes_complete);
 }
 
 #[test]
@@ -1217,4 +1222,206 @@ fn the_current_owner_after_a_gift_receives_the_refund() {
     assert_eq!(client.refund_pass(&pass_id, &recipient), 50_000_000);
     assert_eq!(token.balance(&owner), 0);
     assert_eq!(token.balance(&recipient), 50_000_000);
+}
+
+#[test]
+fn indexes_campaigns_by_merchant_with_stable_pagination() {
+    let (env, _contract_id, client, _platform, _payment_asset) = setup();
+    let merchant = Address::generate(&env);
+    let other_merchant = Address::generate(&env);
+
+    let first_id = create(&client, &merchant, &default_terms());
+    create(&client, &other_merchant, &default_terms());
+    let second_id = create(&client, &merchant, &default_terms());
+
+    assert_eq!(client.merchant_campaign_count(&merchant), 2);
+    assert_eq!(
+        client
+            .get_merchant_campaigns(&merchant, &0, &1)
+            .iter()
+            .map(|campaign| campaign.id)
+            .collect::<std::vec::Vec<_>>(),
+        std::vec![first_id]
+    );
+    assert_eq!(
+        client
+            .get_merchant_campaigns(&merchant, &1, &2)
+            .iter()
+            .map(|campaign| campaign.id)
+            .collect::<std::vec::Vec<_>>(),
+        std::vec![second_id]
+    );
+    assert_eq!(
+        client.try_get_merchant_campaigns(&merchant, &0, &0),
+        Err(Ok(Error::InvalidPageSize))
+    );
+    assert_eq!(
+        client.try_get_merchant_campaigns(&merchant, &0, &(MAX_INDEX_PAGE_SIZE + 1)),
+        Err(Ok(Error::InvalidPageSize))
+    );
+}
+
+#[test]
+fn owner_pass_index_tracks_purchases_gifts_and_terminal_states() {
+    let (env, _contract_id, client, _platform, payment_asset, merchant, owner, campaign_id) =
+        active_campaign(3);
+    let recipient = Address::generate(&env);
+    let first_pass = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+    let second_pass = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+
+    assert_eq!(client.owner_pass_count(&owner), 2);
+    client.gift_pass(&first_pass, &owner, &recipient);
+
+    assert_eq!(client.owner_pass_count(&owner), 1);
+    assert_eq!(client.owner_pass_count(&recipient), 1);
+    assert_eq!(
+        client
+            .get_owner_passes(&owner, &0, &MAX_INDEX_PAGE_SIZE)
+            .iter()
+            .map(|pass| pass.id)
+            .collect::<std::vec::Vec<_>>(),
+        std::vec![second_pass]
+    );
+    assert_eq!(
+        client
+            .get_owner_passes(&recipient, &0, &MAX_INDEX_PAGE_SIZE)
+            .iter()
+            .map(|pass| pass.id)
+            .collect::<std::vec::Vec<_>>(),
+        std::vec![first_pass]
+    );
+
+    client.redeem_pass(&second_pass, &merchant, &owner);
+    let owner_passes = client.get_owner_passes(&owner, &0, &MAX_INDEX_PAGE_SIZE);
+    assert_eq!(owner_passes.len(), 1);
+    assert_eq!(owner_passes.get(0).unwrap().status, PassStatus::Redeemed);
+    assert_eq!(client.pass_count(), 2);
+}
+
+#[test]
+fn incrementally_migrates_legacy_records_without_changing_core_state() {
+    let (env, contract_id, client, _platform, payment_asset, merchant, owner, campaign_id) =
+        active_campaign(2);
+    let first_pass = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+    let second_pass = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+    let campaign_before = client.get_campaign(&campaign_id).unwrap();
+    let first_pass_before = client.get_pass(&first_pass).unwrap();
+
+    env.as_contract(&contract_id, || {
+        env.storage().instance().remove(&DataKey::StorageVersion);
+        env.storage()
+            .instance()
+            .remove(&DataKey::CampaignIndexCursor);
+        env.storage().instance().remove(&DataKey::PassIndexCursor);
+        env.storage()
+            .persistent()
+            .remove(&DataKey::MerchantCampaignCount(merchant.clone()));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::MerchantCampaign(merchant.clone(), 0));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::CampaignIndex(campaign_id));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::OwnerPassCount(owner.clone()));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::OwnerPass(owner.clone(), 0));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::OwnerPass(owner.clone(), 1));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::PassOwnerIndex(first_pass));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::PassOwnerIndex(second_pass));
+    });
+
+    assert_eq!(client.storage_version(), LEGACY_STORAGE_VERSION);
+    assert_eq!(client.merchant_campaign_count(&merchant), 0);
+    assert_eq!(client.owner_pass_count(&owner), 0);
+
+    let campaign_status = client.migrate_campaign_index(&1);
+    assert!(campaign_status.campaigns_complete);
+    assert!(!campaign_status.passes_complete);
+    assert_eq!(client.storage_version(), LEGACY_STORAGE_VERSION);
+    assert_eq!(client.merchant_campaign_count(&merchant), 1);
+
+    let first_pass_status = client.migrate_pass_index(&1);
+    assert!(!first_pass_status.passes_complete);
+    assert_eq!(client.owner_pass_count(&owner), 1);
+    let complete = client.migrate_pass_index(&1);
+    assert!(complete.campaigns_complete);
+    assert!(complete.passes_complete);
+    assert_eq!(client.storage_version(), CURRENT_STORAGE_VERSION);
+    assert_eq!(client.owner_pass_count(&owner), 2);
+
+    client.migrate_campaign_index(&MAX_INDEX_PAGE_SIZE);
+    client.migrate_pass_index(&MAX_INDEX_PAGE_SIZE);
+    assert_eq!(client.merchant_campaign_count(&merchant), 1);
+    assert_eq!(client.owner_pass_count(&owner), 2);
+    assert_eq!(client.get_campaign(&campaign_id).unwrap(), campaign_before);
+    assert_eq!(client.get_pass(&first_pass).unwrap(), first_pass_before);
+}
+
+#[test]
+fn gifting_a_legacy_pass_repairs_its_owner_index_without_duplication() {
+    let (env, contract_id, client, _platform, payment_asset, _merchant, owner, campaign_id) =
+        active_campaign(1);
+    let recipient = Address::generate(&env);
+    let pass_id = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+
+    env.as_contract(&contract_id, || {
+        env.storage().instance().remove(&DataKey::StorageVersion);
+        env.storage().instance().remove(&DataKey::PassIndexCursor);
+        env.storage()
+            .persistent()
+            .remove(&DataKey::OwnerPassCount(owner.clone()));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::OwnerPass(owner.clone(), 0));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::PassOwnerIndex(pass_id));
+    });
+
+    client.gift_pass(&pass_id, &owner, &recipient);
+    assert_eq!(client.owner_pass_count(&owner), 0);
+    assert_eq!(client.owner_pass_count(&recipient), 1);
+    assert_eq!(
+        client
+            .get_owner_passes(&recipient, &0, &MAX_INDEX_PAGE_SIZE)
+            .get(0)
+            .unwrap()
+            .id,
+        pass_id
+    );
+
+    client.migrate_pass_index(&MAX_INDEX_PAGE_SIZE);
+    assert_eq!(client.owner_pass_count(&recipient), 1);
+}
+
+#[test]
+fn extends_core_and_index_storage_ttl_when_records_are_written() {
+    let (env, contract_id, client, _platform, payment_asset, merchant, owner, campaign_id) =
+        active_campaign(1);
+    let pass_id = mint_and_purchase(&env, &client, &payment_asset, campaign_id, &owner);
+
+    env.as_contract(&contract_id, || {
+        assert!(env.storage().instance().get_ttl() >= STORAGE_TTL_EXTEND_TO_LEDGERS);
+        for key in [
+            DataKey::Campaign(campaign_id),
+            DataKey::MerchantCampaignCount(merchant.clone()),
+            DataKey::MerchantCampaign(merchant, 0),
+            DataKey::CampaignIndex(campaign_id),
+            DataKey::Pass(pass_id),
+            DataKey::OwnerPassCount(owner.clone()),
+            DataKey::OwnerPass(owner.clone(), 0),
+            DataKey::PassOwnerIndex(pass_id),
+        ] {
+            assert!(env.storage().persistent().get_ttl(&key) >= STORAGE_TTL_EXTEND_TO_LEDGERS);
+        }
+    });
 }

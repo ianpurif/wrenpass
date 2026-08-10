@@ -2,11 +2,16 @@
 
 use soroban_sdk::{
     contract, contracterror, contractevent, contractimpl, contracttype, token::TokenClient,
-    Address, Env, MuxedAddress,
+    Address, Env, MuxedAddress, Vec,
 };
 
 const BASIS_POINTS_TOTAL: u32 = 10_000;
 const MAX_SAFE_PAYMENT_AMOUNT: i128 = i128::MAX / BASIS_POINTS_TOTAL as i128;
+const LEGACY_STORAGE_VERSION: u32 = 1;
+const CURRENT_STORAGE_VERSION: u32 = 2;
+const MAX_INDEX_PAGE_SIZE: u32 = 50;
+const STORAGE_TTL_THRESHOLD_LEDGERS: u32 = 250_000;
+const STORAGE_TTL_EXTEND_TO_LEDGERS: u32 = 500_000;
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -30,6 +35,7 @@ pub enum Error {
     PassExpired = 16,
     RefundNotAvailable = 17,
     InvalidRecipient = 18,
+    InvalidPageSize = 19,
 }
 
 #[contracttype]
@@ -121,12 +127,30 @@ pub struct Pass {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexMigrationStatus {
+    pub campaign_cursor: u64,
+    pub pass_cursor: u64,
+    pub campaigns_complete: bool,
+    pub passes_complete: bool,
+}
+
+#[contracttype]
 enum DataKey {
     Config,
+    StorageVersion,
     CampaignCount,
     Campaign(u64),
+    CampaignIndexCursor,
+    MerchantCampaignCount(Address),
+    MerchantCampaign(Address, u64),
+    CampaignIndex(u64),
     PassCount,
     Pass(u64),
+    PassIndexCursor,
+    OwnerPassCount(Address),
+    OwnerPass(Address, u64),
+    PassOwnerIndex(u64),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -243,6 +267,16 @@ impl WrenPassContract {
             .instance()
             .set(&DataKey::CampaignCount, &0_u64);
         env.storage().instance().set(&DataKey::PassCount, &0_u64);
+        env.storage()
+            .instance()
+            .set(&DataKey::StorageVersion, &CURRENT_STORAGE_VERSION);
+        env.storage()
+            .instance()
+            .set(&DataKey::CampaignIndexCursor, &1_u64);
+        env.storage()
+            .instance()
+            .set(&DataKey::PassIndexCursor, &1_u64);
+        Self::extend_instance_ttl(&env);
         Ok(())
     }
 
@@ -290,9 +324,10 @@ impl WrenPassContract {
         env.storage()
             .instance()
             .set(&DataKey::CampaignCount, &campaign_id);
-        env.storage()
-            .persistent()
-            .set(&DataKey::Campaign(campaign_id), &campaign);
+        Self::save_campaign(&env, &campaign);
+        Self::append_merchant_campaign(&env, &campaign)?;
+        Self::advance_campaign_cursor_after_write(&env, campaign_id);
+        Self::extend_instance_ttl(&env);
 
         CampaignCreated {
             campaign_id,
@@ -391,9 +426,10 @@ impl WrenPassContract {
         };
         Self::save_campaign(&env, &campaign);
         env.storage().instance().set(&DataKey::PassCount, &pass_id);
-        env.storage()
-            .persistent()
-            .set(&DataKey::Pass(pass_id), &pass);
+        Self::save_pass(&env, &pass);
+        Self::append_owner_pass(&env, &pass)?;
+        Self::advance_pass_cursor_after_write(&env, pass_id);
+        Self::extend_instance_ttl(&env);
 
         let contract_address = env.current_contract_address();
         token.transfer(
@@ -453,8 +489,12 @@ impl WrenPassContract {
         }
 
         owner.require_auth();
+        Self::ensure_pass_indexed(&env, &pass)?;
+        Self::remove_owner_pass(&env, &pass)?;
         pass.owner = recipient.clone();
         Self::save_pass(&env, &pass);
+        Self::append_owner_pass(&env, &pass)?;
+        Self::extend_instance_ttl(&env);
 
         PassGifted {
             campaign_id: pass.campaign_id,
@@ -645,17 +685,8 @@ impl WrenPassContract {
     }
 
     pub fn get_pass(env: Env, pass_id: u64) -> Option<Pass> {
-        let mut pass = Self::load_pass(&env, pass_id).ok()?;
-        if pass.status == PassStatus::Active {
-            if let Ok(campaign) = Self::load_campaign(&env, pass.campaign_id) {
-                if campaign.status != CampaignStatus::Cancelled
-                    && env.ledger().timestamp() >= campaign.expires_at
-                {
-                    pass.status = PassStatus::Expired;
-                }
-            }
-        }
-        Some(pass)
+        let pass = Self::load_pass(&env, pass_id).ok()?;
+        Some(Self::effective_pass(&env, pass))
     }
 
     pub fn pass_count(env: Env) -> u64 {
@@ -663,6 +694,161 @@ impl WrenPassContract {
             .instance()
             .get(&DataKey::PassCount)
             .unwrap_or(0)
+    }
+
+    pub fn storage_version(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&DataKey::StorageVersion)
+            .unwrap_or(LEGACY_STORAGE_VERSION)
+    }
+
+    pub fn index_migration_status(env: Env) -> IndexMigrationStatus {
+        Self::migration_status(&env)
+    }
+
+    pub fn merchant_campaign_count(env: Env, merchant: Address) -> u64 {
+        env.storage()
+            .persistent()
+            .get(&DataKey::MerchantCampaignCount(merchant))
+            .unwrap_or(0)
+    }
+
+    pub fn get_merchant_campaigns(
+        env: Env,
+        merchant: Address,
+        cursor: u64,
+        limit: u32,
+    ) -> Result<Vec<Campaign>, Error> {
+        Self::validate_page_size(limit)?;
+        let count = Self::merchant_campaign_count(env.clone(), merchant.clone());
+        let mut slot = cursor;
+        let mut campaigns = Vec::new(&env);
+
+        while slot < count && campaigns.len() < limit {
+            let campaign_id: u64 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::MerchantCampaign(merchant.clone(), slot))
+                .ok_or(Error::NotFound)?;
+            let mut campaign = Self::load_campaign(&env, campaign_id)?;
+            campaign.status = Self::effective_status(&env, &campaign);
+            campaigns.push_back(campaign);
+            slot = slot.checked_add(1).ok_or(Error::Overflow)?;
+        }
+
+        Ok(campaigns)
+    }
+
+    pub fn owner_pass_count(env: Env, owner: Address) -> u64 {
+        env.storage()
+            .persistent()
+            .get(&DataKey::OwnerPassCount(owner))
+            .unwrap_or(0)
+    }
+
+    pub fn get_owner_passes(
+        env: Env,
+        owner: Address,
+        cursor: u64,
+        limit: u32,
+    ) -> Result<Vec<Pass>, Error> {
+        Self::validate_page_size(limit)?;
+        let count = Self::owner_pass_count(env.clone(), owner.clone());
+        let mut slot = cursor;
+        let mut passes = Vec::new(&env);
+
+        while slot < count && passes.len() < limit {
+            let pass_id: u64 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::OwnerPass(owner.clone(), slot))
+                .ok_or(Error::NotFound)?;
+            let pass = Self::effective_pass(&env, Self::load_pass(&env, pass_id)?);
+            passes.push_back(pass);
+            slot = slot.checked_add(1).ok_or(Error::Overflow)?;
+        }
+
+        Ok(passes)
+    }
+
+    pub fn migrate_campaign_index(env: Env, limit: u32) -> Result<IndexMigrationStatus, Error> {
+        Self::validate_page_size(limit)?;
+        let campaign_count: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::CampaignCount)
+            .unwrap_or(0);
+        let mut cursor: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::CampaignIndexCursor)
+            .unwrap_or(1);
+        let mut processed = 0_u32;
+
+        while cursor <= campaign_count && processed < limit {
+            let campaign = Self::load_campaign(&env, cursor)?;
+            Self::append_merchant_campaign(&env, &campaign)?;
+            cursor = cursor.checked_add(1).ok_or(Error::Overflow)?;
+            processed += 1;
+        }
+        env.storage()
+            .instance()
+            .set(&DataKey::CampaignIndexCursor, &cursor);
+        Self::finish_storage_migration_if_complete(&env);
+        Self::extend_instance_ttl(&env);
+        Ok(Self::migration_status(&env))
+    }
+
+    pub fn migrate_pass_index(env: Env, limit: u32) -> Result<IndexMigrationStatus, Error> {
+        Self::validate_page_size(limit)?;
+        let pass_count: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::PassCount)
+            .unwrap_or(0);
+        let mut cursor: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::PassIndexCursor)
+            .unwrap_or(1);
+        let mut processed = 0_u32;
+
+        while cursor <= pass_count && processed < limit {
+            let pass = Self::load_pass(&env, cursor)?;
+            Self::append_owner_pass(&env, &pass)?;
+            cursor = cursor.checked_add(1).ok_or(Error::Overflow)?;
+            processed += 1;
+        }
+        env.storage()
+            .instance()
+            .set(&DataKey::PassIndexCursor, &cursor);
+        Self::finish_storage_migration_if_complete(&env);
+        Self::extend_instance_ttl(&env);
+        Ok(Self::migration_status(&env))
+    }
+
+    pub fn maintain_storage(
+        env: Env,
+        campaign_ids: Vec<u64>,
+        pass_ids: Vec<u64>,
+    ) -> Result<(), Error> {
+        let entry_count = campaign_ids
+            .len()
+            .checked_add(pass_ids.len())
+            .ok_or(Error::Overflow)?;
+        Self::validate_page_size(entry_count)?;
+
+        for campaign_id in campaign_ids {
+            let campaign = Self::load_campaign(&env, campaign_id)?;
+            Self::extend_campaign_storage_ttl(&env, &campaign);
+        }
+        for pass_id in pass_ids {
+            let pass = Self::load_pass(&env, pass_id)?;
+            Self::extend_pass_storage_ttl(&env, &pass);
+        }
+        Self::extend_instance_ttl(&env);
+        Ok(())
     }
 
     pub fn publish_campaign(env: Env, campaign_id: u64, merchant: Address) -> Result<(), Error> {
@@ -712,9 +898,10 @@ impl WrenPassContract {
     }
 
     fn save_campaign(env: &Env, campaign: &Campaign) {
-        env.storage()
-            .persistent()
-            .set(&DataKey::Campaign(campaign.id), campaign);
+        let key = DataKey::Campaign(campaign.id);
+        env.storage().persistent().set(&key, campaign);
+        Self::extend_persistent_ttl(env, &key);
+        Self::extend_instance_ttl(env);
     }
 
     fn load_pass(env: &Env, pass_id: u64) -> Result<Pass, Error> {
@@ -725,9 +912,227 @@ impl WrenPassContract {
     }
 
     fn save_pass(env: &Env, pass: &Pass) {
-        env.storage()
+        let key = DataKey::Pass(pass.id);
+        env.storage().persistent().set(&key, pass);
+        Self::extend_persistent_ttl(env, &key);
+        Self::extend_instance_ttl(env);
+    }
+
+    fn append_merchant_campaign(env: &Env, campaign: &Campaign) -> Result<(), Error> {
+        let index_key = DataKey::CampaignIndex(campaign.id);
+        if env.storage().persistent().has(&index_key) {
+            return Ok(());
+        }
+
+        let count_key = DataKey::MerchantCampaignCount(campaign.merchant.clone());
+        let slot: u64 = env.storage().persistent().get(&count_key).unwrap_or(0);
+        let next_count = slot.checked_add(1).ok_or(Error::Overflow)?;
+        let slot_key = DataKey::MerchantCampaign(campaign.merchant.clone(), slot);
+        env.storage().persistent().set(&slot_key, &campaign.id);
+        env.storage().persistent().set(&index_key, &slot);
+        env.storage().persistent().set(&count_key, &next_count);
+        Self::extend_persistent_ttl(env, &slot_key);
+        Self::extend_persistent_ttl(env, &index_key);
+        Self::extend_persistent_ttl(env, &count_key);
+        Ok(())
+    }
+
+    fn append_owner_pass(env: &Env, pass: &Pass) -> Result<(), Error> {
+        let index_key = DataKey::PassOwnerIndex(pass.id);
+        if env.storage().persistent().has(&index_key) {
+            return Ok(());
+        }
+
+        let count_key = DataKey::OwnerPassCount(pass.owner.clone());
+        let slot: u64 = env.storage().persistent().get(&count_key).unwrap_or(0);
+        let next_count = slot.checked_add(1).ok_or(Error::Overflow)?;
+        let slot_key = DataKey::OwnerPass(pass.owner.clone(), slot);
+        env.storage().persistent().set(&slot_key, &pass.id);
+        env.storage().persistent().set(&index_key, &slot);
+        env.storage().persistent().set(&count_key, &next_count);
+        Self::extend_persistent_ttl(env, &slot_key);
+        Self::extend_persistent_ttl(env, &index_key);
+        Self::extend_persistent_ttl(env, &count_key);
+        Ok(())
+    }
+
+    fn ensure_pass_indexed(env: &Env, pass: &Pass) -> Result<(), Error> {
+        if !env
+            .storage()
             .persistent()
-            .set(&DataKey::Pass(pass.id), pass);
+            .has(&DataKey::PassOwnerIndex(pass.id))
+        {
+            Self::append_owner_pass(env, pass)?;
+        }
+        Ok(())
+    }
+
+    fn remove_owner_pass(env: &Env, pass: &Pass) -> Result<(), Error> {
+        let index_key = DataKey::PassOwnerIndex(pass.id);
+        let slot: u64 = env
+            .storage()
+            .persistent()
+            .get(&index_key)
+            .ok_or(Error::NotFound)?;
+        let count_key = DataKey::OwnerPassCount(pass.owner.clone());
+        let count: u64 = env
+            .storage()
+            .persistent()
+            .get(&count_key)
+            .ok_or(Error::NotFound)?;
+        if count == 0 || slot >= count {
+            return Err(Error::InvalidState);
+        }
+
+        let last_slot = count - 1;
+        let last_slot_key = DataKey::OwnerPass(pass.owner.clone(), last_slot);
+        if slot != last_slot {
+            let moved_pass_id: u64 = env
+                .storage()
+                .persistent()
+                .get(&last_slot_key)
+                .ok_or(Error::NotFound)?;
+            let slot_key = DataKey::OwnerPass(pass.owner.clone(), slot);
+            let moved_index_key = DataKey::PassOwnerIndex(moved_pass_id);
+            env.storage().persistent().set(&slot_key, &moved_pass_id);
+            env.storage().persistent().set(&moved_index_key, &slot);
+            Self::extend_persistent_ttl(env, &slot_key);
+            Self::extend_persistent_ttl(env, &moved_index_key);
+        }
+
+        env.storage().persistent().remove(&last_slot_key);
+        env.storage().persistent().remove(&index_key);
+        env.storage().persistent().set(&count_key, &last_slot);
+        Self::extend_persistent_ttl(env, &count_key);
+        Ok(())
+    }
+
+    fn advance_campaign_cursor_after_write(env: &Env, campaign_id: u64) {
+        let cursor: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::CampaignIndexCursor)
+            .unwrap_or(1);
+        if cursor == campaign_id {
+            if let Some(next_cursor) = campaign_id.checked_add(1) {
+                env.storage()
+                    .instance()
+                    .set(&DataKey::CampaignIndexCursor, &next_cursor);
+            }
+        }
+    }
+
+    fn advance_pass_cursor_after_write(env: &Env, pass_id: u64) {
+        let cursor: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::PassIndexCursor)
+            .unwrap_or(1);
+        if cursor == pass_id {
+            if let Some(next_cursor) = pass_id.checked_add(1) {
+                env.storage()
+                    .instance()
+                    .set(&DataKey::PassIndexCursor, &next_cursor);
+            }
+        }
+    }
+
+    fn migration_status(env: &Env) -> IndexMigrationStatus {
+        let campaign_count: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::CampaignCount)
+            .unwrap_or(0);
+        let pass_count: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::PassCount)
+            .unwrap_or(0);
+        let campaign_cursor: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::CampaignIndexCursor)
+            .unwrap_or(1);
+        let pass_cursor: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::PassIndexCursor)
+            .unwrap_or(1);
+        IndexMigrationStatus {
+            campaign_cursor,
+            pass_cursor,
+            campaigns_complete: campaign_cursor > campaign_count,
+            passes_complete: pass_cursor > pass_count,
+        }
+    }
+
+    fn finish_storage_migration_if_complete(env: &Env) {
+        let status = Self::migration_status(env);
+        if status.campaigns_complete && status.passes_complete {
+            env.storage()
+                .instance()
+                .set(&DataKey::StorageVersion, &CURRENT_STORAGE_VERSION);
+        }
+    }
+
+    fn extend_campaign_storage_ttl(env: &Env, campaign: &Campaign) {
+        Self::extend_persistent_ttl(env, &DataKey::Campaign(campaign.id));
+        let index_key = DataKey::CampaignIndex(campaign.id);
+        if let Some(slot) = env.storage().persistent().get::<_, u64>(&index_key) {
+            Self::extend_persistent_ttl(env, &index_key);
+            Self::extend_persistent_ttl(
+                env,
+                &DataKey::MerchantCampaign(campaign.merchant.clone(), slot),
+            );
+            Self::extend_persistent_ttl(
+                env,
+                &DataKey::MerchantCampaignCount(campaign.merchant.clone()),
+            );
+        }
+    }
+
+    fn extend_pass_storage_ttl(env: &Env, pass: &Pass) {
+        Self::extend_persistent_ttl(env, &DataKey::Pass(pass.id));
+        let index_key = DataKey::PassOwnerIndex(pass.id);
+        if let Some(slot) = env.storage().persistent().get::<_, u64>(&index_key) {
+            Self::extend_persistent_ttl(env, &index_key);
+            Self::extend_persistent_ttl(env, &DataKey::OwnerPass(pass.owner.clone(), slot));
+            Self::extend_persistent_ttl(env, &DataKey::OwnerPassCount(pass.owner.clone()));
+        }
+    }
+
+    fn extend_instance_ttl(env: &Env) {
+        env.storage()
+            .instance()
+            .extend_ttl(STORAGE_TTL_THRESHOLD_LEDGERS, STORAGE_TTL_EXTEND_TO_LEDGERS);
+    }
+
+    fn extend_persistent_ttl(env: &Env, key: &DataKey) {
+        env.storage().persistent().extend_ttl(
+            key,
+            STORAGE_TTL_THRESHOLD_LEDGERS,
+            STORAGE_TTL_EXTEND_TO_LEDGERS,
+        );
+    }
+
+    fn validate_page_size(limit: u32) -> Result<(), Error> {
+        if limit == 0 || limit > MAX_INDEX_PAGE_SIZE {
+            return Err(Error::InvalidPageSize);
+        }
+        Ok(())
+    }
+
+    fn effective_pass(env: &Env, mut pass: Pass) -> Pass {
+        if pass.status == PassStatus::Active {
+            if let Ok(campaign) = Self::load_campaign(env, pass.campaign_id) {
+                if campaign.status != CampaignStatus::Cancelled
+                    && env.ledger().timestamp() >= campaign.expires_at
+                {
+                    pass.status = PassStatus::Expired;
+                }
+            }
+        }
+        pass
     }
 
     fn validate_terms(env: &Env, terms: &CampaignTerms) -> Result<(), Error> {

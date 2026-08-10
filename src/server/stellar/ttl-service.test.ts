@@ -23,14 +23,14 @@ describe("WrenPass TTL ledger keys", () => {
     );
   });
 
-  it("rejects an unbounded direct TTL scan", () => {
-    expect(() =>
-      createWrenPassLedgerKeys(
-        testStellarConfig.wrenPassContractId,
-        BigInt(2_001),
-        BigInt(0),
-      ),
-    ).toThrow("safe entry limit");
+  it("supports contracts beyond the former 2,000-entry limit", () => {
+    const keys = createWrenPassLedgerKeys(
+      testStellarConfig.wrenPassContractId,
+      BigInt(2_001),
+      BigInt(1),
+    );
+
+    expect(keys).toHaveLength(2_003);
   });
 });
 

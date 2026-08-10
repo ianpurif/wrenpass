@@ -4,7 +4,10 @@ import {
   readContractCampaignCount,
   readContractPassCount,
 } from "@/lib/stellar/wrenpass-client";
-import { createReviewLedgerKeys, createWrenPassLedgerKeys } from "@/server/stellar/ttl-service";
+import {
+  iterateReviewLedgerKeys,
+  iterateWrenPassLedgerKeys,
+} from "@/server/stellar/ttl-service";
 
 async function main() {
   const config = getStellarConfig();
@@ -13,7 +16,7 @@ async function main() {
     readContractPassCount(config),
     readContractReviewCount(config),
   ]);
-  const keys = createWrenPassLedgerKeys(
+  const keys = iterateWrenPassLedgerKeys(
     config.wrenPassContractId,
     campaignCount,
     passCount,
@@ -22,22 +25,35 @@ async function main() {
 
   console.log("Contract instance:");
   console.log(base);
-  keys.slice(1).forEach((key, index) => {
-    const label = index < Number(campaignCount)
-      ? `Campaign #${index + 1}`
-      : `Pass #${index - Number(campaignCount) + 1}`;
+  let entryIndex = BigInt(0);
+  for (const key of keys) {
+    if (entryIndex === BigInt(0)) {
+      entryIndex += BigInt(1);
+      continue;
+    }
+    const recordIndex = entryIndex - BigInt(1);
+    const label = recordIndex < campaignCount
+      ? `Campaign #${recordIndex + BigInt(1)}`
+      : `Pass #${recordIndex - campaignCount + BigInt(1)}`;
     console.log(`${label}:`);
     console.log(`${base} --key-xdr ${key.contractData().key().toXDR("base64")}`);
-  });
+    entryIndex += BigInt(1);
+  }
 
   const reviewBase = `stellar contract extend --id ${config.reviewContractId} --ledgers-to-extend 535679 --source-account REPLACE_WITH_KEEPER_IDENTITY --network ${config.network}`;
-  const reviewKeys = createReviewLedgerKeys(config.reviewContractId, reviewCount);
+  const reviewKeys = iterateReviewLedgerKeys(config.reviewContractId, reviewCount);
   console.log("Review contract instance:");
   console.log(reviewBase);
-  reviewKeys.slice(1).forEach((key, index) => {
-    console.log(`Review #${index + 1}:`);
+  let reviewIndex = BigInt(0);
+  for (const key of reviewKeys) {
+    if (reviewIndex === BigInt(0)) {
+      reviewIndex += BigInt(1);
+      continue;
+    }
+    console.log(`Review #${reviewIndex}:`);
     console.log(`${reviewBase} --key-xdr ${key.contractData().key().toXDR("base64")}`);
-  });
+    reviewIndex += BigInt(1);
+  }
 }
 
 main().catch((error: unknown) => {
