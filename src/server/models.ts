@@ -105,15 +105,6 @@ export const indexedBlockchainEventSchema = z.object({
   indexedAt: isoTimestamp,
 });
 
-export const reviewReceiptSchema = z.object({
-  id: entityIdSchema.regex(/^[1-9]\d*$/),
-  contractId: entityIdSchema,
-  reviewerWalletAddress: walletAddress,
-  transactionHash: z.string().regex(/^[a-f\d]{64}$/i),
-  ledger: z.number().int().positive(),
-  createdAt: isoTimestamp,
-});
-
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type Merchant = z.infer<typeof merchantSchema>;
 export type CampaignMetadata = z.infer<typeof campaignMetadataSchema>;
@@ -122,4 +113,3 @@ export type MetadataRegistryEntry = z.infer<typeof metadataRegistryEntrySchema>;
 export type Notification = z.infer<typeof notificationSchema>;
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 export type IndexedBlockchainEvent = z.infer<typeof indexedBlockchainEventSchema>;
-export type ReviewReceipt = z.infer<typeof reviewReceiptSchema>;

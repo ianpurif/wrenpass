@@ -19,7 +19,8 @@ import type { ReviewInput } from "@/features/reviews/validation";
 import { reviewInputSchema } from "@/features/reviews/validation";
 import type { StellarConfig } from "@/lib/stellar/config";
 import type { EntityRepository } from "@/server/firestore/repositories";
-import { reviewReceiptSchema, type ReviewReceipt } from "@/server/models";
+import type { IndexedBlockchainEvent } from "@/server/models";
+import { toIndexedReviewEvent } from "@/server/reviews/review-event-index";
 
 const AUTH_VALIDITY_LEDGERS = 100;
 const MAX_SPONSORED_FEE_STROOPS = BigInt(1_000_000);
@@ -113,7 +114,7 @@ export class ReviewSponsorshipService {
   constructor(
     private readonly config: StellarConfig,
     sponsorSecret: string,
-    private readonly receipts: EntityRepository<ReviewReceipt>,
+    private readonly events: EntityRepository<IndexedBlockchainEvent>,
     server?: ReviewRpc,
   ) {
     this.sponsor = Keypair.fromSecret(sponsorSecret);
@@ -234,8 +235,8 @@ export class ReviewSponsorshipService {
       }
 
       try {
-        await this.receipts.save(
-          reviewReceiptSchema.parse({
+        await this.events.save(
+          toIndexedReviewEvent({
             id: nativeResult.toString(),
             contractId: this.config.reviewContractId,
             reviewerWalletAddress: reviewer,
@@ -245,7 +246,7 @@ export class ReviewSponsorshipService {
           }),
         );
       } catch (error) {
-        console.error("Review receipt indexing failed after Stellar confirmation.", error);
+        console.error("Review event indexing failed after Stellar confirmation.", error);
       }
       return {
         reviewId: nativeResult,

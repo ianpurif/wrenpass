@@ -3,12 +3,17 @@ import "server-only";
 import { Address, rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
 
 import type { StellarConfig } from "@/lib/stellar/config";
-import type { ReviewReceipt } from "@/server/models";
+import type { ReviewTransactionReference } from "@/server/reviews/review-event-index";
 import { readEventPages } from "@/server/stellar/customer-chain-reader";
 import { resolveRetainedEventRange } from "@/server/stellar/event-retention";
 
 function eventTopic(name: string): string {
   return xdr.ScVal.scvSymbol(name).toXDR("base64");
+}
+
+function eventIndexFromId(id: string): number {
+  const value = Number(id.slice(id.lastIndexOf("-") + 1));
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0;
 }
 
 export class StellarReviewEventSource {
@@ -18,7 +23,7 @@ export class StellarReviewEventSource {
     this.server = new rpc.Server(config.rpcUrl);
   }
 
-  async readRetainedReceipts(): Promise<ReviewReceipt[]> {
+  async readRetainedReferences(): Promise<ReviewTransactionReference[]> {
     const filters: rpc.Api.EventFilter[] = [
       {
         type: "contract",
@@ -50,6 +55,8 @@ export class StellarReviewEventSource {
           transactionHash: event.txHash,
           ledger: event.ledger,
           createdAt: event.ledgerClosedAt,
+          sourceEventId: event.id,
+          eventIndex: eventIndexFromId(event.id),
         },
       ];
     });

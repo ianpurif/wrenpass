@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DocumentStore } from "@/server/firestore/document-store";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
+import { reviewEventIndexId, toIndexedReviewEvent } from "@/server/reviews/review-event-index";
 import { ReviewReader } from "@/server/reviews/review-reader";
 import { testStellarConfig, testCustomerAddress } from "@/test/fixtures/customer";
 
@@ -57,16 +58,16 @@ describe("ReviewReader", () => {
       hasMore: false,
     });
     const repositories = createOffchainRepositories(createStore());
-    await repositories.reviewReceipts.save({
+    await repositories.indexedBlockchainEvents.save(toIndexedReviewEvent({
       id: "2",
       contractId: testStellarConfig.reviewContractId,
       reviewerWalletAddress: testCustomerAddress,
       transactionHash: "a".repeat(64),
       ledger: 200,
       createdAt: "2026-08-10T00:00:00.000Z",
-    });
+    }));
     const eventSource = {
-      readRetainedReceipts: vi.fn(async () => [
+      readRetainedReferences: vi.fn(async () => [
         {
           id: "1",
           contractId: testStellarConfig.reviewContractId,
@@ -79,7 +80,7 @@ describe("ReviewReader", () => {
     };
     const reader = new ReviewReader(
       testStellarConfig,
-      repositories.reviewReceipts,
+      repositories.indexedBlockchainEvents,
       eventSource,
     );
 
@@ -90,8 +91,13 @@ describe("ReviewReader", () => {
       "b".repeat(64),
     ]);
     expect(result.reviews.every((review) => review.network === "testnet")).toBe(true);
-    await expect(repositories.reviewReceipts.findById("1")).resolves.toMatchObject({
+    await expect(
+      repositories.indexedBlockchainEvents.findById(
+        reviewEventIndexId(testStellarConfig.reviewContractId, "1"),
+      ),
+    ).resolves.toMatchObject({
       transactionHash: "b".repeat(64),
+      eventType: "review_submitted",
     });
   });
 });

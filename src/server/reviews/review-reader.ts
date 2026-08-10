@@ -4,18 +4,24 @@ import { toReviewDto, type ReviewPageDto } from "@/features/reviews/dto";
 import type { StellarConfig } from "@/lib/stellar/config";
 import { readContractReviews } from "@/lib/stellar/reviews-client";
 import type { EntityRepository } from "@/server/firestore/repositories";
-import type { ReviewReceipt } from "@/server/models";
+import type { IndexedBlockchainEvent } from "@/server/models";
 import { StellarReviewEventSource } from "@/server/reviews/review-event-source";
+import {
+  fromIndexedReviewEvent,
+  reviewEventIndexId,
+  toIndexedReviewEvent,
+  type ReviewTransactionReference,
+} from "@/server/reviews/review-event-index";
 
-interface ReviewReceiptSource {
-  readRetainedReceipts(): Promise<ReviewReceipt[]>;
+interface ReviewEventSource {
+  readRetainedReferences(): Promise<ReviewTransactionReference[]>;
 }
 
 export class ReviewReader {
   constructor(
     private readonly config: StellarConfig,
-    private readonly receipts: EntityRepository<ReviewReceipt>,
-    private readonly eventSource: ReviewReceiptSource = new StellarReviewEventSource(config),
+    private readonly events: EntityRepository<IndexedBlockchainEvent>,
+    private readonly eventSource: ReviewEventSource = new StellarReviewEventSource(config),
   ) {}
 
   async readPage(input: {
@@ -23,36 +29,48 @@ export class ReviewReader {
     limit: number;
   }): Promise<ReviewPageDto> {
     const page = await readContractReviews(this.config, input);
-    const receiptsById = new Map<string, ReviewReceipt>();
+    const referencesById = new Map<string, ReviewTransactionReference>();
 
     try {
       const stored = await Promise.all(
-        page.reviews.map((review) => this.receipts.findById(review.id.toString())),
+        page.reviews.map((review) => {
+          const reviewId = review.id.toString();
+          return this.events.findById(
+            reviewEventIndexId(this.config.reviewContractId, reviewId),
+          );
+        }),
       );
-      for (const receipt of stored) {
-        if (receipt) receiptsById.set(receipt.id, receipt);
+      for (const [index, event] of stored.entries()) {
+        if (!event) continue;
+        const reviewId = page.reviews[index].id.toString();
+        const reference = fromIndexedReviewEvent(
+          event,
+          this.config.reviewContractId,
+          reviewId,
+        );
+        if (reference) referencesById.set(reference.id, reference);
       }
     } catch (error) {
-      console.error("Unable to read indexed review receipts", error);
+      console.error("Unable to read indexed review events", error);
     }
 
     const missingIds = new Set(
       page.reviews
         .map((review) => review.id.toString())
-        .filter((id) => !receiptsById.has(id)),
+        .filter((id) => !referencesById.has(id)),
     );
     if (missingIds.size > 0) {
       try {
-        const recovered = await this.eventSource.readRetainedReceipts();
-        for (const receipt of recovered) {
-          if (!missingIds.has(receipt.id)) continue;
-          receiptsById.set(receipt.id, receipt);
-          await this.receipts.save(receipt).catch((error: unknown) => {
-            console.error("Unable to cache recovered review receipt", error);
+        const recovered = await this.eventSource.readRetainedReferences();
+        for (const reference of recovered) {
+          if (!missingIds.has(reference.id)) continue;
+          referencesById.set(reference.id, reference);
+          await this.events.save(toIndexedReviewEvent(reference)).catch((error: unknown) => {
+            console.error("Unable to cache recovered review event", error);
           });
         }
       } catch (error) {
-        console.error("Unable to recover review receipts from Stellar events", error);
+        console.error("Unable to recover transaction links from Stellar review events", error);
       }
     }
 
@@ -60,7 +78,7 @@ export class ReviewReader {
       reviews: page.reviews.map((review) =>
         toReviewDto(
           review,
-          receiptsById.get(review.id.toString())?.transactionHash ?? null,
+          referencesById.get(review.id.toString())?.transactionHash ?? null,
           this.config.network,
         ),
       ),

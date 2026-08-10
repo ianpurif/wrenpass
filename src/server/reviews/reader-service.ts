@@ -10,7 +10,7 @@ export function getReviewReader(): ReviewReader {
   const repositories = createOffchainRepositories();
   reader ??= new ReviewReader(
     getStellarConfig(),
-    repositories.reviewReceipts,
+    repositories.indexedBlockchainEvents,
   );
   return reader;
 }

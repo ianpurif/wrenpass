@@ -12,7 +12,7 @@ export function getReviewSponsorshipService(): ReviewSponsorshipService {
   service ??= new ReviewSponsorshipService(
     getStellarConfig(),
     getServerEnv().STELLAR_REVIEW_SPONSOR_SECRET,
-    repositories.reviewReceipts,
+    repositories.indexedBlockchainEvents,
   );
   return service;
 }

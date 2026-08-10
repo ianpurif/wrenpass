@@ -13,6 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { DocumentStore } from "@/server/firestore/document-store";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
+import { reviewEventIndexId } from "@/server/reviews/review-event-index";
 import {
   ReviewSponsorshipError,
   ReviewSponsorshipService,
@@ -89,11 +90,11 @@ describe("ReviewSponsorshipService", () => {
         returnValue: xdr.ScVal.scvU64(xdr.Uint64.fromString("1")),
       }) as rpc.Api.GetSuccessfulTransactionResponse),
     };
-    const receipts = createOffchainRepositories(createStore()).reviewReceipts;
+    const events = createOffchainRepositories(createStore()).indexedBlockchainEvents;
     const service = new ReviewSponsorshipService(
       testStellarConfig,
       sponsor.secret(),
-      receipts,
+      events,
       server as unknown as NonNullable<
         ConstructorParameters<typeof ReviewSponsorshipService>[3]
       >,
@@ -105,11 +106,16 @@ describe("ReviewSponsorshipService", () => {
         signedAuthorizationEntry: authorization.toXDR("base64"),
       }),
     ).resolves.toEqual({ reviewId: BigInt(1), transactionHash: sentHash, ledger: 120 });
-    await expect(receipts.findById("1")).resolves.toMatchObject({
-      id: "1",
-      reviewerWalletAddress: reviewer.publicKey(),
+    await expect(
+      events.findById(reviewEventIndexId(testStellarConfig.reviewContractId, "1")),
+    ).resolves.toMatchObject({
+      eventType: "review_submitted",
       transactionHash: sentHash,
       ledger: 120,
+      payload: {
+        reviewId: "1",
+        reviewerWalletAddress: reviewer.publicKey(),
+      },
     });
   });
 
@@ -132,7 +138,7 @@ describe("ReviewSponsorshipService", () => {
     const service = new ReviewSponsorshipService(
       testStellarConfig,
       sponsor.secret(),
-      createOffchainRepositories(createStore()).reviewReceipts,
+      createOffchainRepositories(createStore()).indexedBlockchainEvents,
       server as unknown as NonNullable<
         ConstructorParameters<typeof ReviewSponsorshipService>[3]
       >,
