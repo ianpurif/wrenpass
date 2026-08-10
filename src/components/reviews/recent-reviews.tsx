@@ -1,12 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { ReviewCard } from "@/components/reviews/review-card";
-import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { reviewsApi } from "@/features/reviews/api";
 import type { ReviewDto, ReviewPageDto } from "@/features/reviews/dto";
@@ -27,7 +26,6 @@ export function RecentReviews({
   const [loadedReviews, setLoadedReviews] = useState(initialReviews);
   const [nextCursor, setNextCursor] = useState(initialPage?.nextCursor ?? null);
   const [hasMore, setHasMore] = useState(initialPage?.hasMore ?? false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const carouselRef = useRef<HTMLDivElement>(null);
   const cardStepRef = useRef(400);
   const windowStartRef = useRef(0);
@@ -51,7 +49,6 @@ export function RecentReviews({
     if (!hasMore || !nextCursor || loadingMoreRef.current) return;
 
     loadingMoreRef.current = true;
-    setLoadingMore(true);
     try {
       const page = await reviewsApi.list({ beforeId: nextCursor, limit: REVIEW_PAGE_SIZE });
       setLoadedReviews((current) => {
@@ -64,7 +61,6 @@ export function RecentReviews({
       console.error("Unable to load more recent reviews", error);
     } finally {
       loadingMoreRef.current = false;
-      setLoadingMore(false);
     }
   }, [hasMore, nextCursor]);
 
@@ -146,15 +142,6 @@ export function RecentReviews({
     return () => carousel.removeEventListener("wheel", handleWheel);
   }, [handleWheel]);
 
-  function move(direction: -1 | 1) {
-    const carousel = carouselRef.current;
-    if (!carousel) return;
-    carousel.scrollBy({
-      behavior: "smooth",
-      left: direction * Math.max(280, carousel.clientWidth * 0.72),
-    });
-  }
-
   function reviewAt(index: number): ReviewDto | null {
     if (!loadedReviews.length) return null;
     const normalizedIndex = ((index % loadedReviews.length) + loadedReviews.length) % loadedReviews.length;
@@ -178,21 +165,6 @@ export function RecentReviews({
             <p className="mt-6 max-w-xl text-base leading-7 text-ink-muted">Every review is submitted by a Stellar wallet and read directly from the public review contract.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            {loadedReviews.length > 1 && (
-              <>
-                <Button aria-label="Previous reviews" className="size-11 px-0" variant="secondary" onClick={() => move(-1)}>
-                  <ArrowLeft aria-hidden="true" className="size-4" />
-                </Button>
-                <Button aria-label="Next reviews" className="size-11 px-0" variant="secondary" onClick={() => move(1)}>
-                  <ArrowRight aria-hidden="true" className="size-4" />
-                </Button>
-              </>
-            )}
-            {loadedReviews.length > 1 && (
-              <span className="px-2 text-xs font-semibold text-ink-faint">
-                {loadingMore ? "Loading more reviews..." : "Hover and scroll to browse"}
-              </span>
-            )}
             <Link className="ml-1 inline-flex h-11 items-center gap-2 rounded-lg px-4 text-sm font-bold text-forest transition hover:bg-mint-soft" href="/reviews">
               All reviews <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
