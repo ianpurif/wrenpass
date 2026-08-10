@@ -62,7 +62,7 @@ export function MerchantProfileForm({
   });
 
   return (
-    <form className="grid gap-5" onSubmit={submit}>
+    <form className="grid gap-6" onSubmit={submit}>
       <Input
         label="Business name"
         placeholder="Wren & Willow Studio"
@@ -76,7 +76,7 @@ export function MerchantProfileForm({
         <textarea
           id="merchant-description"
           rows={5}
-          className="rounded-xl border border-line bg-white px-3.5 py-3 text-sm leading-6 text-ink outline-none transition placeholder:text-ink-faint focus:border-forest focus:ring-3 focus:ring-forest/10"
+          className="rounded-lg border border-line bg-white px-3.5 py-3 text-sm leading-6 text-ink outline-none transition placeholder:text-ink-faint focus:border-forest focus:ring-3 focus:ring-forest/10"
           placeholder="Tell customers what your business does and where the service is delivered."
           aria-invalid={Boolean(errors.description)}
           {...register("description")}
@@ -87,7 +87,7 @@ export function MerchantProfileForm({
         <label className="text-sm font-semibold text-ink" htmlFor="merchant-logo">
           Business logo <span className="font-normal text-ink-faint">(optional)</span>
         </label>
-        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-line bg-canvas px-4 py-3 text-sm font-semibold text-ink-muted transition hover:border-forest/40">
+        <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-workspace px-4 py-4 text-sm font-semibold text-ink-muted transition hover:border-forest/40">
           <ImagePlus aria-hidden="true" className="size-4 text-forest" />
           <span>{logo?.name ?? (merchant?.logoUrl ? "Replace current logo" : "Choose JPG, PNG, or WebP")}</span>
           <input
@@ -101,7 +101,7 @@ export function MerchantProfileForm({
       </div>
       {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
       {saved && <p role="status" className="text-sm font-semibold text-forest">Profile saved.</p>}
-      <Button className="w-fit" disabled={isSubmitting} type="submit">
+      <Button className="w-full sm:w-fit" disabled={isSubmitting} type="submit">
         {isSubmitting ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <Save aria-hidden="true" className="size-4" />}
         {merchant ? "Update profile" : "Save merchant profile"}
       </Button>

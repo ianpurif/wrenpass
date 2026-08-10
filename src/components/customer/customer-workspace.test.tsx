@@ -49,11 +49,10 @@ describe("CustomerWorkspace", () => {
     render(<CustomerWorkspace config={testStellarConfig} />);
 
     expect(await screen.findByText("Owned pass 1")).toBeInTheDocument();
-    expect(screen.getByText("Purchase history")).toBeInTheDocument();
-    expect(screen.getByText("Gifted passes")).toBeInTheDocument();
-    expect(screen.getByText("Received passes")).toBeInTheDocument();
-    expect(screen.getByText("Redeemed passes")).toBeInTheDocument();
-    expect(screen.getByText("Refunded passes")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Recent activity" })).toBeInTheDocument();
+    expect(screen.getByText("Purchased")).toBeInTheDocument();
+    expect(screen.getByText("Gifted")).toBeInTheDocument();
+    expect(screen.getByText("Received")).toBeInTheDocument();
     expect(screen.getByText("5 USDC")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Redeemed 1" }));

@@ -49,14 +49,14 @@ export function NotificationEmailForm() {
   }
 
   return (
-    <section aria-labelledby="email-notifications-heading" className="border-t border-line pt-6">
+    <section aria-labelledby="email-notifications-heading" className="mt-6 border-t border-line pt-6">
       <div className="flex items-start gap-2.5">
         <BellRing aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-ink-faint" />
         <div><h2 id="email-notifications-heading" className="text-sm font-bold text-ink-muted">Essential email notifications</h2><p className="mt-1 text-xs leading-5 text-ink-faint">Optional preferences for purchase, gift, redemption, refund, and sold-out confirmations.</p></div>
       </div>
-      <form className="mt-4 flex max-w-2xl flex-col gap-3 sm:flex-row sm:items-end" onSubmit={save}>
+      <form className="mt-4 grid max-w-2xl gap-3" onSubmit={save}>
         <Input className="min-w-0 flex-1" label="Notification email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
-        <Button disabled={saving || email === savedEmail} type="submit" variant="secondary">
+        <Button className="w-full sm:w-fit" disabled={saving || email === savedEmail} type="submit" variant="secondary">
           {saving ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : savedEmail === email && email ? <CheckCircle2 aria-hidden="true" className="size-4" /> : null}
           {savedEmail === email && email ? "Saved" : "Save email"}
         </Button>

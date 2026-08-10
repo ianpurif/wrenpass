@@ -92,19 +92,21 @@ describe("MerchantWorkspace", () => {
     const workspace = render(<MerchantWorkspace config={config} />);
 
     expect(await screen.findByRole("heading", { name: "Wren Studio" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Business identity/i })).toHaveAttribute("href", "/merchant/business-identity");
-    expect(screen.getByRole("link", { name: /Redeem a customer pass/i })).toHaveAttribute("href", "/merchant/redeem-pass");
-    expect(screen.getByRole("link", { name: /Create a limited future-service campaign/i })).toHaveAttribute("href", "/merchant/create-campaign");
+    expect(screen.getAllByRole("link", { name: "Business profile" })[0]).toHaveAttribute("href", "/merchant/business-identity");
+    expect(screen.getAllByRole("link", { name: "Redeem pass" })[0]).toHaveAttribute("href", "/merchant/redeem-pass");
+    expect(screen.getAllByRole("link", { name: "New campaign" })[0]).toHaveAttribute("href", "/merchant/create-campaign");
+    expect(screen.getAllByRole("link", { name: "Overview" })[0]).toHaveAttribute("aria-current", "page");
     expect(screen.queryByText("Profile form")).not.toBeInTheDocument();
     expect(screen.queryByText("Redemption scanner")).not.toBeInTheDocument();
     expect(screen.queryByText("Campaign form")).not.toBeInTheDocument();
-    expect(screen.getByText("15 USDC")).toBeInTheDocument();
+    expect(screen.getAllByText("15 USDC").length).toBeGreaterThan(0);
     expect(screen.getByText("11.25 USDC")).toBeInTheDocument();
     expect(screen.getAllByText("3").length).toBeGreaterThan(0);
-    expect(screen.getByText("97")).toBeInTheDocument();
+    expect(screen.getAllByText("97").length).toBeGreaterThan(0);
 
     workspace.rerender(<MerchantWorkspace config={config} page="business-identity" />);
     expect(screen.getByText("Profile form")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Business profile" })[0]).toHaveAttribute("aria-current", "page");
 
     workspace.rerender(<MerchantWorkspace config={config} page="redeem-pass" />);
     expect(screen.getByText("Redemption scanner")).toBeInTheDocument();

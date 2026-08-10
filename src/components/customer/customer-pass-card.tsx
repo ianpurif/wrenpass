@@ -1,26 +1,25 @@
 "use client";
 
-import { CalendarClock, ExternalLink, Gift, QrCode, ShieldCheck, TicketCheck } from "lucide-react";
+import { ExternalLink, Gift, QrCode } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import { GiftPassDialog } from "@/components/customer/gift-pass-dialog";
 import { PassQrDialog } from "@/components/customer/pass-qr-dialog";
 import { Button, buttonStyles } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import type { CustomerPassDto } from "@/features/customer/dto";
 import { displayExpiration, displayUsdc } from "@/features/merchant/display";
 import type { StellarConfig } from "@/lib/stellar/config";
 
 const statusStyles = {
-  Active: "bg-mint-soft text-forest",
-  Redeemed: "bg-sage-soft text-ink-muted",
-  Expired: "bg-sage-soft text-ink-muted",
-  Refunded: "bg-coral-soft text-coral-strong",
+  Active: { dot: "bg-forest", text: "text-forest" },
+  Redeemed: { dot: "bg-ink-faint", text: "text-ink-muted" },
+  Expired: { dot: "bg-ink-faint", text: "text-ink-muted" },
+  Refunded: { dot: "bg-coral", text: "text-coral-strong" },
 } as const;
 
 function displayPurchasedAt(epochSeconds: string): string {
-  return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(
+  return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(
     new Date(Number(epochSeconds) * 1_000),
   );
 }
@@ -40,62 +39,76 @@ export function CustomerPassCard({
   const bonus = campaign
     ? BigInt(campaign.onchain.serviceValue) - BigInt(campaign.onchain.passPrice)
     : null;
+  const statusClasses = statusStyles[pass.status];
 
   return (
     <>
-      <Card className="overflow-hidden">
-        {campaign?.metadata.imageUrl && (
-          <div
-            role="img"
-            aria-label="Campaign"
-            className="h-36 bg-sage-soft bg-cover bg-center"
-            style={{ backgroundImage: `url(${campaign.metadata.imageUrl})` }}
-          />
-        )}
-        <div className="p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink-faint">WrenPass #{pass.id}</p>
-              <h3 className="mt-2 text-xl font-extrabold tracking-tight text-ink">
-                {campaign?.metadata.name ?? `Campaign #${pass.campaignId}`}
-              </h3>
-              {campaign && <p className="mt-1 text-sm font-semibold text-ink-muted">{campaign.merchant.businessName}</p>}
+      <article className="rounded-2xl border border-line bg-white p-5 sm:p-6">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-start gap-3">
+              {campaign?.metadata.imageUrl ? (
+                <div
+                  role="img"
+                  aria-label="Campaign"
+                  className="size-12 shrink-0 rounded-lg bg-sage-soft bg-cover bg-center"
+                  style={{ backgroundImage: `url(${campaign.metadata.imageUrl})` }}
+                />
+              ) : (
+                <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-sage-soft font-mono text-xs font-bold text-forest">
+                  #{pass.id}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-ink-faint">WrenPass #{pass.id}</p>
+                    <h3 className="mt-1 truncate font-bold text-ink">
+                      {campaign?.metadata.name ?? `Campaign #${pass.campaignId}`}
+                    </h3>
+                    {campaign && <p className="mt-0.5 truncate text-xs text-ink-muted">{campaign.merchant.businessName}</p>}
+                  </div>
+                  <span className={`inline-flex shrink-0 items-center gap-2 self-start text-xs font-bold ${statusClasses.text}`}>
+                    <span aria-hidden="true" className={`size-1.5 rounded-full ${statusClasses.dot}`} />
+                    {pass.status}
+                  </span>
+                </div>
+              </div>
             </div>
-            <span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${statusStyles[pass.status]}`}>{pass.status}</span>
+
+            <dl className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 border-y border-line py-4 sm:grid-cols-4">
+              <div><dt className="text-xs text-ink-faint">Paid</dt><dd className="mt-1 text-sm font-bold text-ink">{displayUsdc(pass.purchaseAmounts.total, config.assetCode)}</dd></div>
+              <div><dt className="text-xs text-ink-faint">Service value</dt><dd className="mt-1 text-sm font-bold text-ink">{campaign ? displayUsdc(campaign.onchain.serviceValue, config.assetCode) : "Unavailable"}</dd></div>
+              <div><dt className="text-xs text-ink-faint">Bonus</dt><dd className="mt-1 text-sm font-bold text-forest">{bonus === null ? "Unavailable" : displayUsdc(bonus, config.assetCode)}</dd></div>
+              <div><dt className="text-xs text-ink-faint">Protected</dt><dd className="mt-1 text-sm font-bold text-ink">{displayUsdc(pass.purchaseAmounts.protectedReserve, config.assetCode)}</dd></div>
+            </dl>
+
+            <div className="mt-4 flex flex-col gap-1 text-xs text-ink-muted sm:flex-row sm:flex-wrap sm:gap-x-5">
+              <span>Purchased {displayPurchasedAt(pass.purchasedAt)}</span>
+              {campaign && <span>Expires {displayExpiration(campaign.onchain.expiresAt)}</span>}
+              <span>Reserve follows contract eligibility rules</span>
+            </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-4 border-y border-line py-4 text-sm">
-            <div><p className="text-ink-faint">Paid</p><p className="mt-1 font-bold text-ink">{displayUsdc(pass.purchaseAmounts.total, config.assetCode)}</p></div>
-            <div><p className="text-ink-faint">Service value</p><p className="mt-1 font-bold text-ink">{campaign ? displayUsdc(campaign.onchain.serviceValue, config.assetCode) : "Unavailable"}</p></div>
-            <div><p className="text-ink-faint">Bonus</p><p className="mt-1 font-bold text-forest">{bonus === null ? "Unavailable" : displayUsdc(bonus, config.assetCode)}</p></div>
-            <div><p className="text-ink-faint">Protected at purchase</p><p className="mt-1 font-bold text-ink">{displayUsdc(pass.purchaseAmounts.protectedReserve, config.assetCode)}</p></div>
-          </div>
-
-          <div className="mt-4 grid gap-2 text-xs font-semibold text-ink-muted">
-            <p className="flex items-center gap-2"><TicketCheck aria-hidden="true" className="size-4 text-forest" />Purchased {displayPurchasedAt(pass.purchasedAt)}</p>
-            {campaign && <p className="flex items-center gap-2"><CalendarClock aria-hidden="true" className="size-4 text-forest" />Expires {displayExpiration(campaign.onchain.expiresAt)}</p>}
-            <p className="flex items-start gap-2"><ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-forest" />Reserve protection follows the campaign&apos;s contract-defined eligibility rules.</p>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {campaign && (
-              <Link className={buttonStyles({ variant: "secondary", size: "sm" })} href={`/campaigns/${pass.campaignId}`}>
-                Campaign <ExternalLink aria-hidden="true" className="size-3.5" />
-              </Link>
-            )}
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:w-36 lg:grid-cols-1 lg:flex-col">
             {pass.status === "Active" && (
               <>
-                <Button size="sm" variant="secondary" onClick={() => setQrOpen(true)}>
+                <Button className="w-full" size="sm" onClick={() => setQrOpen(true)}>
                   <QrCode aria-hidden="true" className="size-3.5" /> Show QR
                 </Button>
-                <Button size="sm" onClick={() => setGiftOpen(true)}>
+                <Button className="w-full" size="sm" variant="secondary" onClick={() => setGiftOpen(true)}>
                   <Gift aria-hidden="true" className="size-3.5" /> Gift pass
                 </Button>
               </>
             )}
+            {campaign && (
+              <Link className={buttonStyles({ className: "w-full", variant: "ghost", size: "sm" })} href={`/campaigns/${pass.campaignId}`}>
+                Campaign <ExternalLink aria-hidden="true" className="size-3.5" />
+              </Link>
+            )}
           </div>
         </div>
-      </Card>
+      </article>
       <GiftPassDialog
         config={config}
         open={giftOpen}

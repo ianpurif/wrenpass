@@ -185,9 +185,9 @@ export function CampaignForm({
   }
 
   return (
-    <div className="grid gap-5">
+    <div>
       {pending && (
-        <div className="rounded-2xl border border-coral/30 bg-coral-soft p-5">
+        <div className="mb-7 border-l-2 border-coral bg-coral-soft p-5">
           <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-coral-strong">Recoverable draft</p>
           <p className="mt-2 font-bold text-ink">Campaign #{pending.campaignId}: {pending.name}</p>
           <p className="mt-1 text-sm leading-6 text-ink-muted">The draft transaction is confirmed. Complete metadata registration and publishing without creating another campaign.</p>
@@ -198,65 +198,81 @@ export function CampaignForm({
         </div>
       )}
 
-      <form className="grid gap-5" onSubmit={submit}>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Input label="Campaign name" placeholder="Five haircuts forward" error={errors.name?.message} {...register("name")} />
-          <Input label="Maximum passes" type="number" min="1" step="1" error={errors.maxSupply?.message} {...register("maxSupply", { valueAsNumber: true })} />
-        </div>
-        <div className="grid gap-2">
-          <label className="text-sm font-semibold text-ink" htmlFor="service-description">Service description</label>
-          <textarea
-            id="service-description"
-            rows={4}
-            className="rounded-xl border border-line bg-white px-3.5 py-3 text-sm leading-6 text-ink outline-none transition placeholder:text-ink-faint focus:border-forest focus:ring-3 focus:ring-forest/10"
-            placeholder="Describe the service customers can redeem, including any practical conditions."
-            aria-invalid={Boolean(errors.serviceDescription)}
-            {...register("serviceDescription")}
-          />
-          {errors.serviceDescription && <p className="text-sm text-danger">{errors.serviceDescription.message}</p>}
-        </div>
-        <div className="grid gap-5 sm:grid-cols-3">
-          <Input label="Price (USDC)" inputMode="decimal" error={errors.passPrice?.message} {...register("passPrice")} />
-          <Input label="Service value (USDC)" inputMode="decimal" error={errors.serviceValue?.message} {...register("serviceValue")} />
-          <Input label="Expiration" type="datetime-local" error={errors.expiresAt?.message} {...register("expiresAt")} />
-        </div>
-
-        {quote && (
-          <div className="grid gap-3 rounded-2xl border border-line bg-canvas p-4 sm:grid-cols-4">
-            {[
-              ["Customer bonus", quote.bonus],
-              ["Merchant receives", quote.merchantRelease],
-              ["Protected reserve", quote.protectedReserve],
-              ["Platform fee", quote.platformFee],
-            ].map(([label, amount]) => (
-              <div key={String(label)}>
-                <p className="text-xs font-bold uppercase tracking-[0.1em] text-ink-faint">{String(label)}</p>
-                <p className="mt-1 font-extrabold text-ink">{formatUsdcAmount(amount as bigint)} USDC</p>
+      <form className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_19rem] xl:items-start" onSubmit={submit}>
+        <div className="min-w-0 space-y-8">
+          <section aria-labelledby="campaign-details-heading">
+            <h3 id="campaign-details-heading" className="text-sm font-bold text-ink">Campaign details</h3>
+            <p className="mt-1 text-xs leading-5 text-ink-faint">The name and service description customers see before purchasing.</p>
+            <div className="mt-5 grid gap-5">
+              <Input label="Campaign name" placeholder="Five haircuts forward" error={errors.name?.message} {...register("name")} />
+              <div className="grid gap-2">
+                <label className="text-sm font-semibold text-ink" htmlFor="service-description">Service description</label>
+                <textarea
+                  id="service-description"
+                  rows={5}
+                  className="rounded-lg border border-line bg-white px-3.5 py-3 text-sm leading-6 text-ink outline-none transition placeholder:text-ink-faint focus:border-forest focus:ring-3 focus:ring-forest/10"
+                  placeholder="Describe the service customers can redeem, including any practical conditions."
+                  aria-invalid={Boolean(errors.serviceDescription)}
+                  {...register("serviceDescription")}
+                />
+                {errors.serviceDescription && <p className="text-sm text-danger">{errors.serviceDescription.message}</p>}
               </div>
-            ))}
+            </div>
+          </section>
+
+          <section aria-labelledby="campaign-offer-heading" className="border-t border-line pt-8">
+            <h3 id="campaign-offer-heading" className="text-sm font-bold text-ink">Offer and availability</h3>
+            <p className="mt-1 text-xs leading-5 text-ink-faint">These financial terms are enforced by the contract.</p>
+            <div className="mt-5 grid gap-5 sm:grid-cols-2">
+              <Input label="Price (USDC)" inputMode="decimal" error={errors.passPrice?.message} {...register("passPrice")} />
+              <Input label="Service value (USDC)" inputMode="decimal" error={errors.serviceValue?.message} {...register("serviceValue")} />
+              <Input label="Maximum passes" type="number" min="1" step="1" error={errors.maxSupply?.message} {...register("maxSupply", { valueAsNumber: true })} />
+              <Input label="Expiration" type="datetime-local" error={errors.expiresAt?.message} {...register("expiresAt")} />
+            </div>
+          </section>
+
+          <section aria-labelledby="campaign-image-heading" className="border-t border-line pt-8">
+            <h3 id="campaign-image-heading" className="text-sm font-bold text-ink">Campaign image <span className="font-normal text-ink-faint">(optional)</span></h3>
+            <label className="mt-4 flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-workspace px-4 py-4 text-sm font-semibold text-ink-muted transition hover:border-forest/40">
+              <ImagePlus aria-hidden="true" className="size-4 text-forest" />
+              <span className="min-w-0 truncate">{image?.name ?? "Choose JPG, PNG, or WebP up to 5 MB"}</span>
+              <input id="campaign-image" aria-label="Campaign image" className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setImage(event.target.files?.[0] ?? null)} />
+            </label>
+          </section>
+        </div>
+
+        <aside className="rounded-xl border border-line bg-workspace p-5 xl:sticky xl:top-24">
+          <h3 className="text-sm font-bold text-ink">Offer summary</h3>
+          {quote ? (
+            <dl className="mt-4 divide-y divide-line border-y border-line">
+              {[
+                ["Customer bonus", quote.bonus],
+                ["Merchant receives", quote.merchantRelease],
+                ["Protected reserve", quote.protectedReserve],
+                ["Platform fee", quote.platformFee],
+              ].map(([label, amount]) => (
+                <div className="flex items-center justify-between gap-4 py-3" key={String(label)}>
+                  <dt className="text-xs text-ink-muted">{String(label)}</dt>
+                  <dd className="text-sm font-bold text-ink">{formatUsdcAmount(amount as bigint)} USDC</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className="mt-3 text-sm leading-6 text-ink-faint">Enter valid price and service values to calculate the distribution.</p>
+          )}
+
+          <div className="mt-5 flex gap-3 text-xs leading-5 text-ink-muted">
+            <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-forest" />
+            <p>Financial terms become immutable once sales begin. Publishing requires two wallet approvals.</p>
           </div>
-        )}
-
-        <div className="grid gap-2">
-          <label className="text-sm font-semibold text-ink" htmlFor="campaign-image">Campaign image <span className="font-normal text-ink-faint">(optional)</span></label>
-          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-line bg-canvas px-4 py-3 text-sm font-semibold text-ink-muted transition hover:border-forest/40">
-            <ImagePlus aria-hidden="true" className="size-4 text-forest" />
-            <span>{image?.name ?? "Choose JPG, PNG, or WebP up to 5 MB"}</span>
-            <input id="campaign-image" className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setImage(event.target.files?.[0] ?? null)} />
-          </label>
-        </div>
-
-        <div className="flex gap-3 rounded-2xl bg-mint-soft p-4 text-sm leading-6 text-ink-muted">
-          <ShieldCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-forest" />
-          <p>Financial terms become immutable once sales begin. Publishing uses two approvals: one to create the recoverable draft and one to make it active.</p>
-        </div>
-        {stage && <p role="status" className="flex items-center gap-2 text-sm font-semibold text-forest"><LoaderCircle aria-hidden="true" className="size-4 animate-spin" />{stage}</p>}
-        {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
-        {success && <p role="status" className="flex items-center gap-2 text-sm font-semibold text-forest"><CheckCircle2 aria-hidden="true" className="size-4" />{success}</p>}
-        <Button className="w-fit" disabled={isSubmitting || Boolean(stage) || Boolean(pending)} size="lg" type="submit">
-          {isSubmitting || stage ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <Rocket aria-hidden="true" className="size-4" />}
-          Create and publish campaign
-        </Button>
+          {stage && <p role="status" className="mt-4 flex items-start gap-2 text-sm font-semibold text-forest"><LoaderCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0 animate-spin" />{stage}</p>}
+          {error && <p role="alert" className="mt-4 text-sm font-semibold text-danger">{error}</p>}
+          {success && <p role="status" className="mt-4 flex items-start gap-2 text-sm font-semibold text-forest"><CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0" />{success}</p>}
+          <Button className="mt-5 w-full" disabled={isSubmitting || Boolean(stage) || Boolean(pending)} type="submit">
+            {isSubmitting || stage ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <Rocket aria-hidden="true" className="size-4" />}
+            Create and publish campaign
+          </Button>
+        </aside>
       </form>
     </div>
   );

@@ -1,9 +1,17 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { Logo } from "@/components/layout/logo";
 import { Container } from "@/components/ui/container";
 
 export function Footer() {
+  const pathname = usePathname();
+  const isProductWorkspace = pathname === "/passes" || pathname.startsWith("/merchant");
+
+  if (isProductWorkspace) return null;
+
   return (
     <footer className="border-t border-line bg-white py-8">
       <Container className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">

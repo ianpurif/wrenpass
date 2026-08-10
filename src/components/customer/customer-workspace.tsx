@@ -1,13 +1,12 @@
 "use client";
 
-import { ArrowDownLeft, CheckCircle2, ChevronDown, Gift, History, LoaderCircle, RefreshCcw, RotateCcw, TicketCheck, WalletCards } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LoaderCircle, RefreshCcw, TicketCheck, WalletCards } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CustomerPassCard } from "@/components/customer/customer-pass-card";
 import { RedemptionRequests } from "@/components/customer/redemption-requests";
 import { NotificationEmailForm } from "@/components/notifications/notification-email-form";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { ErrorState, LoadingState } from "@/components/ui/feedback-state";
 import { useWallet } from "@/components/wallet/wallet-provider";
 import { customerApi } from "@/features/customer/api";
@@ -27,29 +26,71 @@ const passTabs: Array<{ label: string; status: CustomerPassStatusDto }> = [
   { label: "Refunded", status: "Refunded" },
 ];
 
-function ActivityList({
-  activity,
-  emptyLabel,
-  kind,
-}: {
-  activity: CustomerActivityDto[];
-  emptyLabel: string;
-  kind: CustomerActivityDto["kind"];
-}) {
-  const items = activity.filter((item) => item.kind === kind);
-  if (!items.length) return <p className="mt-4 text-sm text-ink-faint">{emptyLabel}</p>;
+const activityLabels: Record<CustomerActivityDto["kind"], string> = {
+  Purchased: "Purchased",
+  Gifted: "Gifted",
+  Received: "Received",
+  Redeemed: "Redeemed",
+  Refunded: "Refunded",
+};
+
+function ActivityTable({ activity }: { activity: CustomerActivityDto[] }) {
+  if (!activity.length) {
+    return (
+      <div className="rounded-xl border border-dashed border-line bg-white px-6 py-10 text-center">
+        <p className="font-semibold text-ink">No recent activity</p>
+        <p className="mt-1 text-sm text-ink-muted">Retained purchase, transfer, redemption, and refund events appear here.</p>
+      </div>
+    );
+  }
+
+  const sortedActivity = [...activity].sort(
+    (left, right) => new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime(),
+  );
+
   return (
-    <div className="mt-4 grid gap-3">
-      {items.map((item) => (
-        <div className="rounded-2xl border border-line bg-canvas p-4" key={item.id}>
-          <div className="flex items-start justify-between gap-3">
-            <div><p className="font-bold text-ink">Pass #{item.passId}</p><p className="mt-1 text-xs font-semibold text-ink-muted">Campaign #{item.campaignId}</p></div>
-            {item.amount && <span className="text-sm font-extrabold text-ink">{displayUsdc(item.amount)}</span>}
+    <div className="overflow-hidden rounded-2xl border border-line bg-white">
+      <div className="hidden grid-cols-[0.75fr_0.75fr_0.85fr_minmax(0,1fr)_1fr] gap-4 border-b border-line bg-canvas px-5 py-3 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-ink-faint md:grid">
+        <span>Type</span><span>Pass</span><span>Campaign</span><span>Details</span><span>Date</span>
+      </div>
+      {sortedActivity.map((item) => {
+        const counterpartyLabel = item.kind === "Gifted" ? "To" : "From";
+        return (
+          <div
+            className="grid gap-3 border-b border-line px-5 py-4 text-sm last:border-b-0 md:grid-cols-[0.75fr_0.75fr_0.85fr_minmax(0,1fr)_1fr] md:items-center md:gap-4"
+            key={item.id}
+          >
+            <div className="flex items-center justify-between md:block">
+              <span className="text-xs font-semibold text-ink-faint md:hidden">Type</span>
+              <span className="font-semibold text-ink">{activityLabels[item.kind]}</span>
+            </div>
+            <div className="flex items-center justify-between md:block">
+              <span className="text-xs font-semibold text-ink-faint md:hidden">Pass</span>
+              <span className="font-mono text-xs text-ink">#{item.passId}</span>
+            </div>
+            <div className="flex items-center justify-between md:block">
+              <span className="text-xs font-semibold text-ink-faint md:hidden">Campaign</span>
+              <span className="font-mono text-xs text-ink">#{item.campaignId}</span>
+            </div>
+            <div className="flex items-center justify-between gap-4 md:block">
+              <span className="text-xs font-semibold text-ink-faint md:hidden">Details</span>
+              <span className="text-right text-xs text-ink-muted md:text-left">
+                {item.amount
+                  ? displayUsdc(item.amount)
+                  : item.counterparty
+                    ? `${counterpartyLabel} ${shortenStellarAddress(item.counterparty)}`
+                    : "—"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between md:block">
+              <span className="text-xs font-semibold text-ink-faint md:hidden">Date</span>
+              <span className="text-xs text-ink-muted">
+                {new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.occurredAt))}
+              </span>
+            </div>
           </div>
-          {item.counterparty && <p className="mt-2 text-xs text-ink-muted">{kind === "Gifted" ? "To" : "From"} {shortenStellarAddress(item.counterparty)}</p>}
-          <p className="mt-2 text-xs text-ink-faint">{new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.occurredAt))}</p>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -59,9 +100,6 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
   const [dashboard, setDashboard] = useState<CustomerDashboardDto | null>(null);
   const [loadedAddress, setLoadedAddress] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<CustomerPassStatusDto>("Active");
-  const [mobileStatusOpen, setMobileStatusOpen] = useState(false);
-  const mobileStatusRef = useRef<HTMLDivElement>(null);
-  const mobileStatusButtonRef = useRef<HTMLButtonElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
@@ -77,7 +115,7 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
         await notificationApi.syncEvents();
         setSyncWarning(null);
       } catch {
-        setSyncWarning("On-chain data is current, but durable event and email sync will retry later.");
+        setSyncWarning("On-chain data is current. Event and email sync will retry later.");
       }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load your passes.");
@@ -97,7 +135,7 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
         setError(null);
         void notificationApi.syncEvents().then(
           () => active && setSyncWarning(null),
-          () => active && setSyncWarning("On-chain data is current, but durable event and email sync will retry later."),
+          () => active && setSyncWarning("On-chain data is current. Event and email sync will retry later."),
         );
       },
       (loadError: unknown) => {
@@ -110,24 +148,6 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
     };
   }, [address]);
 
-  useEffect(() => {
-    if (!mobileStatusOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setMobileStatusOpen(false);
-      mobileStatusButtonRef.current?.focus();
-    };
-    const closeOnOutsidePress = (event: PointerEvent) => {
-      if (!mobileStatusRef.current?.contains(event.target as Node)) setMobileStatusOpen(false);
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    document.addEventListener("pointerdown", closeOnOutsidePress);
-    return () => {
-      document.removeEventListener("keydown", closeOnEscape);
-      document.removeEventListener("pointerdown", closeOnOutsidePress);
-    };
-  }, [mobileStatusOpen]);
-
   const passCounts = useMemo(() => {
     const counts: Record<CustomerPassStatusDto, number> = { Active: 0, Redeemed: 0, Expired: 0, Refunded: 0 };
     for (const pass of dashboard?.passes ?? []) counts[pass.status] += 1;
@@ -138,109 +158,133 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
 
   if (status !== "connected" || !address) {
     return (
-      <Card className="mx-auto max-w-2xl p-8 text-center sm:p-12">
-        <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-mint-soft text-forest"><WalletCards aria-hidden="true" className="size-6" /></span>
-        <h2 className="mt-6 text-2xl font-extrabold tracking-tight text-ink">Connect your customer wallet</h2>
-        <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-ink-muted">WrenPass reads current pass ownership directly from the contract. Connect the wallet that purchased or received the pass.</p>
+      <section className="mx-auto max-w-xl rounded-2xl border border-line bg-white p-8 text-center sm:p-10">
+        <WalletCards aria-hidden="true" className="mx-auto size-6 text-forest" />
+        <h2 className="mt-5 text-xl font-bold tracking-tight text-ink">Connect your customer wallet</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
+          Connect the wallet that purchased or received the passes you want to manage.
+        </p>
         {walletError && <p role="alert" className="mt-4 text-sm font-semibold text-danger">{walletError}</p>}
         <Button className="mt-6" onClick={() => void connect()}>Connect Freighter</Button>
-      </Card>
+      </section>
     );
   }
 
-  if (loadedAddress !== address || (loading && !dashboard)) return <LoadingState className="min-h-[28rem]" label="Reading passes from Stellar" />;
+  if (loadedAddress !== address || (loading && !dashboard)) {
+    return <LoadingState className="min-h-[28rem]" label="Reading passes from Stellar" />;
+  }
   if (error && !dashboard) return <ErrorState description={error} onRetry={() => void loadDashboard()} />;
   if (!dashboard) return null;
 
   const visiblePasses = dashboard.passes.filter((pass) => pass.status === selectedStatus);
 
   return (
-    <div className="grid min-w-0 max-w-full gap-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div><p className="eyebrow">Customer passes</p><h1 className="mt-3 text-3xl font-extrabold tracking-[-0.035em] text-ink sm:text-4xl">Your WrenPass wallet</h1><p className="mt-2 text-sm font-semibold text-ink-muted">{shortenStellarAddress(address)} · {config.network === "testnet" ? "Stellar Testnet" : "Stellar Mainnet"}</p></div>
-        <Button disabled={loading} size="sm" variant="secondary" onClick={() => void loadDashboard()}>{loading ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <RefreshCcw aria-hidden="true" className="size-4" />}Refresh on-chain data</Button>
-      </div>
-      {error && <ErrorState description={error} onRetry={() => void loadDashboard()} />}
-      {syncWarning && <p role="status" className="rounded-2xl border border-coral/25 bg-coral-soft p-4 text-sm font-semibold text-ink-muted">{syncWarning}</p>}
-
-      <RedemptionRequests config={config} onRedeemed={loadDashboard} />
-
-      <section aria-labelledby="owned-passes-heading" className="min-w-0 max-w-full">
-        <div><p className="eyebrow">Current ownership</p><h2 id="owned-passes-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-ink">Passes held by this wallet</h2></div>
-        <div className="mt-5 w-full min-w-0 max-w-full sm:hidden" ref={mobileStatusRef}>
-          <span className="block text-xs font-bold uppercase tracking-[0.12em] text-ink-muted" id="mobile-pass-status-label">
-            Show passes
-          </span>
-          <div className="relative mt-2 w-full min-w-0 max-w-full">
-            <button
-              ref={mobileStatusButtonRef}
-              type="button"
-              aria-controls="mobile-pass-status-options"
-              aria-expanded={mobileStatusOpen}
-              aria-haspopup="listbox"
-              aria-labelledby="mobile-pass-status-label mobile-pass-status-value"
-              className="flex h-14 w-full min-w-0 max-w-full touch-manipulation items-center justify-between gap-3 rounded-2xl border border-line bg-white px-4 text-left text-base font-bold text-ink shadow-sm outline-none transition hover:border-forest/40 focus:border-forest focus:ring-4 focus:ring-forest/10 active:bg-sage-soft"
-              onClick={() => setMobileStatusOpen((open) => !open)}
-            >
-              <span className="min-w-0 truncate" id="mobile-pass-status-value">
-                {passTabs.find((tab) => tab.status === selectedStatus)?.label} passes ({passCounts[selectedStatus]})
-              </span>
-              <span className={`grid size-8 shrink-0 place-items-center rounded-xl bg-sage-soft text-forest transition-transform ${mobileStatusOpen ? "rotate-180" : ""}`}>
-                <ChevronDown aria-hidden="true" className="size-4" />
-              </span>
-            </button>
-            {mobileStatusOpen && (
-              <div
-                id="mobile-pass-status-options"
-                role="listbox"
-                aria-labelledby="mobile-pass-status-label"
-                className="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 w-full min-w-0 max-w-full overflow-y-auto overflow-x-hidden rounded-2xl border border-line bg-white p-1 shadow-dialog"
-              >
-                {passTabs.map((tab) => (
-                  <button
-                    key={tab.status}
-                    type="button"
-                    role="option"
-                    aria-selected={selectedStatus === tab.status}
-                    className={`flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-bold transition ${selectedStatus === tab.status ? "bg-mint-soft text-forest" : "text-ink-muted hover:bg-sage-soft hover:text-ink"}`}
-                    onClick={() => {
-                      setSelectedStatus(tab.status);
-                      setMobileStatusOpen(false);
-                      mobileStatusButtonRef.current?.focus();
-                    }}
-                  >
-                    <span className="min-w-0 truncate">{tab.label} passes</span>
-                    <span className="shrink-0 text-xs opacity-70">{passCounts[tab.status]}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+    <div className="min-w-0">
+      <header className="flex flex-col gap-5 border-b border-line pb-7 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-coral-strong">Customer workspace</p>
+          <h1 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-ink sm:text-3xl">My passes</h1>
+          <p className="mt-2 text-sm leading-6 text-ink-muted">Manage current ownership, approvals, transfers, and activity.</p>
+          <p className="mt-2 text-xs font-semibold text-ink-faint">
+            {shortenStellarAddress(address)} · {config.network === "testnet" ? "Stellar Testnet" : "Stellar Mainnet"}
+          </p>
         </div>
-        <div className="mt-5 hidden flex-wrap gap-2 sm:flex" role="tablist" aria-label="Pass status">
-          {passTabs.map((tab) => (
-            <button key={tab.status} role="tab" aria-selected={selectedStatus === tab.status} className={`rounded-xl px-4 py-2 text-sm font-bold transition ${selectedStatus === tab.status ? "bg-forest text-white" : "border border-line bg-white text-ink-muted hover:border-forest/30"}`} onClick={() => setSelectedStatus(tab.status)}>{tab.label} <span className="ml-1 opacity-70">{passCounts[tab.status]}</span></button>
-          ))}
-        </div>
-        {visiblePasses.length ? (
-          <div className="mt-6 grid gap-5 lg:grid-cols-2">{visiblePasses.map((pass) => <CustomerPassCard config={config} key={pass.id} pass={pass} onGifted={loadDashboard} />)}</div>
-        ) : (
-          <Card className="mt-6 p-8 text-center"><TicketCheck aria-hidden="true" className="mx-auto size-6 text-forest" /><p className="mt-4 font-bold text-ink">No {selectedStatus.toLowerCase()} passes</p><p className="mt-2 text-sm text-ink-muted">Passes in this state will appear here from current on-chain ownership.</p></Card>
+        <Button disabled={loading} size="sm" variant="secondary" onClick={() => void loadDashboard()}>
+          {loading ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <RefreshCcw aria-hidden="true" className="size-4" />}
+          Refresh
+        </Button>
+      </header>
+
+      <nav aria-label="My passes sections" className="mt-5 grid grid-cols-3 rounded-xl border border-line bg-white p-1 text-center text-xs font-bold text-ink-muted sm:inline-grid sm:w-auto sm:grid-cols-3 sm:text-sm">
+        <a className="rounded-lg px-3 py-2 hover:bg-sage-soft hover:text-ink" href="#owned-passes">Passes</a>
+        <a className="rounded-lg px-3 py-2 hover:bg-sage-soft hover:text-ink" href="#activity">Activity</a>
+        <a className="rounded-lg px-3 py-2 hover:bg-sage-soft hover:text-ink" href="#preferences">Preferences</a>
+      </nav>
+
+      <div className="mt-7 grid gap-8">
+        {error && <ErrorState description={error} onRetry={() => void loadDashboard()} />}
+        {syncWarning && (
+          <p role="status" className="border-l-2 border-coral bg-coral-soft px-4 py-3 text-sm font-semibold text-ink-muted">
+            {syncWarning}
+          </p>
         )}
-      </section>
 
-      <section aria-labelledby="activity-heading">
-        <div><p className="eyebrow">Recent contract events</p><h2 id="activity-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-ink">Purchase and transfer history</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">This live RPC view covers events retained since {new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(dashboard.activityWindowStartsAt))}. WrenPass also stores idempotent event records for operational sync and notifications.</p></div>
-        <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          <Card className="p-6"><History aria-hidden="true" className="size-5 text-forest" /><h3 className="mt-4 font-extrabold text-ink">Purchase history</h3><ActivityList activity={dashboard.activity} emptyLabel="No retained purchase events." kind="Purchased" /></Card>
-          <Card className="p-6"><Gift aria-hidden="true" className="size-5 text-forest" /><h3 className="mt-4 font-extrabold text-ink">Gifted passes</h3><ActivityList activity={dashboard.activity} emptyLabel="No retained outgoing gifts." kind="Gifted" /></Card>
-          <Card className="p-6"><ArrowDownLeft aria-hidden="true" className="size-5 text-forest" /><h3 className="mt-4 font-extrabold text-ink">Received passes</h3><ActivityList activity={dashboard.activity} emptyLabel="No retained received gifts." kind="Received" /></Card>
-          <Card className="p-6"><CheckCircle2 aria-hidden="true" className="size-5 text-forest" /><h3 className="mt-4 font-extrabold text-ink">Redeemed passes</h3><ActivityList activity={dashboard.activity} emptyLabel="No retained redemption events." kind="Redeemed" /></Card>
-          <Card className="p-6"><RotateCcw aria-hidden="true" className="size-5 text-forest" /><h3 className="mt-4 font-extrabold text-ink">Refunded passes</h3><ActivityList activity={dashboard.activity} emptyLabel="No retained refund events." kind="Refunded" /></Card>
-        </div>
-      </section>
+        <section aria-label="Pass status summary" className="overflow-hidden rounded-2xl border border-line bg-white">
+          <div className="grid grid-cols-2 sm:grid-cols-4">
+            {passTabs.map((tab, index) => (
+              <div
+                className={`${index % 2 ? "border-l border-line" : ""} ${index >= 2 ? "border-t border-line sm:border-t-0" : ""} ${index > 0 ? "sm:border-l sm:border-line" : ""} p-4 sm:p-5`}
+                key={tab.status}
+              >
+                <p className="text-xs font-semibold text-ink-muted">{tab.label}</p>
+                <p className="mt-2 text-2xl font-bold tracking-tight text-ink">{passCounts[tab.status]}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-      <NotificationEmailForm />
+        <RedemptionRequests config={config} onRedeemed={loadDashboard} />
+
+        <section id="owned-passes" aria-labelledby="owned-passes-heading" className="min-w-0 scroll-mt-28">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 id="owned-passes-heading" className="text-lg font-bold tracking-tight text-ink">Owned passes</h2>
+              <p className="mt-1 text-sm text-ink-muted">Passes currently held by this wallet, grouped by status.</p>
+            </div>
+            <div className="sm:hidden">
+              <label className="sr-only" htmlFor="mobile-pass-status">Pass status</label>
+              <select
+                id="mobile-pass-status"
+                className="h-11 w-full min-w-0 rounded-lg border border-line bg-white px-3 text-sm font-bold text-ink outline-none focus:border-forest focus:ring-3 focus:ring-forest/10"
+                value={selectedStatus}
+                onChange={(event) => setSelectedStatus(event.target.value as CustomerPassStatusDto)}
+              >
+                {passTabs.map((tab) => <option key={tab.status} value={tab.status}>{tab.label} ({passCounts[tab.status]})</option>)}
+              </select>
+            </div>
+            <div className="hidden flex-wrap gap-1 rounded-lg border border-line bg-white p-1 sm:flex" role="tablist" aria-label="Pass status">
+              {passTabs.map((tab) => (
+                <button
+                  key={tab.status}
+                  role="tab"
+                  aria-selected={selectedStatus === tab.status}
+                  className={`rounded-md px-3 py-1.5 text-sm font-bold transition ${selectedStatus === tab.status ? "bg-forest text-white" : "text-ink-muted hover:bg-sage-soft hover:text-ink"}`}
+                  onClick={() => setSelectedStatus(tab.status)}
+                >
+                  {tab.label} <span className="ml-1 opacity-70">{passCounts[tab.status]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {visiblePasses.length ? (
+            <div className="mt-4 grid gap-3">
+              {visiblePasses.map((pass) => <CustomerPassCard config={config} key={pass.id} pass={pass} onGifted={loadDashboard} />)}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-dashed border-line bg-white px-6 py-10 text-center">
+              <TicketCheck aria-hidden="true" className="mx-auto size-5 text-forest" />
+              <p className="mt-3 font-semibold text-ink">No {selectedStatus.toLowerCase()} passes</p>
+              <p className="mt-1 text-sm text-ink-muted">Passes in this state will appear from current on-chain ownership.</p>
+            </div>
+          )}
+        </section>
+
+        <section id="activity" aria-labelledby="activity-heading" className="scroll-mt-28">
+          <div>
+            <h2 id="activity-heading" className="text-lg font-bold tracking-tight text-ink">Recent activity</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-muted">
+              Retained contract events since {new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(dashboard.activityWindowStartsAt))}.
+            </p>
+          </div>
+          <div className="mt-4"><ActivityTable activity={dashboard.activity} /></div>
+        </section>
+
+        <section id="preferences" aria-labelledby="preferences-heading" className="max-w-3xl scroll-mt-28 rounded-2xl border border-line bg-white p-6 sm:p-7">
+          <h2 id="preferences-heading" className="font-bold text-ink">Preferences</h2>
+          <NotificationEmailForm />
+        </section>
+      </div>
     </div>
   );
 }

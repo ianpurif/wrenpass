@@ -1,10 +1,9 @@
 "use client";
 
-import { Camera, CheckCircle2, ImageUp, LoaderCircle, ScanLine } from "lucide-react";
+import { Camera, CheckCircle2, ImageUp, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { useWallet } from "@/components/wallet/wallet-provider";
 import { redemptionApi } from "@/features/redemption/api";
 import { parseRedemptionQrPayload } from "@/features/redemption/qr";
@@ -86,25 +85,33 @@ export function RedemptionScanner({ config }: { config: StellarConfig }) {
   }
 
   return (
-    <section aria-labelledby="redeem-pass-heading">
-      <Card className="grid overflow-hidden lg:grid-cols-[0.72fr_1.28fr]">
-        <div className="bg-ink p-7 text-white sm:p-8">
-          <ScanLine aria-hidden="true" className="size-6 text-mint" />
-          <h2 id="redeem-pass-heading" className="mt-5 text-2xl font-extrabold tracking-tight">Redeem a customer pass</h2>
-          <p className="mt-3 text-sm leading-6 text-white/65">Scan the customer&apos;s QR, approve as the campaign merchant, then ask the current owner to approve from their wallet.</p>
+    <section aria-labelledby="redeem-pass-heading" className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="rounded-2xl border border-line bg-white">
+        <div className="border-b border-line px-6 py-5 sm:px-7">
+          <h2 id="redeem-pass-heading" className="font-bold text-ink">Scan customer QR</h2>
+          <p className="mt-1 text-sm leading-6 text-ink-muted">Use the camera or upload a QR image from this device.</p>
         </div>
-        <div className="p-7 sm:p-8">
+        <div className="p-6 sm:p-7">
           {cameraOpen && (
-            <div className="mb-5 overflow-hidden rounded-2xl bg-ink">
+            <div className="mb-5 overflow-hidden rounded-xl bg-ink">
               <video aria-label="QR scanner camera" className="aspect-video w-full object-cover" muted playsInline ref={videoRef} />
             </div>
           )}
-          <div className="flex flex-wrap gap-3">
-            <Button disabled={working} variant={cameraOpen ? "secondary" : "primary"} onClick={() => setCameraOpen((open) => !open)}>
+          {!cameraOpen && (
+            <div className="mb-5 grid min-h-48 place-items-center rounded-xl border border-dashed border-line bg-workspace px-6 text-center">
+              <div>
+                <Camera aria-hidden="true" className="mx-auto size-6 text-forest" />
+                <p className="mt-3 text-sm font-semibold text-ink">Camera is off</p>
+                <p className="mt-1 text-xs text-ink-faint">Nothing is recorded or uploaded.</p>
+              </div>
+            </div>
+          )}
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Button className="w-full sm:w-auto" disabled={working} variant={cameraOpen ? "secondary" : "primary"} onClick={() => setCameraOpen((open) => !open)}>
               {working ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <Camera aria-hidden="true" className="size-4" />}
               {cameraOpen ? "Close camera" : "Open scanner"}
             </Button>
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-white px-4 py-2 text-sm font-bold text-ink transition hover:border-forest/35">
+            <label className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 text-sm font-bold text-ink transition hover:border-forest/35 sm:w-auto">
               <ImageUp aria-hidden="true" className="size-4" /> Use QR image
               <input className="sr-only" type="file" accept="image/*" disabled={working} onChange={(event) => void scanImage(event.target.files?.[0])} />
             </label>
@@ -113,7 +120,26 @@ export function RedemptionScanner({ config }: { config: StellarConfig }) {
           {success && <p role="status" className="mt-4 flex items-start gap-2 text-sm font-semibold text-forest"><CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0" />{success}</p>}
           <p className="mt-4 text-xs leading-5 text-ink-faint">Camera scanning requires HTTPS outside localhost. An uploaded QR image is processed in this browser and is not stored.</p>
         </div>
-      </Card>
+      </div>
+
+      <aside className="self-start rounded-2xl border border-line bg-white p-6 xl:sticky xl:top-24">
+        <h2 className="text-sm font-bold text-ink">Redemption flow</h2>
+        <ol className="mt-4 grid gap-5">
+          {[
+            ["1", "Scan the pass", "The QR identifies the pass but cannot redeem it alone."],
+            ["2", "Approve as merchant", "Your wallet prepares the merchant-authorized request."],
+            ["3", "Customer approves", "The current owner submits the final redemption transaction."],
+          ].map(([number, title, description]) => (
+            <li className="grid grid-cols-[1.5rem_1fr] gap-3" key={number}>
+              <span className="font-mono text-xs font-bold text-coral-strong">{number}</span>
+              <div>
+                <p className="text-sm font-semibold text-ink">{title}</p>
+                <p className="mt-1 text-xs leading-5 text-ink-muted">{description}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </aside>
     </section>
   );
 }

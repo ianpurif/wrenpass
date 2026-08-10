@@ -1,19 +1,13 @@
 "use client";
 
 import {
-  ArrowLeft,
-  ArrowRight,
-  Camera,
-  CircleDollarSign,
+  CircleGauge,
   LoaderCircle,
   Plus,
   RefreshCcw,
-  Rocket,
   ScanLine,
   Settings2,
-  ShieldCheck,
   Store,
-  TicketCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -24,7 +18,6 @@ import { MerchantProfileForm } from "@/components/merchant/profile-form";
 import { RedemptionScanner } from "@/components/merchant/redemption-scanner";
 import { NotificationEmailForm } from "@/components/notifications/notification-email-form";
 import { Button, buttonStyles } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { ErrorState, LoadingState } from "@/components/ui/feedback-state";
 import { useWallet } from "@/components/wallet/wallet-provider";
 import { merchantApi } from "@/features/merchant/api";
@@ -39,87 +32,54 @@ export type MerchantWorkspacePage =
   | "redeem-pass"
   | "create-campaign";
 
-const merchantActions = [
-  {
-    href: "/merchant/business-identity",
-    eyebrow: "Profile",
-    title: "Business identity",
-    description: "Create or update the business information customers see on shared campaigns.",
-    icon: Store,
-    actionIcon: Settings2,
-    actionLabel: "Manage profile",
-    cardClass: "border-line border-l-4 border-l-forest bg-white hover:border-forest/35",
-    iconClass: "bg-mint-soft text-forest",
-    eyebrowClass: "text-forest",
-    titleClass: "text-ink",
-    descriptionClass: "text-ink-muted",
-    actionClass: "bg-forest text-white",
-  },
-  {
-    href: "/merchant/redeem-pass",
-    eyebrow: "Fulfillment",
-    title: "Redeem a customer pass",
-    description: "Scan a customer QR and prepare the owner-authorized redemption flow.",
-    icon: ScanLine,
-    actionIcon: Camera,
-    actionLabel: "Open scanner",
-    cardClass: "border-ink bg-ink hover:border-mint/45",
-    iconClass: "bg-white/10 text-mint",
-    eyebrowClass: "text-mint",
-    titleClass: "text-white",
-    descriptionClass: "text-white/65",
-    actionClass: "bg-white text-ink",
-  },
-  {
-    href: "/merchant/create-campaign",
-    eyebrow: "Working capital",
-    title: "Create a limited future-service campaign",
-    description: "Define service value, fixed supply, expiration, and contract financial terms.",
-    icon: Rocket,
-    actionIcon: Plus,
-    actionLabel: "Create campaign",
-    cardClass: "border-coral/35 bg-coral-soft hover:border-coral",
-    iconClass: "bg-white text-coral-strong",
-    eyebrowClass: "text-coral-strong",
-    titleClass: "text-ink",
-    descriptionClass: "text-ink-muted",
-    actionClass: "bg-coral-strong text-white",
-  },
+const merchantNavigation = [
+  { href: "/merchant", label: "Overview", page: "overview", icon: CircleGauge },
+  { href: "/merchant/business-identity", label: "Business profile", page: "business-identity", icon: Settings2 },
+  { href: "/merchant/redeem-pass", label: "Redeem pass", page: "redeem-pass", icon: ScanLine },
+  { href: "/merchant/create-campaign", label: "New campaign", page: "create-campaign", icon: Plus },
 ] as const;
 
-const pageCopy: Record<Exclude<MerchantWorkspacePage, "overview">, { eyebrow: string; title: string; description: string }> = {
+const pageCopy: Record<MerchantWorkspacePage, { label: string; title: string; description: string }> = {
+  overview: {
+    label: "Overview",
+    title: "Merchant dashboard",
+    description: "Monitor your campaigns, funding, supply, and redemptions.",
+  },
   "business-identity": {
-    eyebrow: "Merchant profile",
-    title: "Business identity",
-    description: "Manage the public business information shown to customers on every campaign.",
+    label: "Business profile",
+    title: "Business profile",
+    description: "Manage the public business information shown on every campaign.",
   },
   "redeem-pass": {
-    eyebrow: "Pass fulfillment",
-    title: "Redeem a customer pass",
-    description: "Scan the pass, approve as the merchant, and wait for the current owner to authorize redemption.",
+    label: "Fulfillment",
+    title: "Redeem a pass",
+    description: "Scan a customer pass and prepare the owner-approved redemption.",
   },
   "create-campaign": {
-    eyebrow: "Campaign setup",
-    title: "Create a limited future-service campaign",
-    description: "Configure and publish a fixed-supply campaign backed by real service value.",
+    label: "Campaigns",
+    title: "Create campaign",
+    description: "Define a fixed-supply offer and publish its terms on Stellar.",
   },
 };
 
 function MerchantSetupRequired() {
   return (
-    <Card className="p-8 text-center sm:p-10">
-      <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-mint-soft text-forest">
-        <Store aria-hidden="true" className="size-5" />
-      </span>
-      <h2 className="mt-5 text-xl font-extrabold tracking-tight text-ink">Complete your business identity first</h2>
-      <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-ink-muted">
-        WrenPass needs a merchant profile before campaigns can be published or customer passes redeemed.
-      </p>
-      <Link className={buttonStyles({ className: "mt-5", size: "sm" })} href="/merchant/business-identity">
-        Set up business identity
-        <ArrowRight aria-hidden="true" className="size-4" />
-      </Link>
-    </Card>
+    <section className="rounded-2xl border border-line bg-white p-6 sm:p-8" aria-labelledby="merchant-setup-heading">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-coral-strong">Setup required</p>
+          <h2 id="merchant-setup-heading" className="mt-2 text-xl font-bold tracking-tight text-ink">
+            Add your business profile before continuing
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted">
+            Campaigns and redemptions need a business name and public description tied to this wallet.
+          </p>
+        </div>
+        <Link className={buttonStyles({ className: "shrink-0", size: "sm" })} href="/merchant/business-identity">
+          Set up business profile
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -151,7 +111,7 @@ export function MerchantWorkspace({
         await notificationApi.syncEvents();
         setSyncWarning(null);
       } catch {
-        setSyncWarning("On-chain data is current, but durable event and email sync will retry later.");
+        setSyncWarning("On-chain data is current. Event and email sync will retry later.");
       }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load the dashboard.");
@@ -171,7 +131,7 @@ export function MerchantWorkspace({
         setError(null);
         void notificationApi.syncEvents().then(
           () => active && setSyncWarning(null),
-          () => active && setSyncWarning("On-chain data is current, but durable event and email sync will retry later."),
+          () => active && setSyncWarning("On-chain data is current. Event and email sync will retry later."),
         );
       },
       (loadError: unknown) => {
@@ -205,160 +165,211 @@ export function MerchantWorkspace({
 
   if (status !== "connected" || !address) {
     return (
-      <Card className="mx-auto max-w-2xl p-8 text-center sm:p-12">
-        <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-mint-soft text-forest"><Store aria-hidden="true" className="size-6" /></span>
-        <h2 className="mt-6 text-2xl font-extrabold tracking-tight text-ink">Connect your merchant wallet</h2>
-        <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-ink-muted">Freighter verifies which campaigns belong to you and authorizes every on-chain merchant action. WrenPass never requests your secret key.</p>
+      <section className="mx-auto max-w-xl rounded-2xl border border-line bg-white p-8 text-center sm:p-10">
+        <Store aria-hidden="true" className="mx-auto size-6 text-forest" />
+        <h2 className="mt-5 text-xl font-bold tracking-tight text-ink">Connect your merchant wallet</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
+          Connect Freighter to load campaigns owned by this wallet and authorize merchant actions.
+        </p>
         {walletError && <p role="alert" className="mt-4 text-sm font-semibold text-danger">{walletError}</p>}
         <Button className="mt-6" onClick={() => void connect()}>Connect Freighter</Button>
-      </Card>
+      </section>
     );
   }
 
-  if (loadedAddress !== address || (loading && !dashboard)) return <LoadingState className="min-h-[28rem]" label="Loading merchant workspace" />;
+  if (loadedAddress !== address || (loading && !dashboard)) {
+    return <LoadingState className="min-h-[28rem]" label="Loading merchant workspace" />;
+  }
   if (error && !dashboard) return <ErrorState description={error} onRetry={() => void loadDashboard()} />;
   if (!dashboard) return null;
 
   const stats = [
-    { label: "USDC raised", value: displayUsdc(totals.raised), icon: CircleDollarSign },
-    { label: "Passes sold", value: String(totals.sold), icon: TicketCheck },
-    { label: "Passes remaining", value: String(totals.remaining), icon: Plus },
-    { label: "Passes redeemed", value: String(totals.redeemed), icon: TicketCheck },
-    { label: "Merchant funds released", value: displayUsdc(totals.merchantFunds), icon: CircleDollarSign },
-    { label: "Protected funds", value: displayUsdc(totals.protectedFunds), icon: ShieldCheck },
+    { label: "USDC raised", value: displayUsdc(totals.raised) },
+    { label: "Passes sold", value: String(totals.sold) },
+    { label: "Remaining", value: String(totals.remaining) },
+    { label: "Redeemed", value: String(totals.redeemed) },
+    { label: "Released", value: displayUsdc(totals.merchantFunds) },
+    { label: "Protected", value: displayUsdc(totals.protectedFunds) },
   ];
-  const activePageCopy = page === "overview" ? null : pageCopy[page];
+  const activePageCopy = pageCopy[page];
+  const dashboardTitle = page === "overview" && dashboard.merchant
+    ? dashboard.merchant.businessName
+    : activePageCopy.title;
 
   return (
-    <div className="grid gap-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          {page !== "overview" && (
-            <Link className={buttonStyles({ className: "-ml-3 mb-3", size: "sm", variant: "ghost" })} href="/merchant">
-              <ArrowLeft aria-hidden="true" className="size-4" />
-              Merchant overview
-            </Link>
-          )}
-          <p className="eyebrow">{activePageCopy?.eyebrow ?? "Merchant workspace"}</p>
-          <h1 className="mt-3 text-3xl font-extrabold tracking-[-0.035em] text-ink sm:text-4xl">
-            {activePageCopy?.title ?? dashboard.merchant?.businessName ?? "Set up your business"}
-          </h1>
-          {activePageCopy && <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted">{activePageCopy.description}</p>}
-          <p className="mt-2 text-sm font-semibold text-ink-muted">Authenticated as {shortenStellarAddress(address)} · {config.network === "testnet" ? "Stellar Testnet" : "Stellar Mainnet"}</p>
+    <div className="min-w-0 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10 xl:grid-cols-[14rem_minmax(0,1fr)] xl:gap-12">
+      <aside className="hidden lg:block">
+        <div className="sticky top-24">
+          <p className="px-3 text-xs font-bold uppercase tracking-[0.14em] text-ink-faint">Merchant workspace</p>
+          <nav aria-label="Merchant workspace" className="mt-4 grid gap-1">
+            {merchantNavigation.map(({ href, icon: Icon, label, page: navPage }) => (
+              <Link
+                key={href}
+                aria-current={page === navPage ? "page" : undefined}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
+                  page === navPage
+                    ? "bg-white text-forest shadow-sm"
+                    : "text-ink-muted hover:bg-white/70 hover:text-ink"
+                }`}
+                href={href}
+              >
+                <Icon aria-hidden="true" className="size-4" />
+                {label}
+              </Link>
+            ))}
+          </nav>
+          <div className="mt-7 border-t border-line px-3 pt-5 text-xs leading-5 text-ink-faint">
+            <p className="font-semibold text-ink-muted">{config.network === "testnet" ? "Stellar Testnet" : "Stellar Mainnet"}</p>
+            <p className="mt-1 font-mono">{shortenStellarAddress(address)}</p>
+          </div>
         </div>
-        <Button disabled={loading} size="sm" variant="secondary" onClick={() => void loadDashboard()}>
-          {loading ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <RefreshCcw aria-hidden="true" className="size-4" />}
-          Refresh on-chain data
-        </Button>
-      </div>
+      </aside>
 
-      {error && <ErrorState description={error} onRetry={() => void loadDashboard()} />}
-      {syncWarning && <p role="status" className="rounded-2xl border border-coral/25 bg-coral-soft p-4 text-sm font-semibold text-ink-muted">{syncWarning}</p>}
+      <div className="min-w-0">
+        <nav
+          aria-label="Merchant workspace"
+          className="mb-7 grid grid-cols-2 gap-1 rounded-xl border border-line bg-white p-1 sm:grid-cols-4 lg:hidden"
+        >
+          {merchantNavigation.map(({ href, label, page: navPage }) => (
+            <Link
+              key={href}
+              aria-current={page === navPage ? "page" : undefined}
+              className={`rounded-lg px-3 py-2 text-center text-xs font-bold transition sm:text-sm ${
+                page === navPage ? "bg-forest text-white" : "text-ink-muted hover:bg-sage-soft hover:text-ink"
+              }`}
+              href={href}
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
 
-      {page === "overview" && (
-        <>
-          <section aria-labelledby="merchant-actions-heading">
-            <div>
-              <p className="eyebrow">Merchant tools</p>
-              <h2 id="merchant-actions-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-ink">Choose what you want to manage</h2>
-            </div>
-            <div className="mt-6 grid gap-4 lg:grid-cols-3">
-              {merchantActions.map(({
-                actionClass,
-                actionIcon: ActionIcon,
-                actionLabel,
-                cardClass,
-                description,
-                descriptionClass,
-                eyebrow,
-                eyebrowClass,
-                href,
-                icon: Icon,
-                iconClass,
-                title,
-                titleClass,
-              }) => (
-                <Link
-                  className={`group flex min-h-64 flex-col rounded-3xl border p-6 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:shadow-dialog focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest ${cardClass}`}
-                  href={href}
-                  key={href}
-                >
-                  <span className={`grid size-12 place-items-center rounded-2xl ${iconClass}`}><Icon aria-hidden="true" className="size-5" /></span>
-                  <p className={`mt-6 text-xs font-extrabold uppercase tracking-[0.12em] ${eyebrowClass}`}>{eyebrow}</p>
-                  <h3 className={`mt-2 text-xl font-extrabold tracking-tight ${titleClass}`}>{title}</h3>
-                  <p className={`mt-2 text-sm leading-6 ${descriptionClass}`}>{description}</p>
-                  <span className={`mt-auto inline-flex w-fit items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-bold transition-transform group-hover:translate-x-0.5 ${actionClass}`}>
-                    <ActionIcon aria-hidden="true" className="size-4" />
-                    {actionLabel}
-                  </span>
+        <header className="flex flex-col gap-5 border-b border-line pb-7 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-coral-strong">{activePageCopy.label}</p>
+            <h1 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-ink sm:text-3xl">{dashboardTitle}</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted">{activePageCopy.description}</p>
+            <p className="mt-2 text-xs font-semibold text-ink-faint lg:hidden">
+              {shortenStellarAddress(address)} · {config.network === "testnet" ? "Testnet" : "Mainnet"}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {page === "overview" && dashboard.merchant && (
+              <>
+                <Link className={buttonStyles({ size: "sm", variant: "secondary" })} href="/merchant/redeem-pass">
+                  <ScanLine aria-hidden="true" className="size-4" /> Redeem pass
                 </Link>
-              ))}
-            </div>
-          </section>
+                <Link className={buttonStyles({ size: "sm" })} href="/merchant/create-campaign">
+                  <Plus aria-hidden="true" className="size-4" /> New campaign
+                </Link>
+              </>
+            )}
+            <Button disabled={loading} size="sm" variant="ghost" onClick={() => void loadDashboard()}>
+              {loading ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <RefreshCcw aria-hidden="true" className="size-4" />}
+              Refresh
+            </Button>
+          </div>
+        </header>
 
-          {dashboard.merchant && (
-            <>
-              <section aria-label="Campaign performance" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {stats.map(({ icon: Icon, label, value }) => (
-                  <Card className="p-5" key={label}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div><p className="text-sm font-semibold text-ink-muted">{label}</p><p className="mt-2 text-2xl font-extrabold tracking-tight text-ink">{value}</p></div>
-                      <span className="grid size-10 place-items-center rounded-xl bg-mint-soft text-forest"><Icon aria-hidden="true" className="size-4" /></span>
-                    </div>
-                  </Card>
-                ))}
-              </section>
-
-              <section aria-labelledby="campaigns-heading">
-                <div className="flex items-end justify-between gap-4">
-                  <div><p className="eyebrow">Your campaigns</p><h2 id="campaigns-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-ink">Share and monitor</h2></div>
-                  <p className="text-sm font-semibold text-ink-muted">{dashboard.campaigns.length} total</p>
-                </div>
-                {dashboard.campaigns.length ? (
-                  <div className="mt-6 grid gap-5 lg:grid-cols-2">{dashboard.campaigns.map((campaign) => <CampaignCard campaign={campaign} key={campaign.onchain.id} />)}</div>
-                ) : (
-                  <Card className="mt-6 p-8 text-center"><p className="font-bold text-ink">No campaigns yet</p><p className="mt-2 text-sm text-ink-muted">Create your first campaign from the campaign setup page.</p></Card>
-                )}
-              </section>
-            </>
+        <div className="mt-7 grid gap-7">
+          {error && <ErrorState description={error} onRetry={() => void loadDashboard()} />}
+          {syncWarning && (
+            <p role="status" className="border-l-2 border-coral bg-coral-soft px-4 py-3 text-sm font-semibold text-ink-muted">
+              {syncWarning}
+            </p>
           )}
-        </>
-      )}
 
-      {page === "business-identity" && (
-        <>
-          <section aria-labelledby="merchant-profile-heading">
-            <Card className="grid overflow-hidden lg:grid-cols-[0.72fr_1.28fr]">
-              <div className="bg-ink p-7 text-white sm:p-8">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-mint">Business identity</p>
-                <h2 id="merchant-profile-heading" className="mt-4 text-2xl font-extrabold tracking-tight">Your public merchant profile</h2>
-                <p className="mt-3 text-sm leading-6 text-white/65">Customers see this information on every campaign you share. Your connected wallet remains the owner.</p>
-              </div>
-              <div className="p-7 sm:p-8">
-                <MerchantProfileForm merchant={dashboard.merchant} onSaved={(merchant) => setDashboard((current) => current ? { ...current, merchant } : current)} />
-              </div>
-            </Card>
-          </section>
-          <NotificationEmailForm />
-        </>
-      )}
+          {page === "overview" && (
+            dashboard.merchant ? (
+              <>
+                <section aria-label="Campaign performance" className="overflow-hidden rounded-2xl border border-line bg-white">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
+                    {stats.map(({ label, value }, index) => (
+                      <div
+                        className={`min-w-0 p-4 sm:p-5 ${index % 2 ? "border-l border-line" : ""} ${
+                          index >= 2 ? "border-t border-line sm:border-t-0" : ""
+                        } ${index >= 3 ? "sm:border-t sm:border-line xl:border-t-0" : ""} ${
+                          index > 0 ? "xl:border-l xl:border-line" : ""
+                        }`}
+                        key={label}
+                      >
+                        <p className="truncate text-xs font-semibold text-ink-muted">{label}</p>
+                        <p className="mt-2 truncate text-xl font-bold tracking-tight text-ink">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
 
-      {page === "redeem-pass" && (dashboard.merchant ? <RedemptionScanner config={config} /> : <MerchantSetupRequired />)}
+                <section aria-labelledby="campaigns-heading">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h2 id="campaigns-heading" className="text-lg font-bold tracking-tight text-ink">Campaigns</h2>
+                      <p className="mt-1 text-sm text-ink-muted">Current on-chain performance and public sharing links.</p>
+                    </div>
+                    <span className="text-sm font-semibold text-ink-faint">{dashboard.campaigns.length} total</span>
+                  </div>
+                  {dashboard.campaigns.length ? (
+                    <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-white">
+                      <div className="hidden grid-cols-[minmax(0,1.5fr)_0.65fr_0.8fr_0.8fr_auto] gap-4 border-b border-line bg-canvas px-5 py-3 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-ink-faint md:grid">
+                        <span>Campaign</span><span>Status</span><span>Supply</span><span>Raised</span><span className="text-right">Actions</span>
+                      </div>
+                      {dashboard.campaigns.map((campaign) => <CampaignCard campaign={campaign} key={campaign.onchain.id} />)}
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-2xl border border-dashed border-line bg-white px-6 py-10 text-center">
+                      <p className="font-bold text-ink">No campaigns yet</p>
+                      <p className="mt-1 text-sm text-ink-muted">Create a campaign when your service offer is ready.</p>
+                      <Link className={buttonStyles({ className: "mt-5", size: "sm" })} href="/merchant/create-campaign">New campaign</Link>
+                    </div>
+                  )}
+                </section>
+              </>
+            ) : <MerchantSetupRequired />
+          )}
 
-      {page === "create-campaign" && (
-        dashboard.merchant ? (
-          <section aria-labelledby="create-campaign-heading">
-            <Card className="p-7 sm:p-8">
-              <div className="max-w-2xl">
-                <p className="eyebrow">Raise working capital</p>
-                <h2 id="create-campaign-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-ink">Campaign terms</h2>
-                <p className="mt-2 text-sm leading-6 text-ink-muted">The wallet owns the financial campaign on Stellar. Firestore stores only the descriptive details and optional image used by this interface.</p>
-              </div>
-              <div className="mt-7 border-t border-line pt-7"><CampaignForm config={config} onPublished={loadDashboard} /></div>
-            </Card>
-          </section>
-        ) : <MerchantSetupRequired />
-      )}
+          {page === "business-identity" && (
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+              <section aria-labelledby="merchant-profile-heading" className="rounded-2xl border border-line bg-white">
+                <div className="border-b border-line px-6 py-5 sm:px-7">
+                  <h2 id="merchant-profile-heading" className="font-bold text-ink">Public business details</h2>
+                  <p className="mt-1 text-sm leading-6 text-ink-muted">Used on every campaign page shared with customers.</p>
+                </div>
+                <div className="p-6 sm:p-7">
+                  <MerchantProfileForm
+                    merchant={dashboard.merchant}
+                    onSaved={(merchant) => setDashboard((current) => current ? { ...current, merchant } : current)}
+                  />
+                </div>
+              </section>
+              <aside className="self-start rounded-2xl border border-line bg-white p-6 xl:sticky xl:top-24">
+                <h2 className="text-sm font-bold text-ink">Profile use</h2>
+                <ul className="mt-3 grid gap-2 text-sm leading-6 text-ink-muted">
+                  <li>Shown on public campaign pages</li>
+                  <li>Tied to the connected merchant wallet</li>
+                  <li>Editable without changing contract terms</li>
+                </ul>
+                <NotificationEmailForm />
+              </aside>
+            </div>
+          )}
+
+          {page === "redeem-pass" && (dashboard.merchant ? <RedemptionScanner config={config} /> : <MerchantSetupRequired />)}
+
+          {page === "create-campaign" && (
+            dashboard.merchant ? (
+              <section aria-labelledby="create-campaign-heading" className="rounded-2xl border border-line bg-white">
+                <div className="border-b border-line px-6 py-5 sm:px-7">
+                  <h2 id="create-campaign-heading" className="font-bold text-ink">Campaign terms</h2>
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-muted">
+                    Public details are stored off-chain. Supply, pricing, expiration, and fund distribution are enforced on Stellar.
+                  </p>
+                </div>
+                <div className="p-6 sm:p-7"><CampaignForm config={config} onPublished={loadDashboard} /></div>
+              </section>
+            ) : <MerchantSetupRequired />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

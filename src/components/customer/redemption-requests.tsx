@@ -4,7 +4,6 @@ import { LoaderCircle, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { useWallet } from "@/components/wallet/wallet-provider";
 import { redemptionApi } from "@/features/redemption/api";
 import { notificationApi } from "@/features/notifications/api";
@@ -82,29 +81,32 @@ export function RedemptionRequests({
   if (!requests.length && !error) return null;
 
   return (
-    <section aria-labelledby="redemption-requests-heading">
-      <div>
-        <p className="eyebrow">Wallet approval required</p>
-        <h2 id="redemption-requests-heading" className="mt-3 text-2xl font-extrabold tracking-tight text-ink">Pending redemptions</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">Confirm only while you are physically receiving the service. The merchant has approved, but the pass stays active until you submit the transaction.</p>
+    <section aria-labelledby="redemption-requests-heading" className="overflow-hidden rounded-2xl border border-coral/35 bg-white">
+      <div className="border-b border-coral/20 bg-coral-soft px-5 py-4 sm:px-6">
+        <div className="flex items-start gap-3">
+          <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-coral-strong" />
+          <div>
+            <h2 id="redemption-requests-heading" className="font-bold text-ink">Pending redemption approval</h2>
+            <p className="mt-1 text-sm leading-6 text-ink-muted">Approve only while you are receiving the service. The pass remains active until you submit.</p>
+          </div>
+        </div>
       </div>
-      {error && <p role="alert" className="mt-4 text-sm font-semibold text-danger">{error}</p>}
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+      {error && <p role="alert" className="px-5 pt-4 text-sm font-semibold text-danger sm:px-6">{error}</p>}
+      <div className="divide-y divide-line">
         {requests.map((request) => (
-          <Card className="p-6" key={request.id}>
-            <div className="flex items-start gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-mint-soft text-forest"><ShieldCheck aria-hidden="true" className="size-5" /></span>
+          <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6" key={request.id}>
+            <div>
               <div>
-                <h3 className="font-extrabold text-ink">Redeem pass #{request.passId}</h3>
+                <h3 className="font-bold text-ink">Pass #{request.passId}</h3>
                 <p className="mt-1 text-xs font-semibold text-ink-muted">Merchant {shortenStellarAddress(request.merchant)}</p>
               </div>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted">Approval permanently marks the pass redeemed and releases its reserve according to the campaign terms.</p>
             </div>
-            <p className="mt-4 text-sm leading-6 text-ink-muted">Approval releases the pass&apos;s protected reserve according to its contract terms and permanently marks the pass redeemed.</p>
-            <Button className="mt-5" disabled={workingId !== null} onClick={() => void approve(request)}>
+            <Button className="w-full shrink-0 sm:w-auto" disabled={workingId !== null} onClick={() => void approve(request)}>
               {workingId === request.id && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
               Approve and redeem
             </Button>
-          </Card>
+          </div>
         ))}
       </div>
     </section>
