@@ -16,6 +16,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Container } from "@/components/ui/container";
 import { MotionReveal } from "@/components/ui/motion-reveal";
+import { ConnectedWalletLink } from "@/components/wallet/connected-wallet-link";
 
 const trustPoints = [
   { icon: BadgeCheck, label: "Fixed pass supply" },
@@ -66,9 +67,9 @@ export default function Home() {
                 Explore the model
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
-              <Link className={buttonStyles({ variant: "secondary", size: "lg" })} href="/merchant">
+              <ConnectedWalletLink className={buttonStyles({ variant: "secondary", size: "lg" })} href="/merchant">
                 Create a campaign
-              </Link>
+              </ConnectedWalletLink>
             </div>
             <div className="mt-9 grid gap-3 sm:grid-cols-3">
               {trustPoints.map(({ icon: Icon, label }) => (

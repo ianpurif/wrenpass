@@ -9,6 +9,7 @@ import { Logo } from "@/components/layout/logo";
 import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { WalletButton } from "@/components/wallet/wallet-button";
+import { useWallet } from "@/components/wallet/wallet-provider";
 
 const navItems = [
   { href: "/merchant", label: "Merchant dashboard" },
@@ -16,8 +17,10 @@ const navItems = [
 ];
 
 export function Navigation() {
+  const { status } = useWallet();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const walletConnected = status === "connected";
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -37,17 +40,19 @@ export function Navigation() {
           <Logo />
         </Link>
 
-        <nav aria-label="Primary navigation" className="hidden items-center gap-1 md:flex">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              className={buttonStyles({ variant: "ghost", size: "sm" })}
-              href={item.href}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        {walletConnected && (
+          <nav aria-label="Primary navigation" className="hidden items-center gap-1 md:flex">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                className={buttonStyles({ variant: "ghost", size: "sm" })}
+                href={item.href}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        )}
 
         <div className="hidden md:block">
           <WalletButton />
@@ -78,7 +83,7 @@ export function Navigation() {
             transition={{ duration: 0.2 }}
           >
             <div className="mx-auto grid max-w-7xl gap-1">
-              {navItems.map((item) => (
+              {walletConnected && navItems.map((item) => (
                 <Link
                   key={item.href}
                   className="rounded-xl px-3 py-3 text-sm font-semibold text-ink-muted hover:bg-sage-soft hover:text-ink"
