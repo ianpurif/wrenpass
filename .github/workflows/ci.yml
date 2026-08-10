@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_PUBLIC_STELLAR_NETWORK: testnet
+  NEXT_PUBLIC_STELLAR_RPC_URL: https://soroban-testnet.stellar.org
+  NEXT_PUBLIC_STELLAR_ASSET_CODE: USDC
+  NEXT_PUBLIC_STELLAR_ASSET_ISSUER: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+  NEXT_PUBLIC_STELLAR_ASSET_CONTRACT_ID: CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA
+  NEXT_PUBLIC_WRENPASS_CONTRACT_ID: CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D
+  NEXT_PUBLIC_WRENPASS_REVIEW_CONTRACT_ID: CCZ7KC6SGTFJKOPVUFD6WYNBSYGOCHBUNV5HNR2AVGFP23KBOOMF6WY3
+  NEXT_PUBLIC_WRENPASS_METADATA_CONTRACT_ID: CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR
+  NEXT_PUBLIC_WRENPASS_REDEMPTION_CONTRACT_ID: CB6HZLQJGSZBN6NCII2KGOHIQUSG33YQCM7XWGTUK6JTJ4HLSKY65QHN
+
+jobs:
+  application:
+    name: Application quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.20.0
+      - name: Enable pinned pnpm
+        run: corepack enable && corepack prepare pnpm@11.16.0 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Reject high and critical dependency vulnerabilities
+        run: pnpm audit --audit-level high
+      - name: Lint
+        run: pnpm lint
+      - name: Type check
+        run: pnpm typecheck
+      - name: Unit and integration tests
+        run: pnpm test
+      - name: Production build
+        run: pnpm build
+
+  contracts:
+    name: Contracts and Testnet provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out complete repository history
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.20.0
+      - name: Enable pinned pnpm
+        run: corepack enable && corepack prepare pnpm@11.16.0 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.96.1 --profile minimal --component rustfmt,clippy --target wasm32v1-none
+          rustup default 1.96.1
+      - name: Install attested Stellar CLI
+        uses: stellar/stellar-cli@5a7c5fe76530bf4248477ac812fc757146b98cc4 # v27.0.0
+        with:
+          version: 27.0.0
+      - name: Format contracts
+        run: pnpm contract:fmt
+      - name: Lint contracts
+        run: pnpm contract:clippy
+      - name: Test contracts
+        run: pnpm contract:test
+      - name: Build current contracts
+        run: pnpm contract:build
+      - name: Rebuild and verify deployed Testnet contracts
+        run: pnpm contract:verify:testnet
+
+  e2e:
+    name: Critical browser journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.20.0
+      - name: Enable pinned pnpm
+        run: corepack enable && corepack prepare pnpm@11.16.0 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium and system dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run browser journeys
+        run: pnpm e2e
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore

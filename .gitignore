@@ -7,6 +7,11 @@ out/
 
 # testing
 coverage/
+playwright-report/
+test-results/
+
+# local deployment metadata
+.vercel/
 
 # Rust and Soroban build output
 contracts/target/

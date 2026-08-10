@@ -25,6 +25,11 @@
     "contract:bindings:metadata": "stellar contract bindings typescript --wasm contracts/wasm/wrenpass_metadata.wasm --output-dir src/generated/metadata-contract --overwrite",
     "contract:bindings:redemptions": "stellar contract bindings typescript --wasm contracts/wasm/wrenpass_redemptions.wasm --output-dir src/generated/redemptions-contract --overwrite",
     "contract:bindings:reviews": "stellar contract bindings typescript --wasm contracts/wasm/wrenpass_reviews.wasm --output-dir src/generated/reviews-contract --overwrite",
+    "contract:deploy:testnet": "pnpm contract:fmt && pnpm contract:clippy && pnpm contract:test && pnpm contract:build && node --import tsx scripts/deploy-contract-suite.ts --network testnet",
+    "contract:deploy:plan:testnet": "pnpm contract:build && node --import tsx scripts/deploy-contract-suite.ts --network testnet --dry-run",
+    "contract:verify:testnet": "node --import tsx scripts/verify-contract-deployments.ts deployments/testnet.json",
+    "e2e": "playwright test",
+    "e2e:install": "playwright install chromium",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -55,6 +60,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@tailwindcss/postcss": "4.3.3",
     "@testing-library/jest-dom": "7.0.0",
     "@testing-library/react": "16.3.2",

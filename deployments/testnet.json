@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "network": "testnet",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "toolchain": {
+    "stellarCli": "27.0.0",
+    "rust": "1.96.1",
+    "sorobanSdk": "27.0.5"
+  },
+  "contracts": [
+    {
+      "name": "WrenPass campaign",
+      "package": "wrenpass-campaign",
+      "sourcePath": "contracts/wrenpass-campaign",
+      "sourceCommit": "0eddce4e6f9103eb1efacc605b6491a87d78b0d6",
+      "artifact": "wrenpass_campaign.wasm",
+      "optimized": false,
+      "contractId": "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
+      "wasmSha256": "aeec070bd69017b5201f25317908e3bdd9349971a7c8cf39ff9d1f1095c1ff33",
+      "deploymentTransactionHash": null,
+      "explorerUrl": "https://stellar.expert/explorer/testnet/contract/CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D"
+    },
+    {
+      "name": "WrenPass metadata",
+      "package": "wrenpass-metadata",
+      "sourcePath": "contracts/wrenpass-metadata",
+      "sourceCommit": "ef80b6d6a273504f53ff1aa2bf67a3f06801f068",
+      "artifact": "wrenpass_metadata.wasm",
+      "optimized": false,
+      "contractId": "CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR",
+      "wasmSha256": "56ff566c2f2732deb02d690ec5e68316cc12b73f8a4a2fafc53840685c976e97",
+      "deploymentTransactionHash": null,
+      "explorerUrl": "https://stellar.expert/explorer/testnet/contract/CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR"
+    },
+    {
+      "name": "WrenPass redemptions",
+      "package": "wrenpass-redemptions",
+      "sourcePath": "contracts/wrenpass-redemptions",
+      "sourceCommit": "b7e326674229545eb2b1073e1719c1cf8764c581",
+      "artifact": "wrenpass_redemptions.wasm",
+      "optimized": false,
+      "contractId": "CB6HZLQJGSZBN6NCII2KGOHIQUSG33YQCM7XWGTUK6JTJ4HLSKY65QHN",
+      "wasmSha256": "3e7e47cc108d6376079b0453e1499248a84f7f09fde3e769df32a8e9f2c36c40",
+      "deploymentTransactionHash": null,
+      "explorerUrl": "https://stellar.expert/explorer/testnet/contract/CB6HZLQJGSZBN6NCII2KGOHIQUSG33YQCM7XWGTUK6JTJ4HLSKY65QHN"
+    },
+    {
+      "name": "WrenPass reviews",
+      "package": "wrenpass-reviews",
+      "sourcePath": "contracts/wrenpass-reviews",
+      "sourceCommit": "54119dc944deb78d05a0cc938847b89a9e8f33c0",
+      "artifact": "wrenpass_reviews.wasm",
+      "optimized": false,
+      "contractId": "CCZ7KC6SGTFJKOPVUFD6WYNBSYGOCHBUNV5HNR2AVGFP23KBOOMF6WY3",
+      "wasmSha256": "b0605d6e1da7fcb1229aa18a25ddd22ded196058945bc26577a145ab2fcb427c",
+      "deploymentTransactionHash": null,
+      "explorerUrl": "https://stellar.expert/explorer/testnet/contract/CCZ7KC6SGTFJKOPVUFD6WYNBSYGOCHBUNV5HNR2AVGFP23KBOOMF6WY3"
+    }
+  ],
+  "interactionEvidence": [
+    {
+      "label": "Pass purchase",
+      "transactionHash": "ec8da8a6aceeb6e9ae62fb0a7499f510831cbe0577a17d49bbff8a14a09ca6ec",
+      "explorerUrl": "https://stellar.expert/explorer/testnet/tx/ec8da8a6aceeb6e9ae62fb0a7499f510831cbe0577a17d49bbff8a14a09ca6ec"
+    },
+    {
+      "label": "Pass redemption",
+      "transactionHash": "44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e",
+      "explorerUrl": "https://stellar.expert/explorer/testnet/tx/44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e"
+    }
+  ],
+  "notes": [
+    "The original deployment transaction hashes were not retained. Contract identity is verified from each on-chain instance's WASM hash.",
+    "The campaign deployment intentionally points to the exact historical source commit that reproduces its deployed WASM. Later source changes are not represented as deployed until a new manifest is recorded."
+  ]
+}
