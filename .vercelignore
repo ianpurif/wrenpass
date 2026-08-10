@@ -1,0 +1,13 @@
+.git/
+.github/
+.next/
+.vercel/
+node_modules/
+contracts/target/
+contracts/wasm/
+coverage/
+playwright-report/
+test-results/
+ttl-plan.txt
+.env*
+!.env.example

@@ -2,6 +2,8 @@
 
 WrenPass is a Stellar-powered platform for small businesses to pre-sell limited future-service passes. Customers pay with a configured Stellar asset, receive an owner-authorized pass, and can later gift or redeem it. Financial state, supply, ownership, settlement, and lifecycle transitions remain on Stellar/Soroban.
 
+Production: [wrenpass.vercel.app](https://wrenpass.vercel.app)
+
 ## Architecture
 
 - **Next.js 16 and React 19** provide the public campaign experience and wallet-gated merchant/customer workspaces.
@@ -68,6 +70,7 @@ GitHub Actions runs the credential-free application, contract, dependency-securi
 ## Operations and releases
 
 - [Production operations](docs/OPERATIONS.md)
+- [Production release evidence](docs/PRODUCTION.md)
 - [Contract and Vercel deployment](docs/DEPLOYMENT.md)
 - [Security policy and trust boundaries](SECURITY.md)
 

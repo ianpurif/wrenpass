@@ -54,4 +54,4 @@ VERCEL_PROJECT_ID
 
 The workflow pulls the selected Vercel environment, runs `vercel build`, then uploads the same `.vercel/output` with `vercel deploy --prebuilt`. Production runs are restricted to `main`; the `production` GitHub environment should also require approval.
 
-Production activation, environment creation, first deployment, and monitoring evidence belong to the production release phase. Do not trigger this workflow until those external controls are configured and reviewed.
+The first production release is recorded in [PRODUCTION.md](PRODUCTION.md). Future releases should add a new immutable release record before changing the stable production alias.
