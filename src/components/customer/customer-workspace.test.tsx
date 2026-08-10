@@ -24,7 +24,6 @@ vi.mock("@/components/customer/customer-pass-card", () => ({
   CustomerPassCard: ({ pass }: { pass: { id: string } }) => <div>Owned pass {pass.id}</div>,
 }));
 vi.mock("@/components/customer/redemption-requests", () => ({ RedemptionRequests: () => null }));
-vi.mock("@/components/notifications/notification-email-form", () => ({ NotificationEmailForm: () => null }));
 vi.mock("@/features/customer/api", () => ({
   customerApi: { getDashboard: mocks.getDashboard },
 }));

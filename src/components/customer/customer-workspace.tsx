@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CustomerPassCard } from "@/components/customer/customer-pass-card";
 import { RedemptionRequests } from "@/components/customer/redemption-requests";
-import { NotificationEmailForm } from "@/components/notifications/notification-email-form";
 import { Button } from "@/components/ui/button";
 import { ErrorState, LoadingState } from "@/components/ui/feedback-state";
 import { useWallet } from "@/components/wallet/wallet-provider";
@@ -195,10 +194,9 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
         </Button>
       </header>
 
-      <nav aria-label="My passes sections" className="mt-5 grid grid-cols-3 rounded-xl border border-line bg-white p-1 text-center text-xs font-bold text-ink-muted sm:inline-grid sm:w-auto sm:grid-cols-3 sm:text-sm">
+      <nav aria-label="My passes sections" className="mt-5 grid grid-cols-2 rounded-xl border border-line bg-white p-1 text-center text-xs font-bold text-ink-muted sm:inline-grid sm:w-auto sm:grid-cols-2 sm:text-sm">
         <a className="rounded-lg px-3 py-2 hover:bg-sage-soft hover:text-ink" href="#owned-passes">Passes</a>
         <a className="rounded-lg px-3 py-2 hover:bg-sage-soft hover:text-ink" href="#activity">Activity</a>
-        <a className="rounded-lg px-3 py-2 hover:bg-sage-soft hover:text-ink" href="#preferences">Preferences</a>
       </nav>
 
       <div className="mt-7 grid gap-8">
@@ -280,10 +278,6 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
           <div className="mt-4"><ActivityTable activity={dashboard.activity} /></div>
         </section>
 
-        <section id="preferences" aria-labelledby="preferences-heading" className="max-w-3xl scroll-mt-28 rounded-2xl border border-line bg-white p-6 sm:p-7">
-          <h2 id="preferences-heading" className="font-bold text-ink">Preferences</h2>
-          <NotificationEmailForm />
-        </section>
       </div>
     </div>
   );
