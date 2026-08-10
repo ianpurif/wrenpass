@@ -1,8 +1,10 @@
 import { Keypair } from "@stellar/stellar-sdk";
 
 import { getStellarConfig } from "@/lib/stellar/config";
+import { StellarMetadataContractReader } from "@/lib/stellar/metadata-client";
 import { readContractReviewCount } from "@/lib/stellar/reviews-client";
 import { getServerEnv } from "@/server/env";
+import { createOffchainRepositories } from "@/server/firestore/repositories";
 import {
   readContractCampaignCount,
   readContractConfig,
@@ -10,7 +12,64 @@ import {
 } from "@/lib/stellar/wrenpass-client";
 import { assertPurchaseDistributionReady } from "@/server/stellar/purchase-readiness";
 import { StellarRpcGateway } from "@/server/stellar/rpc-gateway";
-import { assertReviewTtlReady, assertWrenPassTtlReady } from "@/server/stellar/ttl-service";
+import {
+  assertMetadataTtlReady,
+  assertReviewTtlReady,
+  assertWrenPassTtlReady,
+  type MetadataMerchantIndex,
+} from "@/server/stellar/ttl-service";
+
+async function verifyMetadataRegistry(
+  config: ReturnType<typeof getStellarConfig>,
+  campaignCount: bigint,
+): Promise<{ entryCount: number; minimumRemainingLedgers: number }> {
+  const reader = new StellarMetadataContractReader(config);
+  const [registryConfig, storageVersion] = await Promise.all([
+    reader.getConfig(),
+    reader.getStorageVersion(),
+  ]);
+  if (registryConfig.campaign_contract !== config.wrenPassContractId) {
+    throw new Error("The metadata registry targets a different WrenPass campaign contract.");
+  }
+  if (storageVersion !== 1) {
+    throw new Error(`Unsupported metadata registry storage version: ${storageVersion}.`);
+  }
+
+  const campaignIds: bigint[] = [];
+  const campaignCounts = new Map<string, bigint>();
+  for (let campaignId = BigInt(1); campaignId <= campaignCount; campaignId += BigInt(1)) {
+    const metadata = await reader.getCampaignMetadata(campaignId);
+    if (!metadata) {
+      throw new Error(`Campaign #${campaignId} has not been migrated to the metadata registry.`);
+    }
+    campaignIds.push(campaignId);
+    campaignCounts.set(
+      metadata.merchant,
+      (campaignCounts.get(metadata.merchant) ?? BigInt(0)) + BigInt(1),
+    );
+  }
+
+  const merchants: MetadataMerchantIndex[] = [];
+  const profileLocators = await createOffchainRepositories()
+    .metadataRegistryEntries.findByField("kind", "merchant_profile");
+  for (const locator of profileLocators) {
+    if (!campaignCounts.has(locator.ownerWalletAddress)) {
+      campaignCounts.set(locator.ownerWalletAddress, BigInt(0));
+    }
+  }
+  for (const [merchant, merchantCampaignCount] of campaignCounts) {
+    if (!(await reader.getMerchantProfile(merchant))) {
+      throw new Error(`Merchant ${merchant} has no on-chain metadata profile.`);
+    }
+    const registeredCampaigns = await reader.getMerchantCampaigns(merchant);
+    if (BigInt(registeredCampaigns.length) !== merchantCampaignCount) {
+      throw new Error(`Merchant ${merchant} has an inconsistent metadata campaign index.`);
+    }
+    merchants.push({ merchant, campaignCount: merchantCampaignCount });
+  }
+
+  return assertMetadataTtlReady(config, merchants, campaignIds);
+}
 
 async function main() {
   const config = getStellarConfig();
@@ -51,9 +110,10 @@ async function main() {
   }
 
   await assertPurchaseDistributionReady(config, contractConfig, gateway);
-  const [ttl, reviewTtl] = await Promise.all([
+  const [ttl, reviewTtl, metadataTtl] = await Promise.all([
     assertWrenPassTtlReady(config, campaignCount, passCount),
     assertReviewTtlReady(config, reviewCount),
+    verifyMetadataRegistry(config, campaignCount),
   ]);
 
   console.log(`Stellar RPC network verified: ${config.network}`);
@@ -68,6 +128,9 @@ async function main() {
   );
   console.log(
     `Review contract verified: ${reviewCount} reviews, ${reviewTtl.minimumRemainingLedgers} minimum ledgers remaining`,
+  );
+  console.log(
+    `Metadata registry verified: ${metadataTtl.entryCount} entries, ${metadataTtl.minimumRemainingLedgers} minimum ledgers remaining`,
   );
 }
 

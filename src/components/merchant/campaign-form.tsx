@@ -26,6 +26,7 @@ import {
 } from "@/features/merchant/campaign-workflow";
 import { syncEventsAfterMutation } from "@/features/notifications/api";
 import type { StellarConfig } from "@/lib/stellar/config";
+import { StellarMetadataContractWriter } from "@/lib/stellar/metadata-client";
 import { StellarCampaignContractWriter } from "@/lib/stellar/wrenpass-client";
 
 function defaultExpiration(): string {
@@ -59,6 +60,10 @@ export function CampaignForm({
   const { address, signTransaction } = useWallet();
   const { requestReview } = useReviewPrompt();
   const writer = useMemo(() => new StellarCampaignContractWriter(config), [config]);
+  const metadataWriter = useMemo(
+    () => new StellarMetadataContractWriter(config),
+    [config],
+  );
   const [image, setImage] = useState<File | null>(null);
   const [pending, setPending] = useState<RecoverableCampaignDraft | null>(() =>
     address ? readPending(address) : null,
@@ -110,7 +115,19 @@ export function CampaignForm({
 
   const dependencies = {
     writer,
-    saveMetadata: merchantApi.saveCampaignMetadata,
+    saveMetadata: async (metadata: RecoverableCampaignDraft) => {
+      if (walletContext) {
+        setStage("Approve public campaign details in Freighter…");
+        await metadataWriter.registerCampaignMetadata({
+          campaignId: BigInt(metadata.campaignId),
+          merchant: walletContext.merchant,
+          metadata,
+          signTransaction: walletContext.signTransaction,
+        });
+      }
+      setStage("Verifying campaign metadata…");
+      return merchantApi.saveCampaignMetadata(metadata);
+    },
     onPending: rememberDraft,
     onComplete: clearDraft,
   };
@@ -130,14 +147,20 @@ export function CampaignForm({
           metadata: {
             name: values.name,
             serviceDescription: values.serviceDescription,
-            ...(uploaded ? { imageUrl: uploaded.url, imagePublicId: uploaded.publicId } : {}),
+            ...(uploaded
+              ? {
+                  imageUrl: uploaded.url,
+                  imagePublicId: uploaded.publicId,
+                  imageSha256: uploaded.sha256,
+                }
+              : {}),
           },
         },
         {
           ...dependencies,
           saveMetadata: async (metadata) => {
-            setStage("Saving descriptive campaign details…");
-            const result = await merchantApi.saveCampaignMetadata(metadata);
+            setStage("Verifying descriptive campaign details…");
+            const result = await dependencies.saveMetadata(metadata);
             setStage("Approve publishing in Freighter…");
             return result;
           },
@@ -175,7 +198,7 @@ export function CampaignForm({
       await resumeCampaignPublishing(pending, walletContext, {
         ...dependencies,
         saveMetadata: async (metadata) => {
-          const result = await merchantApi.saveCampaignMetadata(metadata);
+          const result = await dependencies.saveMetadata(metadata);
           setStage("Approve publishing in Freighter…");
           return result;
         },
@@ -270,7 +293,7 @@ export function CampaignForm({
 
           <div className="mt-5 flex gap-3 text-xs leading-5 text-ink-muted">
             <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-forest" />
-            <p>Financial terms become immutable once sales begin. Publishing requires two wallet approvals.</p>
+            <p>Financial terms become immutable once sales begin. Wallet approvals secure each on-chain step.</p>
           </div>
           {stage && <p role="status" className="mt-4 flex items-start gap-2 text-sm font-semibold text-forest"><LoaderCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0 animate-spin" />{stage}</p>}
           {error && <p role="alert" className="mt-4 text-sm font-semibold text-danger">{error}</p>}

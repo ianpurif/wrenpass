@@ -2,25 +2,35 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ImagePlus, LoaderCircle, Save } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { merchantApi } from "@/features/merchant/api";
+import { useWallet } from "@/components/wallet/wallet-provider";
 import {
   merchantProfileInputSchema,
   type MerchantProfileInput,
 } from "@/features/merchant/campaign-terms";
 import type { Merchant } from "@/server/models";
+import type { StellarConfig } from "@/lib/stellar/config";
+import { StellarMetadataContractWriter } from "@/lib/stellar/metadata-client";
 
 export function MerchantProfileForm({
   merchant,
+  config,
   onSaved,
 }: {
   merchant: Merchant | null;
+  config: StellarConfig;
   onSaved(merchant: Merchant): void;
 }) {
+  const { address, signTransaction } = useWallet();
+  const metadataWriter = useMemo(
+    () => new StellarMetadataContractWriter(config),
+    [config],
+  );
   const [logo, setLogo] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -49,10 +59,27 @@ export function MerchantProfileForm({
     setSaved(false);
     try {
       const uploaded = logo ? await merchantApi.uploadImage("merchant-logo", logo) : null;
-      const nextMerchant = await merchantApi.saveProfile({
+      const profile = {
         ...values,
-        ...(uploaded ? { logoUrl: uploaded.url, logoPublicId: uploaded.publicId } : {}),
+        ...(uploaded
+          ? {
+              logoUrl: uploaded.url,
+              logoPublicId: uploaded.publicId,
+              logoSha256: uploaded.sha256,
+            }
+          : {}),
+      };
+      if (!address) throw new Error("Connect your merchant wallet first.");
+      await metadataWriter.setMerchantProfile({
+        merchant: address,
+        profile: {
+          ...values,
+          logoUrl: uploaded?.url ?? merchant?.logoUrl,
+          logoSha256: uploaded?.sha256 ?? merchant?.logoSha256,
+        },
+        signTransaction: (transactionXdr) => signTransaction(transactionXdr),
       });
+      const nextMerchant = await merchantApi.saveProfile(profile);
       setLogo(null);
       setSaved(true);
       onSaved(nextMerchant);

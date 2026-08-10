@@ -275,6 +275,7 @@ export function MerchantWorkspace({
                 </div>
                 <div className="p-6 sm:p-7">
                   <MerchantProfileForm
+                    config={config}
                     merchant={dashboard.merchant}
                     onSaved={(merchant) => setDashboard((current) => current ? { ...current, merchant } : current)}
                   />
@@ -286,7 +287,7 @@ export function MerchantWorkspace({
                   <li>Shown on public campaign pages</li>
                   <li>Tied to the connected merchant wallet</li>
                   <li>Editable without changing contract terms</li>
-                </ul>
+                 </ul>
                 <NotificationEmailForm />
               </aside>
             </div>
@@ -300,7 +301,7 @@ export function MerchantWorkspace({
                 <div className="border-b border-line px-6 py-5 sm:px-7">
                   <h2 id="create-campaign-heading" className="font-bold text-ink">Campaign terms</h2>
                   <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-muted">
-                    Public details are stored off-chain. Supply, pricing, expiration, and fund distribution are enforced on Stellar.
+                    Public details and financial terms are anchored to Stellar. Images remain hosted by Cloudinary.
                   </p>
                 </div>
                 <div className="p-6 sm:p-7"><CampaignForm config={config} onPublished={loadDashboard} /></div>

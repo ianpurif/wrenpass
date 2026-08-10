@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 
@@ -35,12 +36,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const sha256 = createHash("sha256")
+      .update(Buffer.from(await file.arrayBuffer()))
+      .digest("hex");
     const uploaded = await createCloudinaryImageService().uploadImage({
       source: file,
       folder: folderFor(kind),
     });
     return Response.json(
-      { url: uploaded.secureUrl, publicId: uploaded.publicId },
+      { url: uploaded.secureUrl, publicId: uploaded.publicId, sha256 },
       { status: 201, headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

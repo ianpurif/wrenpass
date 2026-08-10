@@ -39,7 +39,11 @@ const merchantDashboardSchema = z.object({
 const profileResponseSchema = z.object({ merchant: merchantSchema.nullable() });
 const savedProfileResponseSchema = z.object({ merchant: merchantSchema });
 const savedMetadataResponseSchema = z.object({ metadata: campaignMetadataSchema });
-const uploadResponseSchema = z.object({ url: z.url(), publicId: z.string().min(1) });
+const uploadResponseSchema = z.object({
+  url: z.url(),
+  publicId: z.string().min(1),
+  sha256: z.string().regex(/^[a-f\d]{64}$/i),
+});
 export const publicCampaignSchema = merchantCampaignSchema.extend({ merchant: merchantSchema });
 
 async function requestJson(url: string, init?: RequestInit): Promise<unknown> {

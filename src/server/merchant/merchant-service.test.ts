@@ -1,13 +1,15 @@
+import { describe, expect, it, vi } from "vitest";
+
 import type { Campaign } from "@/generated/wrenpass-contract/src";
 import type { StellarConfig } from "@/lib/stellar/config";
+import type { DocumentStore } from "@/server/firestore/document-store";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
 import {
   MerchantService,
   MerchantServiceError,
 } from "@/server/merchant/merchant-service";
+import type { MetadataRegistryReader } from "@/server/merchant/metadata-registry-reader";
 import type { CampaignReader } from "@/server/stellar/campaign-reader";
-import type { DocumentStore } from "@/server/firestore/document-store";
-import { describe, expect, it } from "vitest";
 
 class MemoryStore implements DocumentStore {
   private readonly documents = new Map<string, Record<string, unknown>>();
@@ -37,6 +39,10 @@ class MemoryStore implements DocumentStore {
 
 const merchant = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 const assetContractId = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";
+const logoUrl = "https://res.cloudinary.com/wrenpass/image/upload/logo.png";
+const imageUrl = "https://res.cloudinary.com/wrenpass/image/upload/campaign.png";
+const logoSha256 = "a".repeat(64);
+const imageSha256 = "b".repeat(64);
 const campaign: Campaign = {
   id: BigInt(1),
   merchant,
@@ -67,73 +73,193 @@ const config: StellarConfig = {
   assetContractId,
   wrenPassContractId: "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
   reviewContractId: "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
+  metadataContractId: "CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR",
+};
+const profile = {
+  id: merchant,
+  ownerWalletAddress: merchant,
+  businessName: "Wren Studio",
+  description: "A neighborhood studio providing complete haircut services.",
+  logoUrl,
+  logoSha256,
+  createdAt: "2026-08-09T00:00:00.000Z",
+  updatedAt: "2026-08-09T00:00:00.000Z",
+};
+const metadata = {
+  id: "1",
+  contractId: config.wrenPassContractId,
+  merchantId: merchant,
+  name: "Future haircut",
+  serviceDescription: "One complete haircut service at the merchant location.",
+  imageUrl,
+  imageSha256,
+  createdAt: "2026-08-09T00:00:00.000Z",
+  updatedAt: "2026-08-09T00:00:00.000Z",
 };
 
-function createService(foundCampaign: Campaign | null = campaign) {
-  const reader: CampaignReader = { findById: async () => foundCampaign };
-  return new MerchantService(
-    createOffchainRepositories(new MemoryStore()),
-    reader,
-    config,
-    () => new Date("2026-08-09T00:00:00.000Z"),
-  );
+function createRegistry(
+  overrides: Partial<MetadataRegistryReader> = {},
+): MetadataRegistryReader {
+  return {
+    getMerchantProfile: async () => profile,
+    getCampaignMetadata: async () => metadata,
+    getMerchantCampaigns: async () => [metadata],
+    ...overrides,
+  };
 }
 
-describe("MerchantService", () => {
-  it("binds the public profile to the authenticated wallet", async () => {
-    const service = createService();
-    const profile = await service.saveProfile(merchant, {
-      businessName: "Wren Studio",
-      description: "A neighborhood studio providing complete haircut services.",
+function createService({
+  foundCampaign = campaign,
+  metadataRegistry = createRegistry(),
+  store = new MemoryStore(),
+}: {
+  foundCampaign?: Campaign | null;
+  metadataRegistry?: MetadataRegistryReader;
+  store?: DocumentStore;
+} = {}) {
+  const reader: CampaignReader = { findById: async () => foundCampaign };
+  return {
+    repositories: createOffchainRepositories(store),
+    service: new MerchantService(
+      createOffchainRepositories(store),
+      reader,
+      config,
+      metadataRegistry,
+      () => new Date("2026-08-10T00:00:00.000Z"),
+    ),
+  };
+}
+
+describe("MerchantService on-chain metadata cutover", () => {
+  it("reads public profile data from Stellar and attaches only a matching provider reference", async () => {
+    const store = new MemoryStore();
+    const { repositories, service } = createService({ store });
+    await repositories.cloudinaryAssetReferences.save({
+      id: `merchant-logo:${merchant}`,
+      kind: "merchant_logo",
+      ownerWalletAddress: merchant,
+      resourceId: merchant,
+      publicUrl: logoUrl,
+      publicId: "wrenpass/merchant-logos/logo",
+      sha256: logoSha256,
+      updatedAt: "2026-08-10T00:00:00.000Z",
     });
 
-    expect(profile.id).toBe(merchant);
-    expect(profile.ownerWalletAddress).toBe(merchant);
-    expect(await service.getProfile(merchant)).toEqual(profile);
+    await expect(service.getProfile(merchant)).resolves.toEqual({
+      ...profile,
+      logoPublicId: "wrenpass/merchant-logos/logo",
+    });
   });
 
-  it("rejects metadata registration by a wallet that does not own the campaign", async () => {
-    const service = createService();
+  it("requires a matching wallet-authorized on-chain profile", async () => {
+    const { service } = createService();
+
+    await expect(service.saveProfile(merchant, {
+      businessName: "Different name",
+      description: profile.description,
+    })).rejects.toThrow("matching merchant profile on Stellar");
+  });
+
+  it("stores only the Cloudinary reference after verifying an on-chain profile", async () => {
+    const { repositories, service } = createService();
+
+    const saved = await service.saveProfile(merchant, {
+      businessName: profile.businessName,
+      description: profile.description,
+      logoUrl,
+      logoPublicId: "wrenpass/merchant-logos/logo",
+      logoSha256,
+    });
+
+    expect(saved).toEqual({ ...profile, logoPublicId: "wrenpass/merchant-logos/logo" });
     await expect(
-      service.saveCampaignMetadata("GOTHER", {
-        campaignId: "1",
-        name: "Future haircut",
-        serviceDescription: "One complete haircut service at the merchant location.",
-      }),
-    ).rejects.toThrow(MerchantServiceError);
+      repositories.cloudinaryAssetReferences.findById(`merchant-logo:${merchant}`),
+    ).resolves.toMatchObject({
+      kind: "merchant_logo",
+      publicId: "wrenpass/merchant-logos/logo",
+    });
   });
 
-  it("registers metadata idempotently but rejects a conflicting overwrite", async () => {
-    const service = createService();
-    await service.saveProfile(merchant, {
-      businessName: "Wren Studio",
-      description: "A neighborhood studio providing complete haircut services.",
-    });
-    const input = {
+  it("rejects campaign metadata from a wallet that does not own the campaign", async () => {
+    const { service } = createService();
+
+    await expect(service.saveCampaignMetadata("GOTHER", {
       campaignId: "1",
-      name: "Future haircut",
-      serviceDescription: "One complete haircut service at the merchant location.",
-    };
-
-    const saved = await service.saveCampaignMetadata(merchant, input);
-    expect(await service.saveCampaignMetadata(merchant, input)).toEqual(saved);
-    await expect(
-      service.saveCampaignMetadata(merchant, { ...input, name: "Changed campaign" }),
-    ).rejects.toThrow("already registered");
+      name: metadata.name,
+      serviceDescription: metadata.serviceDescription,
+      imageUrl,
+      imagePublicId: "wrenpass/campaign-images/campaign",
+      imageSha256,
+    })).rejects.toThrow(MerchantServiceError);
   });
 
-  it("rejects an unsupported on-chain payment asset", async () => {
-    const service = createService({ ...campaign, payment_asset: config.wrenPassContractId });
-    await service.saveProfile(merchant, {
-      businessName: "Wren Studio",
-      description: "A neighborhood studio providing complete haircut services.",
+  it("rejects campaigns using an unsupported payment asset", async () => {
+    const { service } = createService({
+      foundCampaign: { ...campaign, payment_asset: config.wrenPassContractId },
+    });
+
+    await expect(service.saveCampaignMetadata(merchant, {
+      campaignId: "1",
+      name: metadata.name,
+      serviceDescription: metadata.serviceDescription,
+      imageUrl,
+      imagePublicId: "wrenpass/campaign-images/campaign",
+      imageSha256,
+    })).rejects.toThrow("unsupported payment asset");
+  });
+
+  it("stores a campaign image reference only after matching immutable on-chain metadata", async () => {
+    const { repositories, service } = createService();
+
+    const saved = await service.saveCampaignMetadata(merchant, {
+      campaignId: "1",
+      name: metadata.name,
+      serviceDescription: metadata.serviceDescription,
+      imageUrl,
+      imagePublicId: "wrenpass/campaign-images/campaign",
+      imageSha256,
+    });
+
+    expect(saved).toEqual({
+      ...metadata,
+      imagePublicId: "wrenpass/campaign-images/campaign",
     });
     await expect(
-      service.saveCampaignMetadata(merchant, {
-        campaignId: "1",
-        name: "Future haircut",
-        serviceDescription: "One complete haircut service at the merchant location.",
-      }),
-    ).rejects.toThrow("unsupported payment asset");
+      repositories.cloudinaryAssetReferences.findById("campaign-image:1"),
+    ).resolves.toMatchObject({
+      kind: "campaign_image",
+      publicId: "wrenpass/campaign-images/campaign",
+    });
+  });
+
+  it("loads dashboards and public pages from Stellar when provider storage is unavailable", async () => {
+    const failedStore: DocumentStore = {
+      read: async () => { throw new Error("Firestore unavailable"); },
+      findMany: async () => { throw new Error("Firestore unavailable"); },
+      write: async () => { throw new Error("Firestore unavailable"); },
+      remove: async () => undefined,
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { service } = createService({ store: failedStore });
+
+    await expect(service.getDashboard(merchant)).resolves.toMatchObject({
+      merchant: profile,
+      campaigns: [{ metadata }],
+    });
+    await expect(service.getPublicCampaign("1")).resolves.toMatchObject({
+      merchant: profile,
+      metadata,
+    });
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("does not hide metadata registry failures behind stale Firestore data", async () => {
+    const registry = createRegistry({
+      getMerchantProfile: async () => { throw new Error("RPC unavailable"); },
+    });
+    const { service } = createService({ metadataRegistry: registry });
+
+    await expect(service.getProfile(merchant)).rejects.toThrow("RPC unavailable");
   });
 });

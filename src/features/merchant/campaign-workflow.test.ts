@@ -22,13 +22,13 @@ const terms = {
 };
 
 describe("campaign publishing workflow", () => {
-  it("records the on-chain draft before off-chain persistence", async () => {
+  it("records the on-chain draft before metadata registration", async () => {
     const pending: RecoverableCampaignDraft[] = [];
     const writer: CampaignContractWriter = {
       createDraft: vi.fn().mockResolvedValue(BigInt(7)),
       publish: vi.fn(),
     };
-    const saveMetadata = vi.fn().mockRejectedValue(new Error("Firestore unavailable"));
+    const saveMetadata = vi.fn().mockRejectedValue(new Error("Metadata registration unavailable"));
 
     await expect(
       createAndPublishCampaign(
@@ -40,7 +40,7 @@ describe("campaign publishing workflow", () => {
           onComplete: vi.fn(),
         },
       ),
-    ).rejects.toThrow("Firestore unavailable");
+    ).rejects.toThrow("Metadata registration unavailable");
 
     expect(pending).toEqual([{ ...metadata, campaignId: "7" }]);
     expect(writer.publish).not.toHaveBeenCalled();

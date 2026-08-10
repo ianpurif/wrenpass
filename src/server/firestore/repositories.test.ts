@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { DocumentStore } from "@/server/firestore/document-store";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
-import type { UserProfile } from "@/server/models";
+import type { CloudinaryAssetReference, UserProfile } from "@/server/models";
 
 function createStore(): DocumentStore {
   const documents = new Map<string, unknown>();
@@ -32,6 +32,17 @@ const userProfile: UserProfile = {
   walletAddress: "GTESTWALLET",
   displayName: "Ari",
   createdAt: "2026-08-09T04:00:00.000Z",
+  updatedAt: "2026-08-09T04:00:00.000Z",
+};
+
+const cloudinaryReference: CloudinaryAssetReference = {
+  id: "campaign-image:1",
+  kind: "campaign_image",
+  ownerWalletAddress: "GTESTWALLET",
+  resourceId: "1",
+  publicUrl: "https://res.cloudinary.com/wrenpass/image/upload/campaign.png",
+  publicId: "wrenpass/campaign-images/campaign",
+  sha256: "a".repeat(64),
   updatedAt: "2026-08-09T04:00:00.000Z",
 };
 
@@ -90,6 +101,32 @@ describe("off-chain repositories", () => {
       "user_profiles",
       userProfile.id,
       expect.not.objectContaining({ displayName: expect.anything() }),
+    );
+  });
+
+  it("stores only Cloudinary provider-management data for public on-chain assets", async () => {
+    const repositories = createOffchainRepositories(createStore());
+
+    await repositories.cloudinaryAssetReferences.save(cloudinaryReference);
+
+    await expect(
+      repositories.cloudinaryAssetReferences.findById(cloudinaryReference.id),
+    ).resolves.toEqual(cloudinaryReference);
+  });
+
+  it("stores metadata locators without duplicating public profile fields", async () => {
+    const repositories = createOffchainRepositories(createStore());
+    const locator = {
+      id: "merchant-profile:GTESTWALLET",
+      kind: "merchant_profile" as const,
+      ownerWalletAddress: "GTESTWALLET",
+      updatedAt: "2026-08-09T04:00:00.000Z",
+    };
+
+    await repositories.metadataRegistryEntries.save(locator);
+
+    await expect(repositories.metadataRegistryEntries.findById(locator.id)).resolves.toEqual(
+      locator,
     );
   });
 });

@@ -27,6 +27,10 @@ function enumStorageKey(name: "Campaign" | "Pass" | "Review", id: bigint): xdr.S
   ]);
 }
 
+function metadataStorageKey(name: string, values: xdr.ScVal[]): xdr.ScVal {
+  return xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(name), ...values]);
+}
+
 export function* iterateReviewLedgerKeys(
   contractId: string,
   reviewCount: bigint,
@@ -119,6 +123,69 @@ export function createWrenPassLedgerKeys(
   return [...iterateWrenPassLedgerKeys(contractId, campaignCount, passCount)];
 }
 
+export interface MetadataMerchantIndex {
+  merchant: string;
+  campaignCount: bigint;
+}
+
+export function* iterateMetadataLedgerKeys(
+  contractId: string,
+  merchants: MetadataMerchantIndex[],
+  campaignIds: bigint[],
+): Generator<xdr.LedgerKey> {
+  const contractAddress = Address.fromString(contractId).toScAddress();
+  yield contractDataKey(contractAddress, xdr.ScVal.scvLedgerKeyContractInstance());
+
+  for (const { merchant, campaignCount } of merchants) {
+    if (campaignCount < BigInt(0)) {
+      throw new Error("Metadata campaign count cannot be negative.");
+    }
+    const merchantValue = Address.fromString(merchant).toScVal();
+    yield contractDataKey(
+      contractAddress,
+      metadataStorageKey("Merchant", [merchantValue]),
+    );
+    if (campaignCount > BigInt(0)) {
+      yield contractDataKey(
+        contractAddress,
+        metadataStorageKey("MerchantCampaignCount", [merchantValue]),
+      );
+    }
+    for (let slot = BigInt(0); slot < campaignCount; slot += BigInt(1)) {
+      yield contractDataKey(
+        contractAddress,
+        metadataStorageKey("MerchantCampaign", [
+          merchantValue,
+          nativeToScVal(slot, { type: "u64" }),
+        ]),
+      );
+    }
+  }
+
+  for (const campaignId of campaignIds) {
+    if (campaignId <= BigInt(0)) {
+      throw new Error("Metadata campaign IDs must be positive.");
+    }
+    const campaignValue = nativeToScVal(campaignId, { type: "u64" });
+    yield contractDataKey(
+      contractAddress,
+      metadataStorageKey("Campaign", [campaignValue]),
+    );
+    yield contractDataKey(
+      contractAddress,
+      metadataStorageKey("CampaignIndex", [campaignValue]),
+    );
+  }
+}
+
+export function createMetadataLedgerKeys(
+  contractId: string,
+  merchants: MetadataMerchantIndex[],
+  campaignIds: bigint[],
+): xdr.LedgerKey[] {
+  return [...iterateMetadataLedgerKeys(contractId, merchants, campaignIds)];
+}
+
 export async function assertWrenPassTtlReady(
   config: StellarConfig,
   campaignCount: bigint,
@@ -136,5 +203,17 @@ export async function assertReviewTtlReady(
     config.rpcUrl,
     iterateReviewLedgerKeys(config.reviewContractId, reviewCount),
     "WrenPass review contract",
+  );
+}
+
+export async function assertMetadataTtlReady(
+  config: StellarConfig,
+  merchants: MetadataMerchantIndex[],
+  campaignIds: bigint[],
+): Promise<{ entryCount: number; minimumRemainingLedgers: number }> {
+  return assertLedgerKeysTtlReady(
+    config.rpcUrl,
+    iterateMetadataLedgerKeys(config.metadataContractId, merchants, campaignIds),
+    "WrenPass metadata contract",
   );
 }

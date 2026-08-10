@@ -14,8 +14,10 @@ export const recoverableCampaignDraftSchema = z
     serviceDescription: z.string().trim().min(20).max(4_000),
     imageUrl: z.url().optional(),
     imagePublicId: z.string().trim().min(1).max(240).optional(),
+    imageSha256: z.string().regex(/^[a-f\d]{64}$/i).optional(),
   })
-  .refine((value) => Boolean(value.imageUrl) === Boolean(value.imagePublicId));
+  .refine((value) => Boolean(value.imageUrl) === Boolean(value.imagePublicId))
+  .refine((value) => !value.imageSha256 || Boolean(value.imageUrl));
 
 export type RecoverableCampaignDraft = z.infer<typeof recoverableCampaignDraftSchema>;
 

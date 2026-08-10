@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createDraft: vi.fn(),
   publish: vi.fn(),
   requestReview: vi.fn(),
+  registerCampaignMetadata: vi.fn(),
   saveCampaignMetadata: vi.fn(),
   signTransaction: vi.fn(),
   syncEventsAfterMutation: vi.fn(),
@@ -34,6 +35,11 @@ vi.mock("@/lib/stellar/wrenpass-client", () => ({
     publish = mocks.publish;
   },
 }));
+vi.mock("@/lib/stellar/metadata-client", () => ({
+  StellarMetadataContractWriter: class {
+    registerCampaignMetadata = mocks.registerCampaignMetadata;
+  },
+}));
 vi.mock("@/features/notifications/api", () => ({
   syncEventsAfterMutation: mocks.syncEventsAfterMutation,
 }));
@@ -50,6 +56,7 @@ const config: StellarConfig = {
   assetContractId: "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
   wrenPassContractId: "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
   reviewContractId: "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
+  metadataContractId: "CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR",
 };
 
 describe("CampaignForm", () => {
@@ -58,6 +65,7 @@ describe("CampaignForm", () => {
     mocks.createDraft.mockReset().mockResolvedValue(BigInt(12));
     mocks.publish.mockReset().mockResolvedValue(undefined);
     mocks.requestReview.mockReset();
+    mocks.registerCampaignMetadata.mockReset().mockResolvedValue({});
     mocks.saveCampaignMetadata.mockReset().mockResolvedValue({});
     mocks.signTransaction.mockReset();
     mocks.syncEventsAfterMutation.mockReset().mockResolvedValue(true);
@@ -77,12 +85,16 @@ describe("CampaignForm", () => {
 
     await waitFor(() => expect(mocks.publish).toHaveBeenCalledOnce());
     expect(mocks.createDraft).toHaveBeenCalledOnce();
+    expect(mocks.registerCampaignMetadata).toHaveBeenCalledOnce();
     expect(mocks.saveCampaignMetadata).toHaveBeenCalledWith({
       campaignId: "12",
       name: "Five haircuts forward",
       serviceDescription: "One complete haircut service delivered at the merchant studio.",
     });
     expect(mocks.createDraft.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.registerCampaignMetadata.mock.invocationCallOrder[0],
+    );
+    expect(mocks.registerCampaignMetadata.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.saveCampaignMetadata.mock.invocationCallOrder[0],
     );
     expect(mocks.saveCampaignMetadata.mock.invocationCallOrder[0]).toBeLessThan(

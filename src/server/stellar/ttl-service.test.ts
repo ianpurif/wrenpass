@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { scValToNative } from "@stellar/stellar-sdk";
 
 import {
+  createMetadataLedgerKeys,
   createReviewLedgerKeys,
   createWrenPassLedgerKeys,
 } from "@/server/stellar/ttl-service";
-import { testStellarConfig } from "@/test/fixtures/customer";
+import { testCustomerAddress, testStellarConfig } from "@/test/fixtures/customer";
 
 describe("WrenPass TTL ledger keys", () => {
   it("includes the contract instance and every campaign and pass entry", () => {
@@ -45,5 +47,49 @@ describe("Review TTL ledger keys", () => {
     expect(keys[2]?.contractData().key().toXDR("base64")).toBe(
       "AAAAEAAAAAEAAAACAAAADwAAAAZSZXZpZXcAAAAAAAUAAAAAAAAAAg==",
     );
+  });
+});
+
+describe("Metadata TTL ledger keys", () => {
+  it("includes profiles, campaign indexes, and campaign records", () => {
+    const keys = createMetadataLedgerKeys(
+      testStellarConfig.wrenPassContractId,
+      [{ merchant: testCustomerAddress, campaignCount: BigInt(1) }],
+      [BigInt(1)],
+    );
+
+    expect(keys).toHaveLength(6);
+    expect(scValToNative(keys[1]!.contractData().key())).toEqual([
+      "Merchant",
+      testCustomerAddress,
+    ]);
+    expect(scValToNative(keys[3]!.contractData().key())).toEqual([
+      "MerchantCampaign",
+      testCustomerAddress,
+      BigInt(0),
+    ]);
+    expect(scValToNative(keys[4]!.contractData().key())).toEqual(["Campaign", BigInt(1)]);
+  });
+
+  it("rejects invalid campaign identifiers", () => {
+    expect(() => createMetadataLedgerKeys(
+      testStellarConfig.wrenPassContractId,
+      [],
+      [BigInt(0)],
+    )).toThrow("positive");
+  });
+
+  it("tracks profile-only merchants without inventing a campaign-count key", () => {
+    const keys = createMetadataLedgerKeys(
+      testStellarConfig.metadataContractId,
+      [{ merchant: testCustomerAddress, campaignCount: BigInt(0) }],
+      [],
+    );
+
+    expect(keys).toHaveLength(2);
+    expect(scValToNative(keys[1]!.contractData().key())).toEqual([
+      "Merchant",
+      testCustomerAddress,
+    ]);
   });
 });

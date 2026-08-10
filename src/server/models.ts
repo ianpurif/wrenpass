@@ -9,6 +9,7 @@ export const entityIdSchema = z
 const isoTimestamp = z.string().datetime();
 const walletAddress = z.string().trim().min(1).max(128);
 const optionalUrl = z.url().optional();
+export const sha256Schema = z.string().regex(/^[a-f\d]{64}$/i);
 export const cloudinaryPublicIdSchema = z
   .string()
   .trim()
@@ -32,6 +33,7 @@ export const merchantSchema = z.object({
   businessName: z.string().trim().min(1).max(140),
   description: z.string().trim().min(1).max(2_000),
   logoUrl: optionalUrl,
+  logoSha256: sha256Schema.optional(),
   logoPublicId: cloudinaryPublicIdSchema.optional(),
   createdAt: isoTimestamp,
   updatedAt: isoTimestamp,
@@ -44,8 +46,29 @@ export const campaignMetadataSchema = z.object({
   name: z.string().trim().min(1).max(140),
   serviceDescription: z.string().trim().min(1).max(4_000),
   imageUrl: optionalUrl,
+  imageSha256: sha256Schema.optional(),
   imagePublicId: cloudinaryPublicIdSchema.optional(),
   createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+});
+
+export const cloudinaryAssetReferenceSchema = z.object({
+  id: entityIdSchema,
+  kind: z.enum(["merchant_logo", "campaign_image"]),
+  ownerWalletAddress: walletAddress,
+  resourceId: entityIdSchema,
+  publicUrl: z
+    .url()
+    .refine((value) => new URL(value).hostname === "res.cloudinary.com"),
+  publicId: cloudinaryPublicIdSchema,
+  sha256: sha256Schema.optional(),
+  updatedAt: isoTimestamp,
+});
+
+export const metadataRegistryEntrySchema = z.object({
+  id: entityIdSchema,
+  kind: z.literal("merchant_profile"),
+  ownerWalletAddress: walletAddress,
   updatedAt: isoTimestamp,
 });
 
@@ -109,6 +132,8 @@ export const redemptionRequestSchema = z.object({
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type Merchant = z.infer<typeof merchantSchema>;
 export type CampaignMetadata = z.infer<typeof campaignMetadataSchema>;
+export type CloudinaryAssetReference = z.infer<typeof cloudinaryAssetReferenceSchema>;
+export type MetadataRegistryEntry = z.infer<typeof metadataRegistryEntrySchema>;
 export type Notification = z.infer<typeof notificationSchema>;
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 export type IndexedBlockchainEvent = z.infer<typeof indexedBlockchainEventSchema>;

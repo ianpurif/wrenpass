@@ -4,17 +4,17 @@ import type { ZodType } from "zod";
 
 import { FirestoreDocumentStore, type DocumentStore } from "@/server/firestore/document-store";
 import {
-  campaignMetadataSchema,
+  cloudinaryAssetReferenceSchema,
   entityIdSchema,
   indexedBlockchainEventSchema,
-  merchantSchema,
+  metadataRegistryEntrySchema,
   notificationSchema,
   redemptionRequestSchema,
   reviewReceiptSchema,
   userProfileSchema,
-  type CampaignMetadata,
+  type CloudinaryAssetReference,
   type IndexedBlockchainEvent,
-  type Merchant,
+  type MetadataRegistryEntry,
   type Notification,
   type RedemptionRequest,
   type ReviewReceipt,
@@ -72,8 +72,8 @@ export class EntityRepository<T extends IdentifiedEntity> {
 
 export interface OffchainRepositories {
   userProfiles: EntityRepository<UserProfile>;
-  merchants: EntityRepository<Merchant>;
-  campaignMetadata: EntityRepository<CampaignMetadata>;
+  cloudinaryAssetReferences: EntityRepository<CloudinaryAssetReference>;
+  metadataRegistryEntries: EntityRepository<MetadataRegistryEntry>;
   notifications: EntityRepository<Notification>;
   indexedBlockchainEvents: EntityRepository<IndexedBlockchainEvent>;
   reviewReceipts: EntityRepository<ReviewReceipt>;
@@ -85,10 +85,14 @@ export function createOffchainRepositories(
 ): OffchainRepositories {
   return {
     userProfiles: new EntityRepository("user_profiles", userProfileSchema, store),
-    merchants: new EntityRepository("merchants", merchantSchema, store),
-    campaignMetadata: new EntityRepository(
-      "campaign_metadata",
-      campaignMetadataSchema,
+    cloudinaryAssetReferences: new EntityRepository(
+      "cloudinary_asset_references",
+      cloudinaryAssetReferenceSchema,
+      store,
+    ),
+    metadataRegistryEntries: new EntityRepository(
+      "metadata_registry_entries",
+      metadataRegistryEntrySchema,
       store,
     ),
     notifications: new EntityRepository("notifications", notificationSchema, store),

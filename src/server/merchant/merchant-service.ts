@@ -10,13 +10,14 @@ import type {
 import type { StellarConfig } from "@/lib/stellar/config";
 import type { OffchainRepositories } from "@/server/firestore/repositories";
 import {
-  campaignMetadataSchema,
   cloudinaryPublicIdSchema,
-  merchantSchema,
+  sha256Schema,
   type CampaignMetadata,
+  type CloudinaryAssetReference,
   type Merchant,
 } from "@/server/models";
 import type { CampaignReader } from "@/server/stellar/campaign-reader";
+import type { MetadataRegistryReader } from "@/server/merchant/metadata-registry-reader";
 import { z } from "zod";
 
 const merchantProfileUpdateSchema = z
@@ -28,9 +29,13 @@ const merchantProfileUpdateSchema = z
       .refine((value) => new URL(value).hostname === "res.cloudinary.com")
       .optional(),
     logoPublicId: cloudinaryPublicIdSchema.optional(),
+    logoSha256: sha256Schema.optional(),
   })
   .refine((value) => Boolean(value.logoUrl) === Boolean(value.logoPublicId), {
     message: "Logo URL and public ID must be provided together.",
+  })
+  .refine((value) => !value.logoSha256 || Boolean(value.logoUrl), {
+    message: "Logo hash requires a logo URL.",
   });
 
 const campaignMetadataInputSchema = z
@@ -43,9 +48,13 @@ const campaignMetadataInputSchema = z
       .refine((value) => new URL(value).hostname === "res.cloudinary.com")
       .optional(),
     imagePublicId: cloudinaryPublicIdSchema.optional(),
+    imageSha256: sha256Schema.optional(),
   })
   .refine((value) => Boolean(value.imageUrl) === Boolean(value.imagePublicId), {
     message: "Image URL and public ID must be provided together.",
+  })
+  .refine((value) => !value.imageSha256 || Boolean(value.imageUrl), {
+    message: "Image hash requires an image URL.",
   });
 
 export type MerchantProfileUpdate = z.infer<typeof merchantProfileUpdateSchema>;
@@ -82,34 +91,147 @@ function toOnchainDto(campaign: Campaign): OnchainCampaignDto {
   };
 }
 
+function mergeMerchant(
+  onchain: Merchant | null,
+  reference: CloudinaryAssetReference | null,
+): Merchant | null {
+  if (!onchain) return null;
+  return {
+    ...onchain,
+    ...(referenceMatches(reference, "merchant_logo", onchain.id, onchain.logoUrl, onchain.logoSha256)
+      ? { logoPublicId: reference.publicId }
+      : {}),
+  };
+}
+
+function mergeCampaignMetadata(
+  onchain: CampaignMetadata,
+  reference: CloudinaryAssetReference | null,
+): CampaignMetadata {
+  return {
+    ...onchain,
+    ...(referenceMatches(reference, "campaign_image", onchain.id, onchain.imageUrl, onchain.imageSha256)
+      ? { imagePublicId: reference.publicId }
+      : {}),
+  };
+}
+
+function referenceMatches(
+  reference: CloudinaryAssetReference | null,
+  kind: CloudinaryAssetReference["kind"],
+  resourceId: string,
+  publicUrl: string | undefined,
+  sha256: string | undefined,
+): reference is CloudinaryAssetReference {
+  return Boolean(reference)
+    && reference?.kind === kind
+    && reference.resourceId === resourceId
+    && reference.publicUrl === publicUrl
+    && (sha256 === undefined || reference.sha256 === sha256);
+}
+
+function merchantLogoReferenceId(walletAddress: string): string {
+  return `merchant-logo:${walletAddress}`;
+}
+
+function campaignImageReferenceId(campaignId: string): string {
+  return `campaign-image:${campaignId}`;
+}
+
+function profileMatchesChain(
+  profile: Merchant,
+  input: MerchantProfileUpdate,
+): boolean {
+  return profile.businessName === input.businessName
+    && profile.description === input.description
+    && (input.logoUrl === undefined || profile.logoUrl === input.logoUrl)
+    && (input.logoSha256 === undefined || profile.logoSha256 === input.logoSha256);
+}
+
+function campaignMetadataMatchesChain(
+  metadata: CampaignMetadata,
+  walletAddress: string,
+  input: CampaignMetadataInput,
+): boolean {
+  return metadata.id === input.campaignId
+    && metadata.merchantId === walletAddress
+    && metadata.name === input.name
+    && metadata.serviceDescription === input.serviceDescription
+    && metadata.imageUrl === input.imageUrl
+    && metadata.imageSha256 === input.imageSha256;
+}
+
 export class MerchantService {
   constructor(
     private readonly repositories: OffchainRepositories,
     private readonly campaignReader: CampaignReader,
     private readonly stellarConfig: StellarConfig,
+    private readonly metadataRegistry: MetadataRegistryReader,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  getProfile(walletAddress: string): Promise<Merchant | null> {
-    return this.repositories.merchants.findById(walletAddress);
+  async getProfile(walletAddress: string): Promise<Merchant | null> {
+    const referencePromise = this.repositories.cloudinaryAssetReferences
+      .findById(merchantLogoReferenceId(walletAddress))
+      .catch((error) => {
+        console.warn("The merchant logo provider reference is temporarily unavailable.", error);
+        return null;
+      });
+    const [onchain, reference] = await Promise.all([
+      this.metadataRegistry.getMerchantProfile(walletAddress),
+      referencePromise,
+    ]);
+    return mergeMerchant(onchain, reference);
   }
 
   async saveProfile(walletAddress: string, input: MerchantProfileUpdate): Promise<Merchant> {
     const validated = merchantProfileUpdateSchema.parse(input);
-    const existing = await this.repositories.merchants.findById(walletAddress);
-    const timestamp = this.now().toISOString();
-    return this.repositories.merchants.save(
-      merchantSchema.parse({
-        id: walletAddress,
+    let onchain: Merchant | null;
+    try {
+      onchain = await this.metadataRegistry.getMerchantProfile(walletAddress);
+    } catch (error) {
+      throw new MerchantServiceError(
+        `The on-chain profile could not be verified: ${error instanceof Error ? error.message : "Stellar RPC is unavailable."}`,
+      );
+    }
+    if (!onchain || !profileMatchesChain(onchain, validated)) {
+      throw new MerchantServiceError(
+        "Approve and confirm the matching merchant profile on Stellar before saving its asset reference.",
+      );
+    }
+
+    try {
+      await this.repositories.metadataRegistryEntries.save({
+        id: `merchant-profile:${walletAddress}`,
+        kind: "merchant_profile",
         ownerWalletAddress: walletAddress,
-        businessName: validated.businessName,
-        description: validated.description,
-        logoUrl: validated.logoUrl ?? existing?.logoUrl,
-        logoPublicId: validated.logoPublicId ?? existing?.logoPublicId,
-        createdAt: existing?.createdAt ?? timestamp,
-        updatedAt: timestamp,
-      }),
-    );
+        updatedAt: this.now().toISOString(),
+      });
+    } catch (error) {
+      console.warn("The profile is on-chain, but its TTL locator was not updated.", error);
+    }
+
+    let reference = await this.repositories.cloudinaryAssetReferences
+      .findById(merchantLogoReferenceId(walletAddress))
+      .catch(() => null);
+    if (validated.logoUrl && validated.logoPublicId) {
+      reference = {
+        id: merchantLogoReferenceId(walletAddress),
+        kind: "merchant_logo",
+        ownerWalletAddress: walletAddress,
+        resourceId: walletAddress,
+        publicUrl: validated.logoUrl,
+        publicId: validated.logoPublicId,
+        sha256: validated.logoSha256,
+        updatedAt: this.now().toISOString(),
+      };
+      try {
+        await this.repositories.cloudinaryAssetReferences.save(reference);
+      } catch (error) {
+        console.warn("The profile is on-chain, but its Cloudinary reference was not updated.", error);
+      }
+    }
+    return mergeMerchant(onchain, reference)!;
   }
 
   async saveCampaignMetadata(
@@ -125,52 +247,70 @@ export class MerchantService {
     if (campaign.payment_asset !== this.stellarConfig.assetContractId) {
       throw new MerchantServiceError("The campaign uses an unsupported payment asset.");
     }
-    if (!(await this.repositories.merchants.findById(walletAddress))) {
+    if (!(await this.getProfile(walletAddress))) {
       throw new MerchantServiceError("Create your merchant profile before registering a campaign.");
     }
 
-    const existing = await this.repositories.campaignMetadata.findById(validated.campaignId);
-    if (existing) {
-      const sameMetadata =
-        existing.merchantId === walletAddress &&
-        existing.name === validated.name &&
-        existing.serviceDescription === validated.serviceDescription &&
-        existing.imageUrl === validated.imageUrl &&
-        existing.imagePublicId === validated.imagePublicId;
-      if (!sameMetadata) {
-        throw new MerchantServiceError("Campaign metadata is already registered.");
-      }
-      return existing;
+    let onchain: CampaignMetadata | null;
+    try {
+      onchain = await this.metadataRegistry.getCampaignMetadata(validated.campaignId);
+    } catch (error) {
+      throw new MerchantServiceError(
+        `The on-chain campaign metadata could not be verified: ${error instanceof Error ? error.message : "Stellar RPC is unavailable."}`,
+      );
+    }
+    if (!onchain || !campaignMetadataMatchesChain(onchain, walletAddress, validated)) {
+      throw new MerchantServiceError(
+        "Approve and confirm the matching campaign metadata on Stellar before saving its asset reference.",
+      );
     }
 
-    const timestamp = this.now().toISOString();
-    return this.repositories.campaignMetadata.save(
-      campaignMetadataSchema.parse({
-        id: validated.campaignId,
-        contractId: this.stellarConfig.wrenPassContractId,
-        merchantId: walletAddress,
-        name: validated.name,
-        serviceDescription: validated.serviceDescription,
-        imageUrl: validated.imageUrl,
-        imagePublicId: validated.imagePublicId,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      }),
-    );
+    let reference = await this.repositories.cloudinaryAssetReferences
+      .findById(campaignImageReferenceId(validated.campaignId))
+      .catch(() => null);
+    if (validated.imageUrl && validated.imagePublicId) {
+      reference = {
+        id: campaignImageReferenceId(validated.campaignId),
+        kind: "campaign_image",
+        ownerWalletAddress: walletAddress,
+        resourceId: validated.campaignId,
+        publicUrl: validated.imageUrl,
+        publicId: validated.imagePublicId,
+        sha256: validated.imageSha256,
+        updatedAt: this.now().toISOString(),
+      };
+      try {
+        await this.repositories.cloudinaryAssetReferences.save(reference);
+      } catch (error) {
+        console.warn("The campaign is on-chain, but its Cloudinary reference was not updated.", error);
+      }
+    }
+    return mergeCampaignMetadata(onchain, reference);
   }
 
   async getDashboard(walletAddress: string): Promise<MerchantDashboardDto> {
-    const [merchant, metadata] = await Promise.all([
+    const [merchant, onchainMetadata] = await Promise.all([
       this.getProfile(walletAddress),
-      this.repositories.campaignMetadata.findByField("merchantId", walletAddress),
+      this.metadataRegistry.getMerchantCampaigns(walletAddress),
     ]);
     const campaigns = await Promise.all(
-      metadata.map(async (item): Promise<MerchantCampaignDto> => {
-        const campaign = await this.campaignReader.findById(item.id);
+      onchainMetadata.map(async (item): Promise<MerchantCampaignDto> => {
+        const [campaign, reference] = await Promise.all([
+          this.campaignReader.findById(item.id),
+          this.repositories.cloudinaryAssetReferences
+            .findById(campaignImageReferenceId(item.id))
+            .catch((error) => {
+              console.warn("A campaign image provider reference is unavailable.", error);
+              return null;
+            }),
+        ]);
         if (!campaign) {
           throw new MerchantServiceError(`On-chain campaign ${item.id} is unavailable.`);
         }
-        return { metadata: item, onchain: toOnchainDto(campaign) };
+        return {
+          metadata: mergeCampaignMetadata(item, reference),
+          onchain: toOnchainDto(campaign),
+        };
       }),
     );
     campaigns.sort((left, right) => right.metadata.createdAt.localeCompare(left.metadata.createdAt));
@@ -178,13 +318,23 @@ export class MerchantService {
   }
 
   async getPublicCampaign(campaignId: string): Promise<PublicCampaignDto | null> {
-    const metadata = await this.repositories.campaignMetadata.findById(campaignId);
-    if (!metadata) return null;
-    const [campaign, merchant] = await Promise.all([
+    const onchainMetadata = await this.metadataRegistry.getCampaignMetadata(campaignId);
+    if (!onchainMetadata) return null;
+    const [campaign, merchant, reference] = await Promise.all([
       this.campaignReader.findById(campaignId),
-      this.repositories.merchants.findById(metadata.merchantId),
+      this.getProfile(onchainMetadata.merchantId),
+      this.repositories.cloudinaryAssetReferences
+        .findById(campaignImageReferenceId(campaignId))
+        .catch((error) => {
+          console.warn("The campaign image provider reference is unavailable.", error);
+          return null;
+        }),
     ]);
     if (!campaign || !merchant) return null;
-    return { metadata, merchant, onchain: toOnchainDto(campaign) };
+    return {
+      metadata: mergeCampaignMetadata(onchainMetadata, reference),
+      merchant,
+      onchain: toOnchainDto(campaign),
+    };
   }
 }

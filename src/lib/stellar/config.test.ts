@@ -22,6 +22,8 @@ function validConfig(network: "testnet" | "mainnet" = "testnet") {
       "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
     NEXT_PUBLIC_WRENPASS_REVIEW_CONTRACT_ID:
       "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
+    NEXT_PUBLIC_WRENPASS_METADATA_CONTRACT_ID:
+      "CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR",
   };
 }
 
@@ -29,6 +31,17 @@ describe("parseStellarConfig", () => {
   it("derives the correct passphrase for Testnet and Mainnet", () => {
     expect(parseStellarConfig(validConfig("testnet")).networkPassphrase).toBe(Networks.TESTNET);
     expect(parseStellarConfig(validConfig("mainnet")).networkPassphrase).toBe(Networks.PUBLIC);
+  });
+
+  it("requires the migrated metadata registry", () => {
+    const input = validConfig();
+    expect(parseStellarConfig(input).metadataContractId).toBe(
+      input.NEXT_PUBLIC_WRENPASS_METADATA_CONTRACT_ID,
+    );
+    expect(() => parseStellarConfig({
+      ...input,
+      NEXT_PUBLIC_WRENPASS_METADATA_CONTRACT_ID: undefined,
+    })).toThrow(/WRENPASS_METADATA_CONTRACT_ID/);
   });
 
   it("rejects an asset contract that does not match the configured asset", () => {

@@ -19,6 +19,7 @@ Your architecture decisions should be senior-level, but your code must remain si
 - Use Stellar RPC for current ledger and Soroban access; do not introduce Horizon as the primary Soroban API.
 - Run `pnpm stellar:smoke` after changing public Stellar network or asset configuration.
 - Wallet sessions are server-verified SEP-53 challenges stored as opaque Firestore records; never authorize a server action from a client-provided address alone.
+- Public merchant profiles and campaign descriptions are authoritative in the deployed WrenPass metadata contract; Firestore stores only Cloudinary provider-management references for those records.
 
 ---
 
@@ -552,9 +553,7 @@ Firestore is for OFF-CHAIN application data.
 Examples:
 
 - User profile
-- Merchant profile
-- Campaign metadata
-- Cloudinary URLs
+- Cloudinary provider-management references
 - Notification records
 - Indexed Soroban events
 - UI-oriented cached/indexed data
