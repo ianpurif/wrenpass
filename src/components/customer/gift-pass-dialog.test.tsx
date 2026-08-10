@@ -10,7 +10,11 @@ import {
   testStellarConfig,
 } from "@/test/fixtures/customer";
 
-const mocks = vi.hoisted(() => ({ gift: vi.fn(), signTransaction: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  gift: vi.fn(),
+  signTransaction: vi.fn(),
+  syncEventsAfterMutation: vi.fn(),
+}));
 
 vi.mock("@/components/wallet/wallet-provider", () => ({
   useWallet: () => ({ address: testCustomerAddress, signTransaction: mocks.signTransaction }),
@@ -20,9 +24,15 @@ vi.mock("@/lib/stellar/wrenpass-client", () => ({
     gift = mocks.gift;
   },
 }));
+vi.mock("@/features/notifications/api", () => ({
+  syncEventsAfterMutation: mocks.syncEventsAfterMutation,
+}));
 
 describe("GiftPassDialog", () => {
-  beforeEach(() => mocks.gift.mockReset().mockResolvedValue(undefined));
+  beforeEach(() => {
+    mocks.gift.mockReset().mockResolvedValue(undefined);
+    mocks.syncEventsAfterMutation.mockReset().mockResolvedValue(true);
+  });
 
   it("rejects the current owner and gifts to a different valid address", async () => {
     const user = userEvent.setup();
@@ -55,5 +65,6 @@ describe("GiftPassDialog", () => {
       }),
     );
     expect(onGifted).toHaveBeenCalledOnce();
+    expect(mocks.syncEventsAfterMutation).toHaveBeenCalledOnce();
   });
 });

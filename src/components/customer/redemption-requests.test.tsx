@@ -12,7 +12,7 @@ import {
 const mocks = vi.hoisted(() => ({
   getPending: vi.fn(),
   complete: vi.fn(),
-  syncEvents: vi.fn(),
+  syncEventsAfterMutation: vi.fn(),
   approveAndSubmit: vi.fn(),
   signTransaction: vi.fn(),
 }));
@@ -24,7 +24,7 @@ vi.mock("@/features/redemption/api", () => ({
   redemptionApi: { getPending: mocks.getPending, complete: mocks.complete },
 }));
 vi.mock("@/features/notifications/api", () => ({
-  notificationApi: { syncEvents: mocks.syncEvents },
+  syncEventsAfterMutation: mocks.syncEventsAfterMutation,
 }));
 vi.mock("@/lib/stellar/wrenpass-client", () => ({
   StellarRedemptionContractWriter: class {
@@ -49,7 +49,7 @@ describe("RedemptionRequests", () => {
     mocks.getPending.mockResolvedValueOnce([request]).mockResolvedValueOnce([]);
     mocks.approveAndSubmit.mockResolvedValue({ transactionHash: "a".repeat(64) });
     mocks.complete.mockResolvedValue(undefined);
-    mocks.syncEvents.mockResolvedValue({ indexed: 1, duplicates: 0, notificationsSent: 1, notificationFailures: 0 });
+    mocks.syncEventsAfterMutation.mockResolvedValue(true);
     const onRedeemed = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
 
@@ -65,5 +65,6 @@ describe("RedemptionRequests", () => {
     );
     expect(mocks.complete).toHaveBeenCalledWith("1", "a".repeat(64));
     await waitFor(() => expect(onRedeemed).toHaveBeenCalled());
+    expect(mocks.syncEventsAfterMutation).toHaveBeenCalledOnce();
   });
 });

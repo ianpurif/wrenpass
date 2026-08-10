@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { notificationApi } from "@/features/notifications/api";
+import { notificationApi, syncEventsAfterMutation } from "@/features/notifications/api";
 
 describe("notificationApi", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -40,5 +40,33 @@ describe("notificationApi", () => {
     await expect(notificationApi.saveEmail("owner@example.com")).rejects.toThrow(
       "The notification service is temporarily unavailable.",
     );
+  });
+
+  it("treats a post-transaction sync failure as deferred work", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
+
+    await expect(syncEventsAfterMutation()).resolves.toBe(false);
+  });
+
+  it("deduplicates overlapping post-transaction sync requests", async () => {
+    let resolveResponse!: (response: Response) => void;
+    const response = new Promise<Response>((resolve) => {
+      resolveResponse = resolve;
+    });
+    const fetchMock = vi.fn().mockReturnValue(response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = syncEventsAfterMutation();
+    const second = syncEventsAfterMutation();
+    expect(fetchMock).toHaveBeenCalledOnce();
+
+    resolveResponse(new Response(JSON.stringify({
+      indexed: 0,
+      duplicates: 4,
+      notificationsSent: 0,
+      notificationFailures: 0,
+    }), { status: 200 }));
+
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
   });
 });

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   publish: vi.fn(),
   saveCampaignMetadata: vi.fn(),
   signTransaction: vi.fn(),
+  syncEventsAfterMutation: vi.fn(),
 }));
 
 vi.mock("@/components/wallet/wallet-provider", () => ({
@@ -32,6 +33,9 @@ vi.mock("@/lib/stellar/wrenpass-client", () => ({
     publish = mocks.publish;
   },
 }));
+vi.mock("@/features/notifications/api", () => ({
+  syncEventsAfterMutation: mocks.syncEventsAfterMutation,
+}));
 
 const config: StellarConfig = {
   network: "testnet",
@@ -50,6 +54,7 @@ describe("CampaignForm", () => {
     mocks.publish.mockReset().mockResolvedValue(undefined);
     mocks.saveCampaignMetadata.mockReset().mockResolvedValue({});
     mocks.signTransaction.mockReset();
+    mocks.syncEventsAfterMutation.mockReset().mockResolvedValue(true);
   });
 
   it("creates a contract draft, stores metadata, and publishes in order", async () => {
@@ -78,6 +83,7 @@ describe("CampaignForm", () => {
       mocks.publish.mock.invocationCallOrder[0],
     );
     expect(onPublished).toHaveBeenCalledOnce();
+    expect(mocks.syncEventsAfterMutation).toHaveBeenCalledOnce();
     expect(screen.getByText("Campaign #12 is live on Stellar Testnet.")).toBeInTheDocument();
   });
 });

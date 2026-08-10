@@ -11,6 +11,7 @@ import { useWallet } from "@/components/wallet/wallet-provider";
 import { parseUsdcBalance } from "@/features/merchant/campaign-terms";
 import { displayExpiration, displayUsdc } from "@/features/merchant/display";
 import type { PublicCampaignDto } from "@/features/merchant/dto";
+import { syncEventsAfterMutation } from "@/features/notifications/api";
 import type { StellarConfig } from "@/lib/stellar/config";
 import { StellarCustomerContractWriter } from "@/lib/stellar/wrenpass-client";
 
@@ -73,6 +74,7 @@ export function PurchasePanel({
         signTransaction: (transactionXdr: string) => signTransaction(transactionXdr),
       });
       setPurchasedPassId(passId.toString());
+      void syncEventsAfterMutation();
       await refreshBalances();
       router.refresh();
     } catch (purchaseError) {

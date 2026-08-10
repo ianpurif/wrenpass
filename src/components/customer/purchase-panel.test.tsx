@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   refreshBalances: vi.fn(),
   signTransaction: vi.fn(),
   refreshRoute: vi.fn(),
+  syncEventsAfterMutation: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refreshRoute }) }));
@@ -37,12 +38,16 @@ vi.mock("@/lib/stellar/wrenpass-client", () => ({
     purchase = mocks.purchase;
   },
 }));
+vi.mock("@/features/notifications/api", () => ({
+  syncEventsAfterMutation: mocks.syncEventsAfterMutation,
+}));
 
 describe("PurchasePanel", () => {
   beforeEach(() => {
     mocks.purchase.mockReset().mockResolvedValue(BigInt(9));
     mocks.refreshBalances.mockReset().mockResolvedValue(undefined);
     mocks.refreshRoute.mockReset();
+    mocks.syncEventsAfterMutation.mockReset().mockResolvedValue(true);
   });
 
   it("shows exact terms before submitting the contract purchase", async () => {
@@ -63,6 +68,7 @@ describe("PurchasePanel", () => {
     expect(await screen.findByText("Pass #9 purchased.")).toBeInTheDocument();
     expect(mocks.refreshBalances).toHaveBeenCalledOnce();
     expect(mocks.refreshRoute).toHaveBeenCalledOnce();
+    expect(mocks.syncEventsAfterMutation).toHaveBeenCalledOnce();
   });
 
   it("surfaces a rejected wallet transaction", async () => {
@@ -75,5 +81,6 @@ describe("PurchasePanel", () => {
 
     expect(await screen.findByText("Freighter rejected the transaction.")).toBeInTheDocument();
     expect(mocks.refreshRoute).not.toHaveBeenCalled();
+    expect(mocks.syncEventsAfterMutation).not.toHaveBeenCalled();
   });
 });

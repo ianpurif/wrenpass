@@ -6,6 +6,7 @@ import { getMerchantService } from "@/server/merchant/service";
 import { StellarCustomerChainReader } from "@/server/stellar/customer-chain-reader";
 
 let customerService: CustomerService | undefined;
+const dashboardRequests = new Map<string, Promise<Awaited<ReturnType<CustomerService["getDashboard"]>>>>();
 
 export function getCustomerService(): CustomerService {
   customerService ??= new CustomerService(
@@ -13,4 +14,17 @@ export function getCustomerService(): CustomerService {
     getMerchantService(),
   );
   return customerService;
+}
+
+export function getCustomerDashboard(walletAddress: string) {
+  const existing = dashboardRequests.get(walletAddress);
+  if (existing) return existing;
+
+  const request = getCustomerService().getDashboard(walletAddress).finally(() => {
+    if (dashboardRequests.get(walletAddress) === request) {
+      dashboardRequests.delete(walletAddress);
+    }
+  });
+  dashboardRequests.set(walletAddress, request);
+  return request;
 }

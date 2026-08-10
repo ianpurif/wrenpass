@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useWallet } from "@/components/wallet/wallet-provider";
+import { syncEventsAfterMutation } from "@/features/notifications/api";
 import { redemptionApi } from "@/features/redemption/api";
-import { notificationApi } from "@/features/notifications/api";
 import type { RedemptionRequestDto } from "@/features/redemption/dto";
 import { shortenStellarAddress } from "@/features/merchant/display";
 import type { StellarConfig } from "@/lib/stellar/config";
@@ -65,11 +65,7 @@ export function RedemptionRequests({
         signTransaction: (transactionXdr) => signTransaction(transactionXdr),
       });
       await redemptionApi.complete(request.id, sent.transactionHash);
-      try {
-        await notificationApi.syncEvents();
-      } catch {
-        setError("Pass redeemed on Stellar, but event and email sync is pending. Use Refresh to retry.");
-      }
+      void syncEventsAfterMutation();
       await Promise.all([load(), onRedeemed()]);
     } catch (approveError) {
       setError(approveError instanceof Error ? approveError.message : "Redemption could not be approved.");

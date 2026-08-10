@@ -13,6 +13,7 @@ import { FirestoreNotificationClaimStore } from "@/server/events/firestore-notif
 import { createOffchainRepositories } from "@/server/firestore/repositories";
 
 let eventSyncService: EventSyncService | undefined;
+let eventSyncInFlight: ReturnType<EventSyncService["sync"]> | undefined;
 
 export function getEventSyncService(): EventSyncService {
   if (!eventSyncService) {
@@ -31,4 +32,13 @@ export function getEventSyncService(): EventSyncService {
     );
   }
   return eventSyncService;
+}
+
+export function syncEvents() {
+  if (!eventSyncInFlight) {
+    eventSyncInFlight = getEventSyncService().sync().finally(() => {
+      eventSyncInFlight = undefined;
+    });
+  }
+  return eventSyncInFlight;
 }

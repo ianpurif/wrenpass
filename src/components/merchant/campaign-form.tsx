@@ -23,6 +23,7 @@ import {
   resumeCampaignPublishing,
   type RecoverableCampaignDraft,
 } from "@/features/merchant/campaign-workflow";
+import { syncEventsAfterMutation } from "@/features/notifications/api";
 import type { StellarConfig } from "@/lib/stellar/config";
 import { StellarCampaignContractWriter } from "@/lib/stellar/wrenpass-client";
 
@@ -153,6 +154,7 @@ export function CampaignForm({
         maxSupply: 100,
         expiresAt: defaultExpiration(),
       });
+      void syncEventsAfterMutation();
       await onPublished();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Campaign creation failed.");
@@ -176,6 +178,7 @@ export function CampaignForm({
         },
       });
       setSuccess(`Campaign #${pending.campaignId} is live on Stellar Testnet.`);
+      void syncEventsAfterMutation();
       await onPublished();
     } catch (resumeError) {
       setError(resumeError instanceof Error ? resumeError.message : "Unable to resume publishing.");

@@ -4,6 +4,7 @@ import { rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
 
 import type { StellarConfig } from "@/lib/stellar/config";
 import { readEventPages } from "@/server/stellar/customer-chain-reader";
+import { resolveRetainedEventRange } from "@/server/stellar/event-retention";
 
 export interface WrenPassEvent {
   id: string;
@@ -128,17 +129,17 @@ export class StellarWrenPassEventSource implements WrenPassEventSource {
   }
 
   async readRetainedEvents(): Promise<WrenPassEvent[]> {
-    const health = await this.server.getHealth();
-    const startLedger = Math.max(1, health.latestLedger - Math.max(1, health.ledgerRetentionWindow - 100));
+    const filters: rpc.Api.EventFilter[] = [
+      {
+        type: "contract",
+        contractIds: [this.config.wrenPassContractId],
+        topics: relevantEvents.map((name) => [eventTopic(name), "**"]),
+      },
+    ];
+    const range = await resolveRetainedEventRange(this.server, filters);
     const response = await readEventPages(this.server, {
-      startLedger,
-      filters: [
-        {
-          type: "contract",
-          contractIds: [this.config.wrenPassContractId],
-          topics: relevantEvents.map((name) => [eventTopic(name), "**"]),
-        },
-      ],
+      ...range,
+      filters,
       limit: 10_000,
     });
     return response.events

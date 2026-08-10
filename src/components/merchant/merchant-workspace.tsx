@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CampaignCard } from "@/components/merchant/campaign-card";
+import { campaignTableGridClass } from "@/components/merchant/campaign-table-layout";
 import { CampaignForm } from "@/components/merchant/campaign-form";
 import { MerchantProfileForm } from "@/components/merchant/profile-form";
 import { RedemptionScanner } from "@/components/merchant/redemption-scanner";
@@ -22,7 +23,6 @@ import { useWallet } from "@/components/wallet/wallet-provider";
 import { merchantApi } from "@/features/merchant/api";
 import { displayUsdc, shortenStellarAddress } from "@/features/merchant/display";
 import type { MerchantDashboardDto } from "@/features/merchant/dto";
-import { notificationApi } from "@/features/notifications/api";
 import type { StellarConfig } from "@/lib/stellar/config";
 
 export type MerchantWorkspacePage =
@@ -87,7 +87,6 @@ export function MerchantWorkspace({
   const [loadedAddress, setLoadedAddress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [syncWarning, setSyncWarning] = useState<string | null>(null);
 
   const loadDashboard = useCallback(async () => {
     if (!address) {
@@ -99,12 +98,6 @@ export function MerchantWorkspace({
     try {
       setDashboard(await merchantApi.getDashboard());
       setLoadedAddress(address);
-      try {
-        await notificationApi.syncEvents();
-        setSyncWarning(null);
-      } catch {
-        setSyncWarning("On-chain data is current. Event and email sync will retry later.");
-      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load the dashboard.");
     } finally {
@@ -121,10 +114,6 @@ export function MerchantWorkspace({
         setDashboard(nextDashboard);
         setLoadedAddress(address);
         setError(null);
-        void notificationApi.syncEvents().then(
-          () => active && setSyncWarning(null),
-          () => active && setSyncWarning("On-chain data is current. Event and email sync will retry later."),
-        );
       },
       (loadError: unknown) => {
         if (!active) return;
@@ -228,11 +217,6 @@ export function MerchantWorkspace({
 
         <div className="mt-7 grid gap-7">
           {error && <ErrorState description={error} onRetry={() => void loadDashboard()} />}
-          {syncWarning && (
-            <p role="status" className="border-l-2 border-coral bg-coral-soft px-4 py-3 text-sm font-semibold text-ink-muted">
-              {syncWarning}
-            </p>
-          )}
 
           {page === "overview" && (
             dashboard.merchant ? (
@@ -265,7 +249,7 @@ export function MerchantWorkspace({
                   </div>
                   {dashboard.campaigns.length ? (
                     <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-white">
-                      <div className="hidden grid-cols-[minmax(0,1.5fr)_0.65fr_0.8fr_0.8fr_auto] gap-4 border-b border-line bg-canvas px-5 py-3 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-ink-faint md:grid">
+                      <div className={`${campaignTableGridClass} hidden gap-4 border-b border-line bg-canvas px-5 py-3 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-ink-faint lg:grid`}>
                         <span>Campaign</span><span>Status</span><span>Supply</span><span>Raised</span><span className="text-right">Actions</span>
                       </div>
                       {dashboard.campaigns.map((campaign) => <CampaignCard campaign={campaign} key={campaign.onchain.id} />)}

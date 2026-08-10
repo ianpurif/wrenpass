@@ -93,6 +93,34 @@ describe("decodeCustomerActivity", () => {
 });
 
 describe("readEventPages", () => {
+  it("retries inside the retained range reported by a different RPC backend", async () => {
+    const getEvents = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error("startLedger must be within the ledger range: 3942698 - 4063657"),
+      )
+      .mockResolvedValueOnce({
+        events: [],
+        oldestLedgerCloseTime: "2026-08-01T00:00:00Z",
+      });
+
+    await expect(
+      readEventPages(
+        { getEvents },
+        { startLedger: 3_942_690, endLedger: 3_943_000, filters: [], limit: 10_000 },
+      ),
+    ).resolves.toEqual({
+      events: [],
+      oldestLedgerCloseTime: "2026-08-01T00:00:00Z",
+    });
+    expect(getEvents).toHaveBeenNthCalledWith(2, {
+      startLedger: 3_942_798,
+      endLedger: 3_943_000,
+      filters: [],
+      limit: 10_000,
+    });
+  });
+
   it("continues across empty RPC scan pages and deduplicates boundary events", async () => {
     const purchased = event(
       "pass_purchased",
@@ -103,17 +131,10 @@ describe("readEventPages", () => {
     const getEvents = vi
       .fn()
       .mockResolvedValueOnce({
-        cursor: "page-1",
-        events: [],
-        oldestLedgerCloseTime: "2026-08-01T00:00:00Z",
-      })
-      .mockResolvedValueOnce({
-        cursor: "page-2",
         events: [purchased],
         oldestLedgerCloseTime: "2026-08-01T00:00:00Z",
       })
       .mockResolvedValueOnce({
-        cursor: "page-2",
         events: [purchased],
         oldestLedgerCloseTime: "2026-08-01T00:00:00Z",
       });
@@ -121,15 +142,16 @@ describe("readEventPages", () => {
     await expect(
       readEventPages(
         { getEvents },
-        { startLedger: 1, filters: [], limit: 10_000 },
+        { startLedger: 1, endLedger: 20_000, filters: [], limit: 10_000 },
       ),
     ).resolves.toEqual({
       events: [purchased],
       oldestLedgerCloseTime: "2026-08-01T00:00:00Z",
     });
-    expect(getEvents).toHaveBeenCalledTimes(3);
+    expect(getEvents).toHaveBeenCalledTimes(2);
     expect(getEvents).toHaveBeenLastCalledWith({
-      cursor: "page-2",
+      startLedger: 10_001,
+      endLedger: 20_000,
       filters: [],
       limit: 10_000,
     });

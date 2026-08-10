@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircle, RefreshCcw, TicketCheck, WalletCards } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CustomerPassCard } from "@/components/customer/customer-pass-card";
 import { RedemptionRequests } from "@/components/customer/redemption-requests";
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { ErrorState, LoadingState } from "@/components/ui/feedback-state";
 import { useWallet } from "@/components/wallet/wallet-provider";
 import { customerApi } from "@/features/customer/api";
-import { notificationApi } from "@/features/notifications/api";
 import type {
   CustomerActivityDto,
   CustomerDashboardDto,
@@ -100,52 +99,59 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
   const [loadedAddress, setLoadedAddress] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<CustomerPassStatusDto>("Active");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [syncWarning, setSyncWarning] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<{ address: string; message: string } | null>(null);
+  const requestId = useRef(0);
+  const error = loadError?.address === address ? loadError.message : null;
 
-  const loadDashboard = useCallback(async () => {
-    if (!address) return;
+  const loadDashboard = useCallback(async (options: { signal?: AbortSignal } = {}) => {
+    if (status !== "connected" || !address) return;
+    const currentRequestId = requestId.current + 1;
+    requestId.current = currentRequestId;
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     try {
-      setDashboard(await customerApi.getDashboard());
+      const nextDashboard = await customerApi.getDashboard(address, options);
+      if (options.signal?.aborted || requestId.current !== currentRequestId) return;
+      setDashboard(nextDashboard);
       setLoadedAddress(address);
-      try {
-        await notificationApi.syncEvents();
-        setSyncWarning(null);
-      } catch {
-        setSyncWarning("On-chain data is current. Event and email sync will retry later.");
-      }
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load your passes.");
+      if (options.signal?.aborted || requestId.current !== currentRequestId) return;
+      setLoadError({
+        address,
+        message: loadError instanceof Error ? loadError.message : "Unable to load your passes.",
+      });
     } finally {
-      setLoading(false);
+      if (requestId.current === currentRequestId) setLoading(false);
     }
-  }, [address]);
+  }, [address, status]);
 
   useEffect(() => {
-    if (!address) return;
-    let active = true;
-    customerApi.getDashboard().then(
+    if (status !== "connected" || !address) return;
+    const controller = new AbortController();
+    const currentRequestId = requestId.current + 1;
+    requestId.current = currentRequestId;
+    void customerApi.getDashboard(address, { signal: controller.signal }).then(
       (nextDashboard) => {
-        if (!active) return;
+        if (controller.signal.aborted || requestId.current !== currentRequestId) return;
         setDashboard(nextDashboard);
         setLoadedAddress(address);
-        setError(null);
-        void notificationApi.syncEvents().then(
-          () => active && setSyncWarning(null),
-          () => active && setSyncWarning("On-chain data is current. Event and email sync will retry later."),
-        );
+        setLoadError(null);
       },
-      (loadError: unknown) => {
-        if (!active) return;
-        setError(loadError instanceof Error ? loadError.message : "Unable to load your passes.");
+      (initialLoadError: unknown) => {
+        if (controller.signal.aborted || requestId.current !== currentRequestId) return;
+        setLoadError({
+          address,
+          message: initialLoadError instanceof Error
+            ? initialLoadError.message
+            : "Unable to load your passes.",
+        });
       },
     );
     return () => {
-      active = false;
+      controller.abort();
+      requestId.current += 1;
     };
-  }, [address]);
+  }, [address, status]);
 
   const passCounts = useMemo(() => {
     const counts: Record<CustomerPassStatusDto, number> = { Active: 0, Redeemed: 0, Expired: 0, Refunded: 0 };
@@ -169,10 +175,12 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
     );
   }
 
+  if (error && (loadedAddress !== address || !dashboard)) {
+    return <ErrorState description={error} onRetry={() => void loadDashboard()} />;
+  }
   if (loadedAddress !== address || (loading && !dashboard)) {
     return <LoadingState className="min-h-[28rem]" label="Reading passes from Stellar" />;
   }
-  if (error && !dashboard) return <ErrorState description={error} onRetry={() => void loadDashboard()} />;
   if (!dashboard) return null;
 
   const visiblePasses = dashboard.passes.filter((pass) => pass.status === selectedStatus);
@@ -201,11 +209,6 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
 
       <div className="mt-7 grid gap-8">
         {error && <ErrorState description={error} onRetry={() => void loadDashboard()} />}
-        {syncWarning && (
-          <p role="status" className="border-l-2 border-coral bg-coral-soft px-4 py-3 text-sm font-semibold text-ink-muted">
-            {syncWarning}
-          </p>
-        )}
 
         <section aria-label="Pass status summary" className="overflow-hidden rounded-2xl border border-line bg-white">
           <div className="grid grid-cols-2 sm:grid-cols-4">

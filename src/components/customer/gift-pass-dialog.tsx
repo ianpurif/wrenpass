@@ -14,6 +14,7 @@ import {
   giftRecipientSchema,
   type GiftRecipientInput,
 } from "@/features/customer/validation";
+import { syncEventsAfterMutation } from "@/features/notifications/api";
 import type { StellarConfig } from "@/lib/stellar/config";
 import { StellarCustomerContractWriter } from "@/lib/stellar/wrenpass-client";
 
@@ -59,6 +60,7 @@ export function GiftPassDialog({
         recipient,
         signTransaction: (transactionXdr: string) => signTransaction(transactionXdr),
       });
+      void syncEventsAfterMutation();
       reset();
       onOpenChange(false);
       await onGifted();

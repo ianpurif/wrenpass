@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { MerchantWorkspace } from "@/components/merchant/merchant-workspace";
+import { campaignTableGridClass } from "@/components/merchant/campaign-table-layout";
 import type { StellarConfig } from "@/lib/stellar/config";
 
 const mocks = vi.hoisted(() => ({ getDashboard: vi.fn(), syncEvents: vi.fn() }));
@@ -43,7 +44,6 @@ const config: StellarConfig = {
 
 describe("MerchantWorkspace", () => {
   it("derives financial totals from current on-chain campaign fields", async () => {
-    mocks.syncEvents.mockResolvedValue({ indexed: 0, duplicates: 0, notificationsSent: 0, notificationFailures: 0 });
     mocks.getDashboard.mockResolvedValue({
       merchant: {
         id: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
@@ -103,6 +103,11 @@ describe("MerchantWorkspace", () => {
     expect(screen.getByText("11.25 USDC")).toBeInTheDocument();
     expect(screen.getAllByText("3").length).toBeGreaterThan(0);
     expect(screen.getAllByText("97").length).toBeGreaterThan(0);
+    const campaignHeader = screen.getByText("Actions").parentElement;
+    const campaignRow = screen.getByRole("heading", { name: "Future haircut" }).closest("article")?.firstElementChild;
+    expect(campaignHeader).toHaveClass(campaignTableGridClass);
+    expect(campaignRow).toHaveClass(campaignTableGridClass);
+    expect(screen.getByRole("link", { name: "View" }).parentElement).toHaveClass("gap-2", "lg:flex-nowrap");
 
     workspace.rerender(<MerchantWorkspace config={config} page="business-identity" />);
     expect(screen.getByText("Profile form")).toBeInTheDocument();
@@ -113,5 +118,6 @@ describe("MerchantWorkspace", () => {
 
     workspace.rerender(<MerchantWorkspace config={config} page="create-campaign" />);
     expect(screen.getByText("Campaign form")).toBeInTheDocument();
+    expect(mocks.syncEvents).not.toHaveBeenCalled();
   });
 });

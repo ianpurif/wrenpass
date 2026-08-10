@@ -5,6 +5,10 @@ import type { Pass } from "@/generated/wrenpass-contract/src";
 import type { CustomerActivityDto } from "@/features/customer/dto";
 import type { StellarConfig } from "@/lib/stellar/config";
 import {
+  resolveRetainedEventRange,
+  retryStartLedgerFromRangeError,
+} from "@/server/stellar/event-retention";
+import {
   readContractPass,
   readContractPassCount,
 } from "@/lib/stellar/wrenpass-client";
@@ -15,7 +19,6 @@ interface ActivityWindow {
 }
 
 interface EventPage {
-  cursor: string;
   events: rpc.Api.EventResponse[];
   oldestLedgerCloseTime: string;
 }
@@ -24,7 +27,9 @@ interface EventPageReader {
   getEvents(request: rpc.Api.GetEventsRequest): Promise<EventPage>;
 }
 
+const EVENT_LEDGER_BATCH_SIZE = 10_000;
 const MAX_EVENT_PAGES = 25;
+const MAX_EVENT_RANGE_RETRIES = 2;
 
 export interface CustomerChainReader {
   getPassCount(): Promise<bigint>;
@@ -38,26 +43,58 @@ function eventTopic(name: string): string {
 
 export async function readEventPages(
   reader: EventPageReader,
-  request: Extract<rpc.Api.GetEventsRequest, { startLedger: number }>,
+  request: Extract<rpc.Api.GetEventsRequest, { startLedger: number }> & { endLedger: number },
 ): Promise<{ events: rpc.Api.EventResponse[]; oldestLedgerCloseTime: string }> {
-  let page = await reader.getEvents(request);
-  const oldestLedgerCloseTime = page.oldestLedgerCloseTime;
-  const eventsById = new Map(page.events.map((event) => [event.id, event]));
+  const eventsById = new Map<string, rpc.Api.EventResponse>();
+  let oldestLedgerCloseTime: string | null = null;
+  let nextLedger = request.startLedger;
+  let pageCount = 0;
+  let rangeRetries = 0;
 
-  for (let pageNumber = 1; pageNumber <= MAX_EVENT_PAGES; pageNumber += 1) {
-    const previousCursor = page.cursor;
-    page = await reader.getEvents({
-      cursor: previousCursor,
-      filters: request.filters,
-      limit: request.limit,
-    });
-    for (const event of page.events) eventsById.set(event.id, event);
-    if (page.cursor === previousCursor) {
-      return { events: [...eventsById.values()], oldestLedgerCloseTime };
+  while (nextLedger <= request.endLedger) {
+    if (pageCount >= MAX_EVENT_PAGES) {
+      throw new Error("Stellar RPC event scan exceeded the safe page limit.");
     }
+    const endLedger = Math.min(
+      request.endLedger,
+      nextLedger + EVENT_LEDGER_BATCH_SIZE - 1,
+    );
+
+    let page: EventPage;
+    try {
+      page = await reader.getEvents({
+        startLedger: nextLedger,
+        endLedger,
+        filters: request.filters,
+        limit: request.limit,
+      });
+    } catch (error) {
+      const retryStartLedger = retryStartLedgerFromRangeError(error);
+      if (
+        retryStartLedger === null ||
+        retryStartLedger <= nextLedger ||
+        rangeRetries === MAX_EVENT_RANGE_RETRIES
+      ) {
+        throw error;
+      }
+      nextLedger = retryStartLedger;
+      rangeRetries += 1;
+      continue;
+    }
+    oldestLedgerCloseTime ??= page.oldestLedgerCloseTime;
+    for (const event of page.events) eventsById.set(event.id, event);
+    if (request.limit !== undefined && page.events.length >= request.limit) {
+      throw new Error("Stellar RPC event density exceeded the safe range limit.");
+    }
+    nextLedger = endLedger + 1;
+    pageCount += 1;
+    rangeRetries = 0;
   }
 
-  throw new Error("Stellar RPC event pagination exceeded the safe page limit.");
+  if (!oldestLedgerCloseTime) {
+    throw new Error("Stellar RPC did not return an event range.");
+  }
+  return { events: [...eventsById.values()], oldestLedgerCloseTime };
 }
 
 function toBigInt(value: unknown): bigint | null {
@@ -175,23 +212,22 @@ export class StellarCustomerChainReader implements CustomerChainReader {
   }
 
   async readRecentActivity(walletAddress: string): Promise<ActivityWindow> {
-    const health = await this.server.getHealth();
-    const safeRetentionWindow = Math.max(1, health.ledgerRetentionWindow - 100);
-    const startLedger = Math.max(1, health.latestLedger - safeRetentionWindow);
+    const filters: rpc.Api.EventFilter[] = [
+      {
+        type: "contract",
+        contractIds: [this.config.wrenPassContractId],
+        topics: [
+          [eventTopic("pass_purchased"), "**"],
+          [eventTopic("pass_gifted"), "**"],
+          [eventTopic("pass_redeemed"), "**"],
+          [eventTopic("pass_refunded"), "**"],
+        ],
+      },
+    ];
+    const range = await resolveRetainedEventRange(this.server, filters);
     const response = await readEventPages(this.server, {
-      startLedger,
-      filters: [
-        {
-          type: "contract",
-          contractIds: [this.config.wrenPassContractId],
-          topics: [
-            [eventTopic("pass_purchased"), "**"],
-            [eventTopic("pass_gifted"), "**"],
-            [eventTopic("pass_redeemed"), "**"],
-            [eventTopic("pass_refunded"), "**"],
-          ],
-        },
-      ],
+      ...range,
+      filters,
       limit: 10_000,
     });
 

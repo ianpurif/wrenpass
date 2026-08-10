@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { buttonStyles } from "@/components/ui/button";
+import { campaignTableGridClass } from "@/components/merchant/campaign-table-layout";
 import { displayExpiration, displayUsdc } from "@/features/merchant/display";
 import type { MerchantCampaignDto } from "@/features/merchant/dto";
 
@@ -40,7 +41,7 @@ export function CampaignCard({ campaign }: { campaign: MerchantCampaignDto }) {
 
   return (
     <article className="border-b border-line px-5 py-5 last:border-b-0">
-      <div className="grid min-w-0 gap-5 md:grid-cols-[minmax(0,1.5fr)_0.65fr_0.8fr_0.8fr_auto] md:items-center md:gap-4">
+      <div className={`${campaignTableGridClass} grid min-w-0 gap-5 lg:items-center lg:gap-4`}>
         <div className="flex min-w-0 items-start gap-3">
           {metadata.imageUrl ? (
             <div
@@ -60,27 +61,27 @@ export function CampaignCard({ campaign }: { campaign: MerchantCampaignDto }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between md:block">
-          <span className="text-xs font-semibold text-ink-faint md:hidden">Status</span>
+        <div className="flex items-center justify-between lg:block">
+          <span className="text-xs font-semibold text-ink-faint lg:hidden">Status</span>
           <CampaignStatus status={onchain.status} />
         </div>
-        <div className="grid grid-cols-2 gap-4 border-y border-line py-4 md:block md:border-0 md:py-0">
+        <div className="grid grid-cols-2 gap-4 border-y border-line py-4 lg:block lg:border-0 lg:py-0">
           <div>
-            <p className="text-xs text-ink-faint md:hidden">Supply</p>
-            <p className="mt-1 text-sm font-bold text-ink md:mt-0">{onchain.sold} / {onchain.maxSupply}</p>
+            <p className="text-xs text-ink-faint lg:hidden">Supply</p>
+            <p className="mt-1 text-sm font-bold text-ink lg:mt-0">{onchain.sold} / {onchain.maxSupply}</p>
             <p className="mt-0.5 text-xs text-ink-faint">{onchain.remaining} remaining</p>
           </div>
-          <div className="md:hidden">
+          <div className="lg:hidden">
             <p className="text-xs text-ink-faint">Protected</p>
             <p className="mt-1 text-sm font-bold text-ink">{displayUsdc(onchain.protectedFunds)}</p>
           </div>
         </div>
         <div>
-          <p className="text-xs text-ink-faint md:hidden">Raised</p>
-          <p className="mt-1 text-sm font-bold text-ink md:mt-0">{displayUsdc(raised)}</p>
-          <p className="mt-0.5 hidden text-xs text-ink-faint md:block">{displayUsdc(onchain.protectedFunds)} protected</p>
+          <p className="text-xs text-ink-faint lg:hidden">Raised</p>
+          <p className="mt-1 text-sm font-bold text-ink lg:mt-0">{displayUsdc(raised)}</p>
+          <p className="mt-0.5 hidden text-xs text-ink-faint lg:block">{displayUsdc(onchain.protectedFunds)} protected</p>
         </div>
-        <div className="flex flex-wrap gap-2 md:justify-end">
+        <div className="flex flex-wrap gap-2 lg:flex-nowrap lg:justify-end">
           <Link className={buttonStyles({ variant: "secondary", size: "sm" })} href={`/campaigns/${onchain.id}`}>
             View <ExternalLink aria-hidden="true" className="size-3.5" />
           </Link>

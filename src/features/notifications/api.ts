@@ -8,6 +8,9 @@ const syncResultSchema = z.object({
   notificationFailures: z.number().int().nonnegative(),
 });
 
+type SyncResult = z.infer<typeof syncResultSchema>;
+let eventSyncInFlight: Promise<boolean> | null = null;
+
 async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
   const response = await fetch(url, {
     ...init,
@@ -48,7 +51,20 @@ export const notificationApi = {
     if (!result.email) throw new Error("The notification email was not saved.");
     return { email: result.email };
   },
-  async syncEvents() {
+  async syncEvents(): Promise<SyncResult> {
     return syncResultSchema.parse(await requestJson("/api/events/sync", { method: "POST" }));
   },
 };
+
+export function syncEventsAfterMutation(): Promise<boolean> {
+  if (eventSyncInFlight) return eventSyncInFlight;
+
+  const request = notificationApi.syncEvents().then(
+    () => true,
+    () => false,
+  ).finally(() => {
+    if (eventSyncInFlight === request) eventSyncInFlight = null;
+  });
+  eventSyncInFlight = request;
+  return request;
+}
