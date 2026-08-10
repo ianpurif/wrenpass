@@ -114,21 +114,6 @@ export const reviewReceiptSchema = z.object({
   createdAt: isoTimestamp,
 });
 
-export const redemptionRequestSchema = z.object({
-  id: entityIdSchema,
-  passId: entityIdSchema.regex(/^[1-9]\d{0,19}$/),
-  campaignId: entityIdSchema.regex(/^[1-9]\d{0,19}$/),
-  contractId: entityIdSchema,
-  network: z.enum(["testnet", "mainnet"]),
-  merchantWalletAddress: walletAddress,
-  ownerWalletAddress: walletAddress,
-  serializedTransaction: z.string().min(1).max(200_000),
-  expiresAtLedger: z.number().int().positive(),
-  status: z.enum(["pending", "completed"]),
-  createdAt: isoTimestamp,
-  completedAt: isoTimestamp.optional(),
-});
-
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type Merchant = z.infer<typeof merchantSchema>;
 export type CampaignMetadata = z.infer<typeof campaignMetadataSchema>;
@@ -138,4 +123,3 @@ export type Notification = z.infer<typeof notificationSchema>;
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 export type IndexedBlockchainEvent = z.infer<typeof indexedBlockchainEventSchema>;
 export type ReviewReceipt = z.infer<typeof reviewReceiptSchema>;
-export type RedemptionRequest = z.infer<typeof redemptionRequestSchema>;

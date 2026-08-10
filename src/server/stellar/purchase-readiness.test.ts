@@ -22,6 +22,7 @@ const config: StellarConfig = {
   wrenPassContractId: Keypair.random().publicKey().replace("G", "C"),
   reviewContractId: Keypair.random().publicKey().replace("G", "C"),
   metadataContractId: "CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR",
+  redemptionContractId: "CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR",
 };
 const contractConfig: ContractConfig = {
   payment_asset: config.assetContractId,

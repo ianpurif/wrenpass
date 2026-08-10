@@ -17,7 +17,7 @@ const qrPayload = encodeRedemptionQrPayload({
 });
 const mocks = vi.hoisted(() => ({
   validate: vi.fn(),
-  create: vi.fn(),
+  publish: vi.fn(),
   prepare: vi.fn(),
   signAuthEntry: vi.fn(),
   scanImage: vi.fn(),
@@ -27,7 +27,12 @@ vi.mock("@/components/wallet/wallet-provider", () => ({
   useWallet: () => ({ address: merchant, signAuthEntry: mocks.signAuthEntry }),
 }));
 vi.mock("@/features/redemption/api", () => ({
-  redemptionApi: { validate: mocks.validate, create: mocks.create },
+  redemptionApi: { validate: mocks.validate },
+}));
+vi.mock("@/lib/stellar/redemption-request-client", () => ({
+  StellarRedemptionRequestWriter: class {
+    publish = mocks.publish;
+  },
 }));
 vi.mock("@/lib/stellar/wrenpass-client", () => ({
   StellarRedemptionContractWriter: class {
@@ -54,7 +59,7 @@ describe("RedemptionScanner", () => {
       serializedTransaction: "merchant-authorized-transaction",
       expiresAtLedger: 1_234_567,
     });
-    mocks.create.mockResolvedValue({ id: "1" });
+    mocks.publish.mockResolvedValue({ id: "1" });
     const user = userEvent.setup();
 
     render(<RedemptionScanner config={testStellarConfig} />);
@@ -63,10 +68,14 @@ describe("RedemptionScanner", () => {
       new File(["qr"], "pass.png", { type: "image/png" }),
     );
 
-    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({
+    await waitFor(() => expect(mocks.publish).toHaveBeenCalledWith({
       qrPayload,
       serializedTransaction: "merchant-authorized-transaction",
       expiresAtLedger: 1_234_567,
+      passId: BigInt(1),
+      merchant,
+      owner,
+      signAuthEntry: expect.any(Function),
     }));
     expect(mocks.prepare).toHaveBeenCalledWith(
       expect.objectContaining({ passId: BigInt(1), merchant, owner, signAuthEntry: expect.any(Function) }),

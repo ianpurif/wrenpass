@@ -9,14 +9,12 @@ import {
   indexedBlockchainEventSchema,
   metadataRegistryEntrySchema,
   notificationSchema,
-  redemptionRequestSchema,
   reviewReceiptSchema,
   userProfileSchema,
   type CloudinaryAssetReference,
   type IndexedBlockchainEvent,
   type MetadataRegistryEntry,
   type Notification,
-  type RedemptionRequest,
   type ReviewReceipt,
   type UserProfile,
 } from "@/server/models";
@@ -77,7 +75,6 @@ export interface OffchainRepositories {
   notifications: EntityRepository<Notification>;
   indexedBlockchainEvents: EntityRepository<IndexedBlockchainEvent>;
   reviewReceipts: EntityRepository<ReviewReceipt>;
-  redemptionRequests: EntityRepository<RedemptionRequest>;
 }
 
 export function createOffchainRepositories(
@@ -104,11 +101,6 @@ export function createOffchainRepositories(
     reviewReceipts: new EntityRepository(
       "review_receipts",
       reviewReceiptSchema,
-      store,
-    ),
-    redemptionRequests: new EntityRepository(
-      "redemption_requests",
-      redemptionRequestSchema,
       store,
     ),
   };

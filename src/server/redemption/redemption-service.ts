@@ -1,14 +1,14 @@
 import "server-only";
 
 import type { Campaign, Pass } from "@/generated/wrenpass-contract/src";
+import type { RedemptionRequest } from "@/generated/redemptions-contract/src";
 import type {
+  RedemptionRequestPreparationDto,
   RedemptionRequestDto,
   RedemptionScanDto,
 } from "@/features/redemption/dto";
 import { parseRedemptionQrPayload } from "@/features/redemption/qr";
 import type { StellarConfig } from "@/lib/stellar/config";
-import type { OffchainRepositories } from "@/server/firestore/repositories";
-import { redemptionRequestSchema, type RedemptionRequest } from "@/server/models";
 
 interface RedemptionChainReader {
   findPass(passId: bigint): Promise<Pass | null>;
@@ -23,6 +23,26 @@ interface RedemptionTransactionVerifier {
     owner: string;
     expiresAtLedger: number;
   }): Promise<void>;
+}
+
+interface RedemptionRequestRegistry {
+  prepare(input: {
+    merchant: string;
+    owner: string;
+    passId: bigint;
+    serializedTransaction: string;
+    expiresAtLedger: number;
+  }): Promise<RedemptionRequestPreparationDto>;
+  submit(input: {
+    merchant: string;
+    owner: string;
+    passId: bigint;
+    serializedTransaction: string;
+    expiresAtLedger: number;
+    signedAuthorizationEntry: string;
+  }): Promise<{ transactionHash: string; ledger: number }>;
+  findByOwner(owner: string): Promise<RedemptionRequest[]>;
+  findByPass(passId: bigint): Promise<RedemptionRequest | null>;
 }
 
 export class RedemptionServiceError extends Error {
@@ -48,14 +68,14 @@ function toScanDto(pass: Pass, campaign: Campaign): RedemptionScanDto {
 
 function toRequestDto(request: RedemptionRequest, expiresAt: string): RedemptionRequestDto {
   return {
-    id: request.id,
-    passId: request.passId,
-    campaignId: request.campaignId,
-    merchant: request.merchantWalletAddress,
-    owner: request.ownerWalletAddress,
-    serializedTransaction: request.serializedTransaction,
-    expiresAtLedger: request.expiresAtLedger,
-    createdAt: request.createdAt,
+    id: request.pass_id.toString(),
+    passId: request.pass_id.toString(),
+    campaignId: request.campaign_id.toString(),
+    merchant: request.merchant,
+    owner: request.owner,
+    serializedTransaction: request.serialized_transaction,
+    expiresAtLedger: request.expires_at_ledger,
+    createdAt: new Date(Number(request.created_at) * 1_000).toISOString(),
     expiresAt,
   };
 }
@@ -63,7 +83,7 @@ function toRequestDto(request: RedemptionRequest, expiresAt: string): Redemption
 export class RedemptionService {
   constructor(
     private readonly config: StellarConfig,
-    private readonly repositories: OffchainRepositories,
+    private readonly requests: RedemptionRequestRegistry,
     private readonly chain: RedemptionChainReader,
     private readonly verifier: RedemptionTransactionVerifier,
     private readonly now: () => Date = () => new Date(),
@@ -104,14 +124,14 @@ export class RedemptionService {
     return toScanDto(pass, campaign);
   }
 
-  async createRequest(
+  private async validateAuthorizedRequest(
     merchantWalletAddress: string,
     input: {
       qrPayload: string;
       serializedTransaction: string;
       expiresAtLedger: number;
     },
-  ): Promise<RedemptionRequestDto> {
+  ): Promise<RedemptionScanDto> {
     const scan = await this.validateMerchantScan(merchantWalletAddress, input.qrPayload);
     try {
       await this.verifier.verifyMerchantAuthorization({
@@ -126,42 +146,67 @@ export class RedemptionService {
         error instanceof Error ? error.message : "The merchant approval is invalid.",
       );
     }
+    return scan;
+  }
 
-    const existing = await this.repositories.redemptionRequests.findById(scan.passId);
-    const timestamp = this.now().toISOString();
-    const request = await this.repositories.redemptionRequests.save(
-      redemptionRequestSchema.parse({
-        id: scan.passId,
-        passId: scan.passId,
-        campaignId: scan.campaignId,
-        contractId: this.config.wrenPassContractId,
-        network: this.config.network,
-        merchantWalletAddress,
-        ownerWalletAddress: scan.owner,
-        serializedTransaction: input.serializedTransaction,
-        expiresAtLedger: input.expiresAtLedger,
-        status: "pending",
-        createdAt: existing?.createdAt ?? timestamp,
-      }),
-    );
+  async prepareRequest(
+    merchantWalletAddress: string,
+    input: {
+      qrPayload: string;
+      serializedTransaction: string;
+      expiresAtLedger: number;
+    },
+  ): Promise<RedemptionRequestPreparationDto> {
+    const scan = await this.validateAuthorizedRequest(merchantWalletAddress, input);
+    return this.requests.prepare({
+      merchant: merchantWalletAddress,
+      owner: scan.owner,
+      passId: BigInt(scan.passId),
+      serializedTransaction: input.serializedTransaction,
+      expiresAtLedger: input.expiresAtLedger,
+    });
+  }
+
+  async createRequest(
+    merchantWalletAddress: string,
+    input: {
+      qrPayload: string;
+      serializedTransaction: string;
+      expiresAtLedger: number;
+      signedAuthorizationEntry: string;
+    },
+  ): Promise<RedemptionRequestDto> {
+    const scan = await this.validateAuthorizedRequest(merchantWalletAddress, input);
+    await this.requests.submit({
+      merchant: merchantWalletAddress,
+      owner: scan.owner,
+      passId: BigInt(scan.passId),
+      serializedTransaction: input.serializedTransaction,
+      expiresAtLedger: input.expiresAtLedger,
+      signedAuthorizationEntry: input.signedAuthorizationEntry,
+    });
+    const request = await this.requests.findByPass(BigInt(scan.passId));
+    if (!request) {
+      throw new RedemptionServiceError(
+        "Stellar confirmed the request but it could not be read back.",
+      );
+    }
     return toRequestDto(request, scan.expiresAt);
   }
 
   async getPendingRequests(ownerWalletAddress: string): Promise<RedemptionRequestDto[]> {
-    const stored = await this.repositories.redemptionRequests.findByField(
-      "ownerWalletAddress",
-      ownerWalletAddress,
-    );
+    const stored = await this.requests.findByOwner(ownerWalletAddress);
     const requests = await Promise.all(
-      stored
-        .filter((request) => request.status === "pending")
-        .map(async (request): Promise<RedemptionRequestDto | null> => {
-          const pass = await this.chain.findPass(BigInt(request.passId));
-          if (!pass || !passIsActive(pass) || pass.owner !== ownerWalletAddress) return null;
-          const campaign = await this.chain.findCampaign(pass.campaign_id);
-          if (!campaign || campaign.merchant !== request.merchantWalletAddress) return null;
-          return toRequestDto(request, new Date(Number(campaign.expires_at) * 1_000).toISOString());
-        }),
+      stored.map(async (request): Promise<RedemptionRequestDto | null> => {
+        const pass = await this.chain.findPass(request.pass_id);
+        if (!pass || !passIsActive(pass) || pass.owner !== ownerWalletAddress) return null;
+        const campaign = await this.chain.findCampaign(pass.campaign_id);
+        if (!campaign || campaign.merchant !== request.merchant) return null;
+        return toRequestDto(
+          request,
+          new Date(Number(campaign.expires_at) * 1_000).toISOString(),
+        );
+      }),
     );
     return requests
       .filter((request): request is RedemptionRequestDto => request !== null)
@@ -172,18 +217,9 @@ export class RedemptionService {
     ownerWalletAddress: string,
     requestId: string,
   ): Promise<void> {
-    const request = await this.repositories.redemptionRequests.findById(requestId);
-    if (!request || request.ownerWalletAddress !== ownerWalletAddress) {
-      throw new RedemptionServiceError("The redemption request was not found.");
-    }
-    const pass = await this.chain.findPass(BigInt(request.passId));
+    const pass = await this.chain.findPass(BigInt(requestId));
     if (!pass || pass.owner !== ownerWalletAddress || pass.status.tag !== "Redeemed") {
       throw new RedemptionServiceError("Stellar has not confirmed this pass as redeemed.");
     }
-    await this.repositories.redemptionRequests.save({
-      ...request,
-      status: "completed",
-      completedAt: this.now().toISOString(),
-    });
   }
 }

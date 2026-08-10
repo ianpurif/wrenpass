@@ -6,7 +6,8 @@ import {
   readContractPass,
   StellarRedemptionContractWriter,
 } from "@/lib/stellar/wrenpass-client";
-import { createOffchainRepositories } from "@/server/firestore/repositories";
+import { getServerEnv } from "@/server/env";
+import { StellarRedemptionRegistry } from "@/server/redemption/redemption-registry";
 import { RedemptionService } from "@/server/redemption/redemption-service";
 
 let redemptionService: RedemptionService | undefined;
@@ -14,9 +15,13 @@ let redemptionService: RedemptionService | undefined;
 export function getRedemptionService(): RedemptionService {
   if (!redemptionService) {
     const config = getStellarConfig();
+    const registry = new StellarRedemptionRegistry(
+      config,
+      getServerEnv().STELLAR_REVIEW_SPONSOR_SECRET,
+    );
     redemptionService = new RedemptionService(
       config,
-      createOffchainRepositories(),
+      registry,
       {
         findPass: (passId) => readContractPass(config, passId),
         findCampaign: (campaignId) => readContractCampaign(config, campaignId),

@@ -24,6 +24,8 @@ function validConfig(network: "testnet" | "mainnet" = "testnet") {
       "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
     NEXT_PUBLIC_WRENPASS_METADATA_CONTRACT_ID:
       "CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR",
+    NEXT_PUBLIC_WRENPASS_REDEMPTION_CONTRACT_ID:
+      "CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR",
   };
 }
 
@@ -42,6 +44,17 @@ describe("parseStellarConfig", () => {
       ...input,
       NEXT_PUBLIC_WRENPASS_METADATA_CONTRACT_ID: undefined,
     })).toThrow(/WRENPASS_METADATA_CONTRACT_ID/);
+  });
+
+  it("requires the on-chain redemption registry", () => {
+    const input = validConfig();
+    expect(parseStellarConfig(input).redemptionContractId).toBe(
+      input.NEXT_PUBLIC_WRENPASS_REDEMPTION_CONTRACT_ID,
+    );
+    expect(() => parseStellarConfig({
+      ...input,
+      NEXT_PUBLIC_WRENPASS_REDEMPTION_CONTRACT_ID: undefined,
+    })).toThrow(/WRENPASS_REDEMPTION_CONTRACT_ID/);
   });
 
   it("rejects an asset contract that does not match the configured asset", () => {

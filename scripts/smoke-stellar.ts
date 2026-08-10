@@ -3,6 +3,7 @@ import { Keypair } from "@stellar/stellar-sdk";
 import { getStellarConfig } from "@/lib/stellar/config";
 import { StellarMetadataContractReader } from "@/lib/stellar/metadata-client";
 import { readContractReviewCount } from "@/lib/stellar/reviews-client";
+import { Client as RedemptionsClient } from "@/generated/redemptions-contract/src";
 import { getServerEnv } from "@/server/env";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
 import {
@@ -14,6 +15,7 @@ import { assertPurchaseDistributionReady } from "@/server/stellar/purchase-readi
 import { StellarRpcGateway } from "@/server/stellar/rpc-gateway";
 import {
   assertMetadataTtlReady,
+  assertRedemptionRegistryTtlReady,
   assertReviewTtlReady,
   assertWrenPassTtlReady,
   type MetadataMerchantIndex,
@@ -71,6 +73,27 @@ async function verifyMetadataRegistry(
   return assertMetadataTtlReady(config, merchants, campaignIds);
 }
 
+async function verifyRedemptionRegistry(
+  config: ReturnType<typeof getStellarConfig>,
+) {
+  const client = new RedemptionsClient({
+    contractId: config.redemptionContractId,
+    networkPassphrase: config.networkPassphrase,
+    rpcUrl: config.rpcUrl,
+  });
+  const [registryConfig, storageVersion] = await Promise.all([
+    client.get_config(),
+    client.storage_version(),
+  ]);
+  if (registryConfig.result.unwrap().campaign_contract !== config.wrenPassContractId) {
+    throw new Error("The redemption registry targets a different campaign contract.");
+  }
+  if (storageVersion.result !== 1) {
+    throw new Error(`Unsupported redemption registry storage version: ${storageVersion.result}.`);
+  }
+  return assertRedemptionRegistryTtlReady(config);
+}
+
 async function main() {
   const config = getStellarConfig();
   const reviewSponsor = Keypair.fromSecret(
@@ -110,10 +133,11 @@ async function main() {
   }
 
   await assertPurchaseDistributionReady(config, contractConfig, gateway);
-  const [ttl, reviewTtl, metadataTtl] = await Promise.all([
+  const [ttl, reviewTtl, metadataTtl, redemptionTtl] = await Promise.all([
     assertWrenPassTtlReady(config, campaignCount, passCount),
     assertReviewTtlReady(config, reviewCount),
     verifyMetadataRegistry(config, campaignCount),
+    verifyRedemptionRegistry(config),
   ]);
 
   console.log(`Stellar RPC network verified: ${config.network}`);
@@ -131,6 +155,9 @@ async function main() {
   );
   console.log(
     `Metadata registry verified: ${metadataTtl.entryCount} entries, ${metadataTtl.minimumRemainingLedgers} minimum ledgers remaining`,
+  );
+  console.log(
+    `Redemption registry verified: campaign target and storage v1, ${redemptionTtl.minimumRemainingLedgers} minimum ledgers remaining`,
   );
 }
 

@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["wrenpass-campaign", "wrenpass-metadata", "wrenpass-reviews"]
+members = [
+  "wrenpass-campaign",
+  "wrenpass-metadata",
+  "wrenpass-redemptions",
+  "wrenpass-reviews",
+]
 
 [workspace.dependencies]
 soroban-sdk = "=27.0.5"

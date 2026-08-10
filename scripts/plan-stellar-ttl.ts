@@ -102,6 +102,10 @@ async function main() {
     }
     metadataIndex += 1;
   }
+
+  const redemptionBase = `stellar contract extend --id ${config.redemptionContractId} --ledgers-to-extend 535679 --source-account REPLACE_WITH_KEEPER_IDENTITY --network ${config.network}`;
+  console.log("Redemption registry instance:");
+  console.log(redemptionBase);
 }
 
 main().catch((error: unknown) => {

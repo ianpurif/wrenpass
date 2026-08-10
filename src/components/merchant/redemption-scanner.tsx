@@ -9,11 +9,13 @@ import { redemptionApi } from "@/features/redemption/api";
 import { parseRedemptionQrPayload } from "@/features/redemption/qr";
 import { shortenStellarAddress } from "@/features/merchant/display";
 import type { StellarConfig } from "@/lib/stellar/config";
+import { StellarRedemptionRequestWriter } from "@/lib/stellar/redemption-request-client";
 import { StellarRedemptionContractWriter } from "@/lib/stellar/wrenpass-client";
 
 export function RedemptionScanner({ config }: { config: StellarConfig }) {
   const { address, signAuthEntry } = useWallet();
   const writer = useMemo(() => new StellarRedemptionContractWriter(config), [config]);
+  const requestWriter = useMemo(() => new StellarRedemptionRequestWriter(config), [config]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<{ destroy(): void; start(): Promise<void>; stop(): void } | null>(null);
   const workingRef = useRef(false);
@@ -38,7 +40,14 @@ export function RedemptionScanner({ config }: { config: StellarConfig }) {
         owner: scan.owner,
         signAuthEntry: (authEntryXdr) => signAuthEntry(authEntryXdr),
       });
-      await redemptionApi.create({ qrPayload: encodedQr, ...prepared });
+      await requestWriter.publish({
+        qrPayload: encodedQr,
+        ...prepared,
+        passId: BigInt(scan.passId),
+        merchant: address,
+        owner: scan.owner,
+        signAuthEntry: (authEntryXdr) => signAuthEntry(authEntryXdr),
+      });
       setSuccess(`Pass #${scan.passId} is waiting for ${shortenStellarAddress(scan.owner)} to approve.`);
       setCameraOpen(false);
     } catch (scanError) {
@@ -47,7 +56,7 @@ export function RedemptionScanner({ config }: { config: StellarConfig }) {
       workingRef.current = false;
       setWorking(false);
     }
-  }, [address, signAuthEntry, writer]);
+  }, [address, requestWriter, signAuthEntry, writer]);
 
   useEffect(() => {
     if (!cameraOpen || !videoRef.current) return;

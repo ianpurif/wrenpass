@@ -18,6 +18,10 @@ const requestSchema = scanSchema.extend({
   expiresAtLedger: z.number(),
   createdAt: z.string(),
 });
+const preparationSchema = z.object({
+  authorizationEntry: z.string().min(1),
+  expiresAtLedger: z.number().int().positive(),
+});
 
 async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
   const response = await fetch(url, {
@@ -42,14 +46,28 @@ export const redemptionApi = {
     );
   },
 
-  async create(input: {
+  async prepareCreate(input: {
     qrPayload: string;
     serializedTransaction: string;
     expiresAtLedger: number;
+  }) {
+    return preparationSchema.parse(
+      await requestJson("/api/redemptions", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    );
+  },
+
+  async submitCreate(input: {
+    qrPayload: string;
+    serializedTransaction: string;
+    expiresAtLedger: number;
+    signedAuthorizationEntry: string;
   }): Promise<RedemptionRequestDto> {
     return requestSchema.parse(
       await requestJson("/api/redemptions", {
-        method: "POST",
+        method: "PUT",
         body: JSON.stringify(input),
       }),
     );

@@ -3,6 +3,7 @@ import { scValToNative } from "@stellar/stellar-sdk";
 
 import {
   createMetadataLedgerKeys,
+  createRedemptionRegistryLedgerKeys,
   createReviewLedgerKeys,
   createWrenPassLedgerKeys,
 } from "@/server/stellar/ttl-service";
@@ -91,5 +92,18 @@ describe("Metadata TTL ledger keys", () => {
       "Merchant",
       testCustomerAddress,
     ]);
+  });
+});
+
+describe("Redemption registry TTL ledger keys", () => {
+  it("tracks only the durable contract instance", () => {
+    const keys = createRedemptionRegistryLedgerKeys(
+      testStellarConfig.redemptionContractId,
+    );
+
+    expect(keys).toHaveLength(1);
+    expect(keys[0]?.contractData().key().switch().name).toBe(
+      "scvLedgerKeyContractInstance",
+    );
   });
 });

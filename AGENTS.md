@@ -20,6 +20,7 @@ Your architecture decisions should be senior-level, but your code must remain si
 - Run `pnpm stellar:smoke` after changing public Stellar network or asset configuration.
 - Wallet sessions are server-verified SEP-53 challenges stored as opaque Firestore records; never authorize a server action from a client-provided address alone.
 - Public merchant profiles and campaign descriptions are authoritative in the deployed WrenPass metadata contract; Firestore stores only Cloudinary provider-management references for those records.
+- Pending redemption approvals are authoritative in the WrenPass redemption registry contract and must remain short-lived, merchant-authorized, and platform-sponsored; never restore a Firestore redemption-request source of truth.
 
 ---
 

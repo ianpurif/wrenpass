@@ -186,6 +186,13 @@ export function createMetadataLedgerKeys(
   return [...iterateMetadataLedgerKeys(contractId, merchants, campaignIds)];
 }
 
+export function createRedemptionRegistryLedgerKeys(contractId: string): xdr.LedgerKey[] {
+  const contractAddress = Address.fromString(contractId).toScAddress();
+  return [
+    contractDataKey(contractAddress, xdr.ScVal.scvLedgerKeyContractInstance()),
+  ];
+}
+
 export async function assertWrenPassTtlReady(
   config: StellarConfig,
   campaignCount: bigint,
@@ -215,5 +222,15 @@ export async function assertMetadataTtlReady(
     config.rpcUrl,
     iterateMetadataLedgerKeys(config.metadataContractId, merchants, campaignIds),
     "WrenPass metadata contract",
+  );
+}
+
+export async function assertRedemptionRegistryTtlReady(
+  config: StellarConfig,
+): Promise<{ entryCount: number; minimumRemainingLedgers: number }> {
+  return assertLedgerKeysTtlReady(
+    config.rpcUrl,
+    createRedemptionRegistryLedgerKeys(config.redemptionContractId),
+    "WrenPass redemption registry",
   );
 }
