@@ -41,6 +41,10 @@
     text-rendering: optimizeLegibility;
   }
 
+  :target {
+    scroll-margin-top: 5.5rem;
+  }
+
   button,
   input {
     font: inherit;
@@ -57,6 +61,12 @@
     background-image:
       radial-gradient(circle at 1px 1px, rgba(35, 99, 71, 0.11) 1px, transparent 0);
     background-size: 28px 28px;
+  }
+
+  .landing-display {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-variation-settings: "opsz" 72;
+    text-wrap: balance;
   }
 
   .eyebrow {
@@ -102,3 +112,9 @@
   }
 }
 
+@media (max-width: 767px), (prefers-reduced-motion: reduce) {
+  .mobile-motion-reset {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
