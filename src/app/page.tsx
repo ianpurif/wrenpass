@@ -1,17 +1,16 @@
 import { CinematicLanding } from "@/components/home/cinematic-landing";
-import type { ReviewDto } from "@/features/reviews/dto";
+import type { ReviewPageDto } from "@/features/reviews/dto";
 import { getReviewReader } from "@/server/reviews/reader-service";
 
 export const revalidate = 30;
 
 export default async function Home() {
-  let reviews: ReviewDto[] = [];
+  let reviewPage: ReviewPageDto = { reviews: [], nextCursor: null, hasMore: false };
   try {
-    const page = await getReviewReader().readPage({ limit: 6 });
-    reviews = page.reviews;
+    reviewPage = await getReviewReader().readPage({ limit: 12 });
   } catch (error) {
     console.error("Unable to render recent on-chain reviews", error);
   }
 
-  return <CinematicLanding reviews={reviews} />;
+  return <CinematicLanding reviewPage={reviewPage} />;
 }

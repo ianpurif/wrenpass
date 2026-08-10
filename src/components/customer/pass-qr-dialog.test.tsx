@@ -18,7 +18,7 @@ describe("PassQrDialog", () => {
     const qr = screen.getByLabelText("Redemption QR for WrenPass 1");
 
     expect(qr).toBeInTheDocument();
-    expect(qr.querySelector("image")).toHaveAttribute("href", "/logo.png");
+    expect(qr.querySelector("image")).toHaveAttribute("href", "/logo-qr.svg");
     expect(screen.getByText("This QR is not a bearer credential.")).toBeInTheDocument();
     expect(screen.getByText(/You must then approve and submit/)).toBeInTheDocument();
   });
