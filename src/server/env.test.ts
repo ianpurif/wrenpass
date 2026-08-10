@@ -1,3 +1,6 @@
+// @vitest-environment node
+
+import { Keypair } from "@stellar/stellar-sdk";
 import { describe, expect, it } from "vitest";
 
 import { parseServerEnv } from "@/server/env";
@@ -13,6 +16,7 @@ const validEnv = {
   GMAIL_SMTP_USER: "wrenpass@example.com",
   GMAIL_SMTP_APP_PASSWORD: "abcd efgh ijkl mnop",
   EMAIL_FROM: "WrenPass <wrenpass@example.com>",
+  STELLAR_REVIEW_SPONSOR_SECRET: Keypair.random().secret(),
 };
 
 describe("parseServerEnv", () => {

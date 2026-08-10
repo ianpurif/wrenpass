@@ -16,7 +16,9 @@
     "contract:clippy": "cargo clippy --manifest-path contracts/Cargo.toml --all-targets --locked -- -D warnings",
     "contract:test": "cargo test --manifest-path contracts/Cargo.toml --locked",
     "contract:build": "stellar contract build --manifest-path contracts/Cargo.toml --out-dir contracts/wasm --locked --optimize=false",
-    "contract:bindings": "stellar contract bindings typescript --wasm contracts/wasm/wrenpass_campaign.wasm --output-dir src/generated/wrenpass-contract --overwrite",
+    "contract:bindings": "pnpm contract:bindings:campaign && pnpm contract:bindings:reviews",
+    "contract:bindings:campaign": "stellar contract bindings typescript --wasm contracts/wasm/wrenpass_campaign.wasm --output-dir src/generated/wrenpass-contract --overwrite",
+    "contract:bindings:reviews": "stellar contract bindings typescript --wasm contracts/wasm/wrenpass_reviews.wasm --output-dir src/generated/reviews-contract --overwrite",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

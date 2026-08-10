@@ -11,6 +11,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   getPending: vi.fn(),
+  requestReview: vi.fn(),
   complete: vi.fn(),
   syncEventsAfterMutation: vi.fn(),
   approveAndSubmit: vi.fn(),
@@ -31,6 +32,9 @@ vi.mock("@/lib/stellar/wrenpass-client", () => ({
     approveAndSubmit = mocks.approveAndSubmit;
   },
 }));
+vi.mock("@/components/reviews/review-prompt-provider", () => ({
+  useReviewPrompt: () => ({ requestReview: mocks.requestReview }),
+}));
 
 const request = {
   id: "1",
@@ -50,6 +54,7 @@ describe("RedemptionRequests", () => {
     mocks.approveAndSubmit.mockResolvedValue({ transactionHash: "a".repeat(64) });
     mocks.complete.mockResolvedValue(undefined);
     mocks.syncEventsAfterMutation.mockResolvedValue(true);
+    mocks.requestReview.mockReset();
     const onRedeemed = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
 
@@ -66,5 +71,6 @@ describe("RedemptionRequests", () => {
     expect(mocks.complete).toHaveBeenCalledWith("1", "a".repeat(64));
     await waitFor(() => expect(onRedeemed).toHaveBeenCalled());
     expect(mocks.syncEventsAfterMutation).toHaveBeenCalledOnce();
+    expect(mocks.requestReview).toHaveBeenCalledWith({ transactionLabel: "pass redemption" });
   });
 });

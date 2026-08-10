@@ -20,6 +20,7 @@ const config: StellarConfig = {
   assetIssuer: issuer,
   assetContractId: new Asset("USDC", issuer).contractId(Networks.TESTNET),
   wrenPassContractId: Keypair.random().publicKey().replace("G", "C"),
+  reviewContractId: Keypair.random().publicKey().replace("G", "C"),
 };
 const contractConfig: ContractConfig = {
   payment_asset: config.assetContractId,

@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useReviewPrompt } from "@/components/reviews/review-prompt-provider";
 import { useWallet } from "@/components/wallet/wallet-provider";
 import { merchantApi } from "@/features/merchant/api";
 import {
@@ -56,6 +57,7 @@ export function CampaignForm({
   onPublished(): Promise<void>;
 }) {
   const { address, signTransaction } = useWallet();
+  const { requestReview } = useReviewPrompt();
   const writer = useMemo(() => new StellarCampaignContractWriter(config), [config]);
   const [image, setImage] = useState<File | null>(null);
   const [pending, setPending] = useState<RecoverableCampaignDraft | null>(() =>
@@ -145,6 +147,7 @@ export function CampaignForm({
         },
       );
       setSuccess(`Campaign #${campaignId} is live on Stellar Testnet.`);
+      requestReview({ transactionLabel: "campaign publishing" });
       setImage(null);
       reset({
         name: "",
@@ -178,6 +181,7 @@ export function CampaignForm({
         },
       });
       setSuccess(`Campaign #${pending.campaignId} is live on Stellar Testnet.`);
+      requestReview({ transactionLabel: "campaign publishing" });
       void syncEventsAfterMutation();
       await onPublished();
     } catch (resumeError) {

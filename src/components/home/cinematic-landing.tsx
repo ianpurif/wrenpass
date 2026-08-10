@@ -12,8 +12,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { PassPreview } from "@/components/home/pass-preview";
+import { RecentReviews } from "@/components/reviews/recent-reviews";
 import { Container } from "@/components/ui/container";
 import { ConnectedWalletLink } from "@/components/wallet/connected-wallet-link";
+import type { ReviewDto } from "@/features/reviews/dto";
 
 const steps = [
   {
@@ -51,7 +53,7 @@ function useCompactMotion() {
   return isCompact;
 }
 
-export function CinematicLanding() {
+export function CinematicLanding({ reviews = [] }: { reviews?: ReviewDto[] }) {
   const rootRef = useRef<HTMLElement>(null);
   const heroRef = useRef<HTMLElement>(null);
   const campaignRef = useRef<HTMLElement>(null);
@@ -406,6 +408,8 @@ export function CinematicLanding() {
           </motion.div>
         </Container>
       </section>
+
+      <RecentReviews reviews={reviews} />
 
       <section aria-labelledby="closing-title" className="relative overflow-hidden bg-canvas py-24 sm:py-32 lg:py-40">
         <Container>

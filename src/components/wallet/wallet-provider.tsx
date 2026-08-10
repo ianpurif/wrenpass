@@ -30,6 +30,26 @@ const challengeSchema = z.object({ id: z.string(), message: z.string() });
 export type WalletBalances = z.infer<typeof balanceSchema>;
 export type WalletSession = z.infer<typeof sessionSchema>;
 
+interface CachedWalletState {
+  address: string;
+  balances: WalletBalances | null;
+  expiresAt: string;
+}
+
+let cachedWalletState: CachedWalletState | null = null;
+
+function readCachedWalletState(): CachedWalletState | null {
+  if (!cachedWalletState) return null;
+  if (Date.parse(cachedWalletState.expiresAt) <= Date.now()) {
+    cachedWalletState = null;
+  }
+  return cachedWalletState;
+}
+
+export function resetWalletSessionCacheForTests(): void {
+  cachedWalletState = null;
+}
+
 export interface WalletAdapter {
   connect(): Promise<{ address: string; networkPassphrase: string }>;
   restore(): Promise<{ address: string; networkPassphrase: string } | null>;
@@ -157,13 +177,19 @@ export function WalletProvider({
     [adapterOverride, config],
   );
   const api = useMemo(() => apiOverride ?? createWalletApi(), [apiOverride]);
-  const [status, setStatus] = useState<WalletStatus>("checking");
-  const [address, setAddress] = useState<string | null>(null);
-  const [balances, setBalances] = useState<WalletBalances | null>(null);
+  const [initialWallet] = useState(readCachedWalletState);
+  const [status, setStatus] = useState<WalletStatus>(
+    initialWallet ? "connected" : "checking",
+  );
+  const [address, setAddress] = useState<string | null>(initialWallet?.address ?? null);
+  const [balances, setBalances] = useState<WalletBalances | null>(
+    initialWallet?.balances ?? null,
+  );
   const [error, setError] = useState<string | null>(null);
   const networkLabel = config.network === "testnet" ? "Stellar Testnet" : "Stellar Mainnet";
 
   const clearWallet = useCallback(() => {
+    cachedWalletState = null;
     setAddress(null);
     setBalances(null);
     setStatus("disconnected");
@@ -197,11 +223,31 @@ export function WalletProvider({
         }
 
         ensureExpectedNetwork(wallet.networkPassphrase);
-        const nextBalances = await api.readBalances(wallet.address);
         if (active) {
           setAddress(wallet.address);
-          setBalances(nextBalances);
           setStatus("connected");
+          cachedWalletState = {
+            address: wallet.address,
+            balances:
+              cachedWalletState?.address === wallet.address
+                ? cachedWalletState.balances
+                : null,
+            expiresAt: session.expiresAt,
+          };
+        }
+
+        try {
+          const nextBalances = await api.readBalances(wallet.address);
+          if (active) {
+            setBalances(nextBalances);
+            cachedWalletState = {
+              address: wallet.address,
+              balances: nextBalances,
+              expiresAt: session.expiresAt,
+            };
+          }
+        } catch (balanceError) {
+          if (active) setError(readableError(balanceError));
         }
       } catch (restoreError) {
         await api.revokeSession().catch(() => undefined);
@@ -247,6 +293,11 @@ export function WalletProvider({
       setAddress(wallet.address);
       setBalances(nextBalances);
       setStatus("connected");
+      cachedWalletState = {
+        address: wallet.address,
+        balances: nextBalances,
+        expiresAt: session.expiresAt,
+      };
     } catch (connectError) {
       await api.revokeSession().catch(() => undefined);
       await adapter.disconnect().catch(() => undefined);
@@ -265,7 +316,11 @@ export function WalletProvider({
     if (!address) return;
 
     try {
-      setBalances(await api.readBalances(address));
+      const nextBalances = await api.readBalances(address);
+      setBalances(nextBalances);
+      if (cachedWalletState?.address === address) {
+        cachedWalletState = { ...cachedWalletState, balances: nextBalances };
+      }
       setError(null);
     } catch (refreshError) {
       setError(readableError(refreshError));
@@ -294,7 +349,7 @@ export function WalletProvider({
   const signAuthEntry = useCallback(
     async (authEntryXdr: string) => {
       if (!address || status !== "connected") {
-        throw new Error("Connect and authenticate Freighter before approving redemption.");
+        throw new Error("Connect and authenticate Freighter before approving this request.");
       }
 
       const signed = await adapter.signAuthEntry(

@@ -66,6 +66,7 @@ const config: StellarConfig = {
   assetIssuer: merchant,
   assetContractId,
   wrenPassContractId: "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
+  reviewContractId: "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
 };
 
 function createService(foundCampaign: Campaign | null = campaign) {

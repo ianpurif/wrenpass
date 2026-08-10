@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   refreshBalances: vi.fn(),
   signTransaction: vi.fn(),
   refreshRoute: vi.fn(),
+  requestReview: vi.fn(),
   syncEventsAfterMutation: vi.fn(),
 }));
 
@@ -41,12 +42,16 @@ vi.mock("@/lib/stellar/wrenpass-client", () => ({
 vi.mock("@/features/notifications/api", () => ({
   syncEventsAfterMutation: mocks.syncEventsAfterMutation,
 }));
+vi.mock("@/components/reviews/review-prompt-provider", () => ({
+  useReviewPrompt: () => ({ requestReview: mocks.requestReview }),
+}));
 
 describe("PurchasePanel", () => {
   beforeEach(() => {
     mocks.purchase.mockReset().mockResolvedValue(BigInt(9));
     mocks.refreshBalances.mockReset().mockResolvedValue(undefined);
     mocks.refreshRoute.mockReset();
+    mocks.requestReview.mockReset();
     mocks.syncEventsAfterMutation.mockReset().mockResolvedValue(true);
   });
 
@@ -69,6 +74,7 @@ describe("PurchasePanel", () => {
     expect(mocks.refreshBalances).toHaveBeenCalledOnce();
     expect(mocks.refreshRoute).toHaveBeenCalledOnce();
     expect(mocks.syncEventsAfterMutation).toHaveBeenCalledOnce();
+    expect(mocks.requestReview).toHaveBeenCalledWith({ transactionLabel: "pass purchase" });
   });
 
   it("surfaces a rejected wallet transaction", async () => {
@@ -82,5 +88,6 @@ describe("PurchasePanel", () => {
     expect(await screen.findByText("Freighter rejected the transaction.")).toBeInTheDocument();
     expect(mocks.refreshRoute).not.toHaveBeenCalled();
     expect(mocks.syncEventsAfterMutation).not.toHaveBeenCalled();
+    expect(mocks.requestReview).not.toHaveBeenCalled();
   });
 });

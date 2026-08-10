@@ -1,15 +1,17 @@
 import { getStellarConfig } from "@/lib/stellar/config";
+import { readContractReviewCount } from "@/lib/stellar/reviews-client";
 import {
   readContractCampaignCount,
   readContractPassCount,
 } from "@/lib/stellar/wrenpass-client";
-import { createWrenPassLedgerKeys } from "@/server/stellar/ttl-service";
+import { createReviewLedgerKeys, createWrenPassLedgerKeys } from "@/server/stellar/ttl-service";
 
 async function main() {
   const config = getStellarConfig();
-  const [campaignCount, passCount] = await Promise.all([
+  const [campaignCount, passCount, reviewCount] = await Promise.all([
     readContractCampaignCount(config),
     readContractPassCount(config),
+    readContractReviewCount(config),
   ]);
   const keys = createWrenPassLedgerKeys(
     config.wrenPassContractId,
@@ -26,6 +28,15 @@ async function main() {
       : `Pass #${index - Number(campaignCount) + 1}`;
     console.log(`${label}:`);
     console.log(`${base} --key-xdr ${key.contractData().key().toXDR("base64")}`);
+  });
+
+  const reviewBase = `stellar contract extend --id ${config.reviewContractId} --ledgers-to-extend 535679 --source-account REPLACE_WITH_KEEPER_IDENTITY --network ${config.network}`;
+  const reviewKeys = createReviewLedgerKeys(config.reviewContractId, reviewCount);
+  console.log("Review contract instance:");
+  console.log(reviewBase);
+  reviewKeys.slice(1).forEach((key, index) => {
+    console.log(`Review #${index + 1}:`);
+    console.log(`${reviewBase} --key-xdr ${key.contractData().key().toXDR("base64")}`);
   });
 }
 

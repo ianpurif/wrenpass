@@ -12,6 +12,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   gift: vi.fn(),
+  requestReview: vi.fn(),
   signTransaction: vi.fn(),
   syncEventsAfterMutation: vi.fn(),
 }));
@@ -27,10 +28,14 @@ vi.mock("@/lib/stellar/wrenpass-client", () => ({
 vi.mock("@/features/notifications/api", () => ({
   syncEventsAfterMutation: mocks.syncEventsAfterMutation,
 }));
+vi.mock("@/components/reviews/review-prompt-provider", () => ({
+  useReviewPrompt: () => ({ requestReview: mocks.requestReview }),
+}));
 
 describe("GiftPassDialog", () => {
   beforeEach(() => {
     mocks.gift.mockReset().mockResolvedValue(undefined);
+    mocks.requestReview.mockReset();
     mocks.syncEventsAfterMutation.mockReset().mockResolvedValue(true);
   });
 
@@ -66,5 +71,6 @@ describe("GiftPassDialog", () => {
     );
     expect(onGifted).toHaveBeenCalledOnce();
     expect(mocks.syncEventsAfterMutation).toHaveBeenCalledOnce();
+    expect(mocks.requestReview).toHaveBeenCalledWith({ transactionLabel: "pass gift" });
   });
 });

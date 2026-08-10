@@ -4,6 +4,7 @@ import { LoaderCircle, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useReviewPrompt } from "@/components/reviews/review-prompt-provider";
 import { useWallet } from "@/components/wallet/wallet-provider";
 import { syncEventsAfterMutation } from "@/features/notifications/api";
 import { redemptionApi } from "@/features/redemption/api";
@@ -20,6 +21,7 @@ export function RedemptionRequests({
   onRedeemed(): Promise<void>;
 }) {
   const { address, signTransaction } = useWallet();
+  const { requestReview } = useReviewPrompt();
   const writer = useMemo(() => new StellarRedemptionContractWriter(config), [config]);
   const [requests, setRequests] = useState<RedemptionRequestDto[]>([]);
   const [workingId, setWorkingId] = useState<string | null>(null);
@@ -64,6 +66,7 @@ export function RedemptionRequests({
         owner: address,
         signTransaction: (transactionXdr) => signTransaction(transactionXdr),
       });
+      requestReview({ transactionLabel: "pass redemption" });
       await redemptionApi.complete(request.id, sent.transactionHash);
       void syncEventsAfterMutation();
       await Promise.all([load(), onRedeemed()]);

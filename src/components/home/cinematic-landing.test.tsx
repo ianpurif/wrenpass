@@ -55,7 +55,9 @@ describe("CinematicLanding", () => {
       "The service completes the exchange.",
       "Fund what comes next, with what you do best.",
       "The QR identifies. The owner authorizes.",
+      "What people say after using WrenPass.",
       "Let tomorrow's service fund today's possibility.",
     ]);
+    expect(screen.getByRole("link", { name: /All reviews/ })).toHaveAttribute("href", "/reviews");
   });
 });

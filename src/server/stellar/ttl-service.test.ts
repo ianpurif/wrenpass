@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { createWrenPassLedgerKeys } from "@/server/stellar/ttl-service";
+import {
+  createReviewLedgerKeys,
+  createWrenPassLedgerKeys,
+} from "@/server/stellar/ttl-service";
 import { testStellarConfig } from "@/test/fixtures/customer";
 
 describe("WrenPass TTL ledger keys", () => {
@@ -28,5 +31,19 @@ describe("WrenPass TTL ledger keys", () => {
         BigInt(0),
       ),
     ).toThrow("safe entry limit");
+  });
+});
+
+describe("Review TTL ledger keys", () => {
+  it("includes the review contract instance and every review entry", () => {
+    const keys = createReviewLedgerKeys(testStellarConfig.reviewContractId, BigInt(2));
+
+    expect(keys).toHaveLength(3);
+    expect(keys[1]?.contractData().key().toXDR("base64")).toBe(
+      "AAAAEAAAAAEAAAACAAAADwAAAAZSZXZpZXcAAAAAAAUAAAAAAAAAAQ==",
+    );
+    expect(keys[2]?.contractData().key().toXDR("base64")).toBe(
+      "AAAAEAAAAAEAAAACAAAADwAAAAZSZXZpZXcAAAAAAAUAAAAAAAAAAg==",
+    );
   });
 });

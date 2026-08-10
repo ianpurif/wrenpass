@@ -8,6 +8,7 @@ import type { StellarConfig } from "@/lib/stellar/config";
 const mocks = vi.hoisted(() => ({
   createDraft: vi.fn(),
   publish: vi.fn(),
+  requestReview: vi.fn(),
   saveCampaignMetadata: vi.fn(),
   signTransaction: vi.fn(),
   syncEventsAfterMutation: vi.fn(),
@@ -36,6 +37,9 @@ vi.mock("@/lib/stellar/wrenpass-client", () => ({
 vi.mock("@/features/notifications/api", () => ({
   syncEventsAfterMutation: mocks.syncEventsAfterMutation,
 }));
+vi.mock("@/components/reviews/review-prompt-provider", () => ({
+  useReviewPrompt: () => ({ requestReview: mocks.requestReview }),
+}));
 
 const config: StellarConfig = {
   network: "testnet",
@@ -45,6 +49,7 @@ const config: StellarConfig = {
   assetIssuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
   assetContractId: "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
   wrenPassContractId: "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
+  reviewContractId: "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
 };
 
 describe("CampaignForm", () => {
@@ -52,6 +57,7 @@ describe("CampaignForm", () => {
     window.localStorage.clear();
     mocks.createDraft.mockReset().mockResolvedValue(BigInt(12));
     mocks.publish.mockReset().mockResolvedValue(undefined);
+    mocks.requestReview.mockReset();
     mocks.saveCampaignMetadata.mockReset().mockResolvedValue({});
     mocks.signTransaction.mockReset();
     mocks.syncEventsAfterMutation.mockReset().mockResolvedValue(true);
@@ -85,5 +91,6 @@ describe("CampaignForm", () => {
     expect(onPublished).toHaveBeenCalledOnce();
     expect(mocks.syncEventsAfterMutation).toHaveBeenCalledOnce();
     expect(screen.getByText("Campaign #12 is live on Stellar Testnet.")).toBeInTheDocument();
+    expect(mocks.requestReview).toHaveBeenCalledWith({ transactionLabel: "campaign publishing" });
   });
 });

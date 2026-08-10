@@ -66,7 +66,7 @@ export function createFreighterAdapter(config: StellarConfig): WalletAdapter {
       const { signAuthEntry } = await import("@stellar/freighter-api");
       const result = await signAuthEntry(authEntryXdr, { address, networkPassphrase });
       if (result.error || !result.signedAuthEntry) {
-        throw new Error(result.error?.message ?? "Freighter could not approve redemption.");
+        throw new Error(result.error?.message ?? "Freighter could not approve this request.");
       }
       return {
         signedAuthEntry: result.signedAuthEntry,

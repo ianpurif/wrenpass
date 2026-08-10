@@ -1,12 +1,13 @@
 import { Networks } from "@stellar/stellar-sdk";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { StellarConfig } from "@/lib/stellar/config";
 import { WalletButton } from "@/components/wallet/wallet-button";
 import {
   WalletProvider,
+  resetWalletSessionCacheForTests,
   type WalletApi,
   type WalletAdapter,
 } from "@/components/wallet/wallet-provider";
@@ -20,6 +21,7 @@ const config: StellarConfig = {
   assetIssuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
   assetContractId: "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
   wrenPassContractId: "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
+  reviewContractId: "CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D",
 };
 
 function createAdapter(overrides: Partial<WalletAdapter> = {}): WalletAdapter {
@@ -46,7 +48,7 @@ function createApi(overrides: Partial<WalletApi> = {}): WalletApi {
     createChallenge: vi.fn().mockResolvedValue({ id: "challenge", message: "Sign in" }),
     createSession: vi
       .fn()
-      .mockResolvedValue({ authenticated: true, address, expiresAt: "2026-08-10T00:00:00Z" }),
+      .mockResolvedValue({ authenticated: true, address, expiresAt: "2099-08-10T00:00:00Z" }),
     revokeSession: vi.fn().mockResolvedValue(undefined),
     readBalances: vi.fn().mockResolvedValue({
       address,
@@ -66,6 +68,10 @@ function renderWallet(adapter: WalletAdapter, api: WalletApi) {
 }
 
 describe("WalletProvider", () => {
+  beforeEach(() => {
+    resetWalletSessionCacheForTests();
+  });
+
   it("connects Freighter, establishes a signed session, and displays balances", async () => {
     const user = userEvent.setup();
     const adapter = createAdapter();
@@ -107,12 +113,38 @@ describe("WalletProvider", () => {
     const api = createApi({
       readSession: vi
         .fn()
-        .mockResolvedValue({ authenticated: true, address, expiresAt: "2026-08-10T00:00:00Z" }),
+        .mockResolvedValue({ authenticated: true, address, expiresAt: "2099-08-10T00:00:00Z" }),
     });
     renderWallet(adapter, api);
 
     expect(await screen.findByRole("button", { name: /Open wallet menu/i })).toBeInTheDocument();
     expect(api.readBalances).toHaveBeenCalledWith(address);
+  });
+
+  it("keeps the verified wallet visible while a remounted provider revalidates silently", async () => {
+    const session = {
+      authenticated: true as const,
+      address,
+      expiresAt: "2099-08-10T00:00:00Z",
+    };
+    const first = renderWallet(
+      createAdapter({
+        restore: vi.fn().mockResolvedValue({ address, networkPassphrase: Networks.TESTNET }),
+      }),
+      createApi({ readSession: vi.fn().mockResolvedValue(session) }),
+    );
+    await screen.findByRole("button", { name: /Open wallet menu/i });
+    first.unmount();
+
+    renderWallet(
+      createAdapter({
+        restore: vi.fn().mockResolvedValue({ address, networkPassphrase: Networks.TESTNET }),
+      }),
+      createApi({ readSession: vi.fn().mockResolvedValue(session) }),
+    );
+
+    expect(screen.getByRole("button", { name: /Open wallet menu/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Checking wallet" })).not.toBeInTheDocument();
   });
 
   it("rejects a wallet on the wrong network before requesting a challenge", async () => {
@@ -149,7 +181,7 @@ describe("WalletProvider", () => {
     const api = createApi({
       readSession: vi
         .fn()
-        .mockResolvedValue({ authenticated: true, address, expiresAt: "2026-08-10T00:00:00Z" }),
+        .mockResolvedValue({ authenticated: true, address, expiresAt: "2099-08-10T00:00:00Z" }),
       readBalances: vi.fn().mockResolvedValue({
         address,
         xlm: "12.5000000",

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
+import { useReviewPrompt } from "@/components/reviews/review-prompt-provider";
 import { useWallet } from "@/components/wallet/wallet-provider";
 import { parseUsdcBalance } from "@/features/merchant/campaign-terms";
 import { displayExpiration, displayUsdc } from "@/features/merchant/display";
@@ -28,6 +29,7 @@ export function PurchasePanel({
   config: StellarConfig;
 }) {
   const router = useRouter();
+  const { requestReview } = useReviewPrompt();
   const {
     address,
     balances,
@@ -74,6 +76,8 @@ export function PurchasePanel({
         signTransaction: (transactionXdr: string) => signTransaction(transactionXdr),
       });
       setPurchasedPassId(passId.toString());
+      setDialogOpen(false);
+      requestReview({ transactionLabel: "pass purchase" });
       void syncEventsAfterMutation();
       await refreshBalances();
       router.refresh();

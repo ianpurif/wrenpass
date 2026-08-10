@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useReviewPrompt } from "@/components/reviews/review-prompt-provider";
 import { useWallet } from "@/components/wallet/wallet-provider";
 import type { CustomerPassDto } from "@/features/customer/dto";
 import {
@@ -32,6 +33,7 @@ export function GiftPassDialog({
   onOpenChange(open: boolean): void;
 }) {
   const { address, signTransaction } = useWallet();
+  const { requestReview } = useReviewPrompt();
   const writer = useMemo(() => new StellarCustomerContractWriter(config), [config]);
   const [error, setError] = useState<string | null>(null);
   const {
@@ -60,6 +62,7 @@ export function GiftPassDialog({
         recipient,
         signTransaction: (transactionXdr: string) => signTransaction(transactionXdr),
       });
+      requestReview({ transactionLabel: "pass gift" });
       void syncEventsAfterMutation();
       reset();
       onOpenChange(false);
