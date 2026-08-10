@@ -20,8 +20,6 @@ export const cloudinaryPublicIdSchema = z
 
 export const userProfileSchema = z.object({
   id: entityIdSchema,
-  walletAddress,
-  displayName: z.string().trim().min(1).max(120).optional(),
   email: z.email().optional(),
   createdAt: isoTimestamp,
   updatedAt: isoTimestamp,
@@ -77,7 +75,7 @@ export const notificationTypeSchema = z.enum([
 
 export const notificationSchema = z.object({
   id: entityIdSchema,
-  recipientEmail: z.email(),
+  recipientWalletAddress: walletAddress,
   type: notificationTypeSchema,
   status: z.enum(["pending", "sent", "failed"]),
   relatedEntityId: entityIdSchema.optional(),

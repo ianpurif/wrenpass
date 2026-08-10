@@ -83,7 +83,6 @@ describe("EventSyncService", () => {
     await repositories.userProfiles.save(
       userProfileSchema.parse({
         id: owner,
-        walletAddress: owner,
         email: "owner@example.com",
         createdAt: "2026-08-09T10:00:00.000Z",
         updatedAt: "2026-08-09T10:00:00.000Z",
@@ -132,7 +131,10 @@ describe("EventSyncService", () => {
     });
     await expect(
       repositories.notifications.findById(`${redeemedEvent.id}:pass_redeemed:${owner}`),
-    ).resolves.toMatchObject({ status: "sent", recipientEmail: "owner@example.com" });
+    ).resolves.toMatchObject({
+      status: "sent",
+      recipientWalletAddress: owner,
+    });
   });
 
   it("sends one deterministic notice for an active pass expiring within seven days", async () => {
@@ -140,7 +142,6 @@ describe("EventSyncService", () => {
     await repositories.userProfiles.save(
       userProfileSchema.parse({
         id: owner,
-        walletAddress: owner,
         email: "owner@example.com",
         createdAt: "2026-08-09T10:00:00.000Z",
         updatedAt: "2026-08-09T10:00:00.000Z",
@@ -210,7 +211,6 @@ describe("EventSyncService", () => {
     await repositories.userProfiles.save(
       userProfileSchema.parse({
         id: owner,
-        walletAddress: owner,
         email: "owner@example.com",
         createdAt: "2026-08-09T10:00:00.000Z",
         updatedAt: "2026-08-09T10:00:00.000Z",

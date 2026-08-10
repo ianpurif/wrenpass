@@ -19,8 +19,7 @@ async function smokeTestFirestore(): Promise<void> {
     const now = new Date().toISOString();
     await repository.save({
       id: documentId,
-      walletAddress: "GPHASE2SMOKETEST",
-      displayName: "Phase 2 smoke test",
+      email: "wrenpass-smoke@example.com",
       createdAt: now,
       updatedAt: now,
     });

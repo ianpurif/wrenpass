@@ -33,8 +33,6 @@ export async function PUT(request: NextRequest) {
     const profile = await repositories.userProfiles.save(
       userProfileSchema.parse({
         id: walletAddress,
-        walletAddress,
-        ...(existing?.displayName ? { displayName: existing.displayName } : {}),
         email: parsed.data.email,
         createdAt: existing?.createdAt ?? timestamp,
         updatedAt: timestamp,

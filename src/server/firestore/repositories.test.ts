@@ -29,8 +29,7 @@ function createStore(): DocumentStore {
 
 const userProfile: UserProfile = {
   id: "user-1",
-  walletAddress: "GTESTWALLET",
-  displayName: "Ari",
+  email: "ari@example.com",
   createdAt: "2026-08-09T04:00:00.000Z",
   updatedAt: "2026-08-09T04:00:00.000Z",
 };
@@ -62,7 +61,7 @@ describe("off-chain repositories", () => {
     const repositories = createOffchainRepositories(store);
 
     await expect(
-      repositories.userProfiles.save({ ...userProfile, walletAddress: "" }),
+      repositories.userProfiles.save({ ...userProfile, email: "not-an-email" }),
     ).rejects.toThrow();
     expect(store.write).not.toHaveBeenCalled();
   });
@@ -73,11 +72,11 @@ describe("off-chain repositories", () => {
     await repositories.userProfiles.save({
       ...userProfile,
       id: "user-2",
-      walletAddress: "GOTHER",
+      email: "other@example.com",
     });
 
     await expect(
-      repositories.userProfiles.findByField("walletAddress", userProfile.walletAddress),
+      repositories.userProfiles.findByField("email", userProfile.email!),
     ).resolves.toEqual([userProfile]);
   });
 
@@ -95,12 +94,12 @@ describe("off-chain repositories", () => {
     const store = createStore();
     const repositories = createOffchainRepositories(store);
 
-    await repositories.userProfiles.save({ ...userProfile, displayName: undefined });
+    await repositories.userProfiles.save({ ...userProfile, email: undefined });
 
     expect(store.write).toHaveBeenCalledWith(
       "user_profiles",
       userProfile.id,
-      expect.not.objectContaining({ displayName: expect.anything() }),
+      expect.not.objectContaining({ email: expect.anything() }),
     );
   });
 

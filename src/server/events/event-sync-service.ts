@@ -144,7 +144,7 @@ export class EventSyncService {
     const createdAt = existing?.createdAt ?? this.now().toISOString();
     const pending = notificationSchema.parse({
       id,
-      recipientEmail: profile.email,
+      recipientWalletAddress: target.walletAddress,
       type: target.type,
       status: "pending",
       relatedEntityId,

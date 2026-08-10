@@ -18,11 +18,13 @@ Your architecture decisions should be senior-level, but your code must remain si
 - Never commit local environment files. Document variable names with placeholders in `.env.example` when a later phase introduces configuration.
 - Use Stellar RPC for current ledger and Soroban access; do not introduce Horizon as the primary Soroban API.
 - Run `pnpm stellar:smoke` after changing public Stellar network or asset configuration.
+- Run `pnpm offchain:audit` after changing Firestore collection boundaries or retained off-chain schemas.
 - Wallet sessions are server-verified SEP-53 challenges stored as opaque Firestore records; never authorize a server action from a client-provided address alone.
 - Public merchant profiles and campaign descriptions are authoritative in the deployed WrenPass metadata contract; Firestore stores only Cloudinary provider-management references for those records.
 - Pending redemption approvals are authoritative in the WrenPass redemption registry contract and must remain short-lived, merchant-authorized, and platform-sponsored; never restore a Firestore redemption-request source of truth.
 - Reviews are authoritative in the WrenPass review contract; transaction links belong in the derived `indexed_blockchain_events` cache, never in a separate review source of truth.
 - Merchant-profile discovery for storage maintenance is derived from verified metadata-contract events in `indexed_blockchain_events`; never restore a separate profile-locator collection.
+- Firestore user profiles contain only optional notification email settings and timestamps; notification delivery records reference wallets and must not duplicate recipient email addresses.
 
 ---
 

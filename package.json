@@ -10,6 +10,8 @@
     "start": "next start",
     "lint": "eslint .",
     "services:smoke": "node --conditions=react-server --env-file=.env.local --import tsx scripts/smoke-services.ts",
+    "offchain:audit": "node --conditions=react-server --env-file=.env.local --import tsx scripts/audit-offchain-boundary.ts",
+    "offchain:cleanup-auth": "node --conditions=react-server --env-file=.env.local --import tsx scripts/cleanup-expired-wallet-auth.ts",
     "stellar:smoke": "node --conditions=react-server --env-file=.env.local --import tsx scripts/smoke-stellar.ts",
     "stellar:ttl:plan": "node --conditions=react-server --env-file=.env.local --import tsx scripts/plan-stellar-ttl.ts",
     "contract:fmt": "cargo fmt --manifest-path contracts/Cargo.toml --all -- --check",
