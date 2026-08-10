@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Build once and deploy ${{ inputs.target }}
+    name: Deploy ${{ inputs.target }} with Vercel build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: ${{ inputs.target }}
@@ -38,14 +38,16 @@ jobs:
           exit 1
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up pnpm
+        uses: pnpm/action-setup@d15e628ca66d93ee5f352c71671a7bc6a97af5c9 # v6.0.8
+        with:
+          version: 11.16.0
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22.20.0
-      - name: Enable pinned pnpm
-        run: corepack enable && corepack prepare pnpm@11.16.0 --activate
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - name: Validate deployment credentials
         run: |
           test -n "$VERCEL_ORG_ID"
@@ -53,15 +55,9 @@ jobs:
           test -n "$VERCEL_TOKEN"
       - name: Pull Vercel project settings
         run: pnpm dlx vercel@58.9.0 pull --yes --environment=${{ inputs.target }} --token="$VERCEL_TOKEN"
-      - name: Build prebuilt deployment
+      - name: Deploy preview
         if: ${{ inputs.target == 'preview' }}
-        run: pnpm dlx vercel@58.9.0 build --token="$VERCEL_TOKEN"
-      - name: Build prebuilt production deployment
+        run: pnpm dlx vercel@58.9.0 deploy --yes --archive=tgz --token="$VERCEL_TOKEN"
+      - name: Deploy production
         if: ${{ inputs.target == 'production' }}
-        run: pnpm dlx vercel@58.9.0 build --prod --token="$VERCEL_TOKEN"
-      - name: Deploy preview artifact
-        if: ${{ inputs.target == 'preview' }}
-        run: pnpm dlx vercel@58.9.0 deploy --prebuilt --token="$VERCEL_TOKEN"
-      - name: Deploy production artifact
-        if: ${{ inputs.target == 'production' }}
-        run: pnpm dlx vercel@58.9.0 deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@58.9.0 deploy --yes --archive=tgz --prod --token="$VERCEL_TOKEN"

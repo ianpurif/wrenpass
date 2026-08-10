@@ -65,7 +65,7 @@ pnpm stellar:smoke
 pnpm offchain:audit
 ```
 
-GitHub Actions runs the credential-free application, contract, dependency-security, provenance, and browser gates on pull requests and `main`. Deployment is a separate protected manual workflow that builds a Vercel artifact once and deploys that exact output.
+GitHub Actions runs the credential-free application, contract, dependency-security, provenance, and browser gates on pull requests and `main`. Deployment is a separate protected manual workflow that submits the validated commit to Vercel, where sensitive environment variables are available only inside the hosted build.
 
 ## Operations and releases
 

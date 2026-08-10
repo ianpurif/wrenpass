@@ -4,6 +4,8 @@
 
 Contract releases use pinned source, Rust `1.96.1`, Stellar CLI `27.0.0`, Soroban SDK `27.0.5`, locked Cargo dependencies, and unoptimized WASM. Changing any of those inputs requires a new manifest and a full Testnet validation.
 
+The current Testnet suite was built and deployed with the `x86_64-pc-windows-msvc` Rust host. Its byte-for-byte provenance job therefore runs on `windows-latest`, and the manifest verifier rejects a different host before building. Rust WASM output from the same source and toolchain is not assumed to be byte-identical across host targets. Contract formatting, linting, tests, builds, on-chain hashes, and interaction evidence remain enforced by CI.
+
 The deployment identity must be a named Stellar CLI identity backed by the operating system's secure store. Do not place its secret in an environment file.
 
 Set these non-secret values in the current shell:
@@ -52,6 +54,6 @@ VERCEL_ORG_ID
 VERCEL_PROJECT_ID
 ```
 
-The workflow pulls the selected Vercel environment, runs `vercel build`, then uploads the same `.vercel/output` with `vercel deploy --prebuilt`. Production runs are restricted to `main`; the `production` GitHub environment should also require approval.
+The workflow validates the selected Vercel project and submits the checked-out source for a Vercel-hosted build. This is required because sensitive Vercel environment variables are deliberately unavailable to an external prebuild runner and are decrypted only inside Vercel's build environment. `.vercelignore` excludes local artifacts, credentials, caches, and contract build output from the upload. Production runs are restricted to `main`; the `production` GitHub environment should also require approval.
 
 The first production release is recorded in [PRODUCTION.md](PRODUCTION.md). Future releases should add a new immutable release record before changing the stable production alias.

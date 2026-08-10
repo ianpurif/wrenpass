@@ -22,6 +22,7 @@ const deploymentManifestSchema = z.object({
   toolchain: z.object({
     stellarCli: z.string().regex(/^\d+\.\d+\.\d+$/),
     rust: z.string().regex(/^\d+\.\d+\.\d+$/),
+    rustHost: z.string().regex(/^[a-z0-9_-]+$/),
     sorobanSdk: z.string().regex(/^\d+\.\d+\.\d+$/),
   }),
   contracts: z.array(
@@ -84,6 +85,10 @@ function sha256(filePath: string): string {
 function assertToolchain(manifest: DeploymentManifest): void {
   const stellarVersion = run(stellarCommand, ["version", "--only-version"], { quiet: true });
   const rustVersion = run("rustc", ["--version"], { quiet: true }).split(" ")[1];
+  const rustHost = run("rustc", ["-vV"], { quiet: true })
+    .split("\n")
+    .find((line) => line.startsWith("host: "))
+    ?.slice("host: ".length);
 
   if (stellarVersion !== manifest.toolchain.stellarCli) {
     throw new Error(
@@ -92,6 +97,11 @@ function assertToolchain(manifest: DeploymentManifest): void {
   }
   if (rustVersion !== manifest.toolchain.rust) {
     throw new Error(`Rust ${manifest.toolchain.rust} is required; found ${rustVersion}.`);
+  }
+  if (rustHost !== manifest.toolchain.rustHost) {
+    throw new Error(
+      `Rust host ${manifest.toolchain.rustHost} is required for byte-for-byte provenance; found ${rustHost ?? "unknown"}.`,
+    );
   }
 }
 
