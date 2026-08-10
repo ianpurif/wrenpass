@@ -114,19 +114,4 @@ describe("off-chain repositories", () => {
     ).resolves.toEqual(cloudinaryReference);
   });
 
-  it("stores metadata locators without duplicating public profile fields", async () => {
-    const repositories = createOffchainRepositories(createStore());
-    const locator = {
-      id: "merchant-profile:GTESTWALLET",
-      kind: "merchant_profile" as const,
-      ownerWalletAddress: "GTESTWALLET",
-      updatedAt: "2026-08-09T04:00:00.000Z",
-    };
-
-    await repositories.metadataRegistryEntries.save(locator);
-
-    await expect(repositories.metadataRegistryEntries.findById(locator.id)).resolves.toEqual(
-      locator,
-    );
-  });
 });

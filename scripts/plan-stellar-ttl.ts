@@ -12,6 +12,7 @@ import {
   type MetadataMerchantIndex,
 } from "@/server/stellar/ttl-service";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
+import { MerchantProfileEventIndex } from "@/server/merchant/profile-event-index";
 
 async function main() {
   const config = getStellarConfig();
@@ -77,12 +78,15 @@ async function main() {
       campaignCount: campaignCountForMerchant,
     }),
   );
-  const profileLocators = await createOffchainRepositories()
-    .metadataRegistryEntries.findByField("kind", "merchant_profile");
-  for (const locator of profileLocators) {
-    if (!merchantCounts.has(locator.ownerWalletAddress)) {
+  const repositories = createOffchainRepositories();
+  const profileMerchants = await new MerchantProfileEventIndex(
+    config,
+    repositories.indexedBlockchainEvents,
+  ).listMerchantWallets();
+  for (const merchant of profileMerchants) {
+    if (!merchantCounts.has(merchant)) {
       metadataMerchants.push({
-        merchant: locator.ownerWalletAddress,
+        merchant,
         campaignCount: BigInt(0),
       });
     }

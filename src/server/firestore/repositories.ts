@@ -7,12 +7,10 @@ import {
   cloudinaryAssetReferenceSchema,
   entityIdSchema,
   indexedBlockchainEventSchema,
-  metadataRegistryEntrySchema,
   notificationSchema,
   userProfileSchema,
   type CloudinaryAssetReference,
   type IndexedBlockchainEvent,
-  type MetadataRegistryEntry,
   type Notification,
   type UserProfile,
 } from "@/server/models";
@@ -69,7 +67,6 @@ export class EntityRepository<T extends IdentifiedEntity> {
 export interface OffchainRepositories {
   userProfiles: EntityRepository<UserProfile>;
   cloudinaryAssetReferences: EntityRepository<CloudinaryAssetReference>;
-  metadataRegistryEntries: EntityRepository<MetadataRegistryEntry>;
   notifications: EntityRepository<Notification>;
   indexedBlockchainEvents: EntityRepository<IndexedBlockchainEvent>;
 }
@@ -82,11 +79,6 @@ export function createOffchainRepositories(
     cloudinaryAssetReferences: new EntityRepository(
       "cloudinary_asset_references",
       cloudinaryAssetReferenceSchema,
-      store,
-    ),
-    metadataRegistryEntries: new EntityRepository(
-      "metadata_registry_entries",
-      metadataRegistryEntrySchema,
       store,
     ),
     notifications: new EntityRepository("notifications", notificationSchema, store),

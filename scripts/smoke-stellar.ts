@@ -6,6 +6,7 @@ import { readContractReviewCount } from "@/lib/stellar/reviews-client";
 import { Client as RedemptionsClient } from "@/generated/redemptions-contract/src";
 import { getServerEnv } from "@/server/env";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
+import { MerchantProfileEventIndex } from "@/server/merchant/profile-event-index";
 import {
   readContractCampaignCount,
   readContractConfig,
@@ -52,11 +53,14 @@ async function verifyMetadataRegistry(
   }
 
   const merchants: MetadataMerchantIndex[] = [];
-  const profileLocators = await createOffchainRepositories()
-    .metadataRegistryEntries.findByField("kind", "merchant_profile");
-  for (const locator of profileLocators) {
-    if (!campaignCounts.has(locator.ownerWalletAddress)) {
-      campaignCounts.set(locator.ownerWalletAddress, BigInt(0));
+  const repositories = createOffchainRepositories();
+  const profileMerchants = await new MerchantProfileEventIndex(
+    config,
+    repositories.indexedBlockchainEvents,
+  ).listMerchantWallets();
+  for (const merchant of profileMerchants) {
+    if (!campaignCounts.has(merchant)) {
+      campaignCounts.set(merchant, BigInt(0));
     }
   }
   for (const [merchant, merchantCampaignCount] of campaignCounts) {

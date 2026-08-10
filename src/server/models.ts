@@ -65,13 +65,6 @@ export const cloudinaryAssetReferenceSchema = z.object({
   updatedAt: isoTimestamp,
 });
 
-export const metadataRegistryEntrySchema = z.object({
-  id: entityIdSchema,
-  kind: z.literal("merchant_profile"),
-  ownerWalletAddress: walletAddress,
-  updatedAt: isoTimestamp,
-});
-
 export const notificationTypeSchema = z.enum([
   "pass_purchased",
   "pass_gifted",
@@ -109,7 +102,6 @@ export type UserProfile = z.infer<typeof userProfileSchema>;
 export type Merchant = z.infer<typeof merchantSchema>;
 export type CampaignMetadata = z.infer<typeof campaignMetadataSchema>;
 export type CloudinaryAssetReference = z.infer<typeof cloudinaryAssetReferenceSchema>;
-export type MetadataRegistryEntry = z.infer<typeof metadataRegistryEntrySchema>;
 export type Notification = z.infer<typeof notificationSchema>;
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 export type IndexedBlockchainEvent = z.infer<typeof indexedBlockchainEventSchema>;

@@ -9,6 +9,7 @@ import {
   MerchantServiceError,
 } from "@/server/merchant/merchant-service";
 import type { MetadataRegistryReader } from "@/server/merchant/metadata-registry-reader";
+import type { MerchantProfileEventIndex } from "@/server/merchant/profile-event-index";
 import type { CampaignReader } from "@/server/stellar/campaign-reader";
 
 class MemoryStore implements DocumentStore {
@@ -112,10 +113,12 @@ function createRegistry(
 function createService({
   foundCampaign = campaign,
   metadataRegistry = createRegistry(),
+  profileEventIndex = { indexLatest: vi.fn(async () => undefined) },
   store = new MemoryStore(),
 }: {
   foundCampaign?: Campaign | null;
   metadataRegistry?: MetadataRegistryReader;
+  profileEventIndex?: Pick<MerchantProfileEventIndex, "indexLatest">;
   store?: DocumentStore;
 } = {}) {
   const reader: CampaignReader = { findById: async () => foundCampaign };
@@ -126,6 +129,7 @@ function createService({
       reader,
       config,
       metadataRegistry,
+      profileEventIndex,
       () => new Date("2026-08-10T00:00:00.000Z"),
     ),
   };
@@ -162,7 +166,8 @@ describe("MerchantService on-chain metadata cutover", () => {
   });
 
   it("stores only the Cloudinary reference after verifying an on-chain profile", async () => {
-    const { repositories, service } = createService();
+    const profileEventIndex = { indexLatest: vi.fn(async () => undefined) };
+    const { repositories, service } = createService({ profileEventIndex });
 
     const saved = await service.saveProfile(merchant, {
       businessName: profile.businessName,
@@ -173,12 +178,33 @@ describe("MerchantService on-chain metadata cutover", () => {
     });
 
     expect(saved).toEqual({ ...profile, logoPublicId: "wrenpass/merchant-logos/logo" });
+    expect(profileEventIndex.indexLatest).toHaveBeenCalledWith(merchant);
     await expect(
       repositories.cloudinaryAssetReferences.findById(`merchant-logo:${merchant}`),
     ).resolves.toMatchObject({
       kind: "merchant_logo",
       publicId: "wrenpass/merchant-logos/logo",
     });
+  });
+
+  it("keeps a confirmed on-chain profile usable when event indexing is unavailable", async () => {
+    const profileEventIndex = {
+      indexLatest: vi.fn(async () => {
+        throw new Error("Event index unavailable");
+      }),
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { service } = createService({ profileEventIndex });
+
+    await expect(service.saveProfile(merchant, {
+      businessName: profile.businessName,
+      description: profile.description,
+    })).resolves.toMatchObject(profile);
+    expect(warn).toHaveBeenCalledWith(
+      "The profile is on-chain, but its event index was not updated.",
+      expect.any(Error),
+    );
+    warn.mockRestore();
   });
 
   it("rejects campaign metadata from a wallet that does not own the campaign", async () => {

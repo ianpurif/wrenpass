@@ -18,6 +18,7 @@ import {
 } from "@/server/models";
 import type { CampaignReader } from "@/server/stellar/campaign-reader";
 import type { MetadataRegistryReader } from "@/server/merchant/metadata-registry-reader";
+import type { MerchantProfileEventIndex } from "@/server/merchant/profile-event-index";
 import { z } from "zod";
 
 const merchantProfileUpdateSchema = z
@@ -167,6 +168,7 @@ export class MerchantService {
     private readonly campaignReader: CampaignReader,
     private readonly stellarConfig: StellarConfig,
     private readonly metadataRegistry: MetadataRegistryReader,
+    private readonly profileEventIndex: Pick<MerchantProfileEventIndex, "indexLatest">,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
@@ -201,14 +203,9 @@ export class MerchantService {
     }
 
     try {
-      await this.repositories.metadataRegistryEntries.save({
-        id: `merchant-profile:${walletAddress}`,
-        kind: "merchant_profile",
-        ownerWalletAddress: walletAddress,
-        updatedAt: this.now().toISOString(),
-      });
+      await this.profileEventIndex.indexLatest(walletAddress);
     } catch (error) {
-      console.warn("The profile is on-chain, but its TTL locator was not updated.", error);
+      console.warn("The profile is on-chain, but its event index was not updated.", error);
     }
 
     let reference = await this.repositories.cloudinaryAssetReferences
