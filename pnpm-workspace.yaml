@@ -1,9 +1,11 @@
 allowBuilds:
   '@firebase/util': true
   '@reown/appkit': false
+  '@sentry/cli': true
   '@stellar/stellar-sdk': false
   blake-hash: false
   bufferutil: false
+  core-js: false
   esbuild: true
   protobufjs: true
   secp256k1: false
@@ -11,7 +13,25 @@ allowBuilds:
   unrs-resolver: true
   usb: false
   utf-8-validate: false
+minimumReleaseAgeExclude:
+  - '@posthog/core@1.47.0'
+  - '@sentry/browser-utils@10.70.0'
+  - '@sentry/browser@10.70.0'
+  - '@sentry/core@10.70.0'
+  - '@sentry/feedback@10.70.0'
+  - '@sentry/nextjs@10.70.0'
+  - '@sentry/node-core@10.70.0'
+  - '@sentry/node@10.70.0'
+  - '@sentry/opentelemetry@10.70.0'
+  - '@sentry/react@10.70.0'
+  - '@sentry/replay-canvas@10.70.0'
+  - '@sentry/replay@10.70.0'
+  - '@sentry/server-utils@10.70.0'
+  - '@sentry/vercel-edge@10.70.0'
+  - posthog-js@1.415.1
 overrides:
   axios: 1.18.1
   protobufjs: 7.6.5
   uuid: 11.1.1
+patchedDependencies:
+  base32.js@0.1.0: patches/base32.js@0.1.0.patch

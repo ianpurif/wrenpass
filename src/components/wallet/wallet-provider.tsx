@@ -5,6 +5,10 @@ import { z } from "zod";
 
 import type { StellarConfig } from "@/lib/stellar/config";
 import { createFreighterAdapter } from "@/lib/stellar/freighter-adapter";
+import {
+  captureWalletConnected,
+  captureWalletDisconnected,
+} from "@/lib/analytics";
 
 const balanceSchema = z.object({
   address: z.string(),
@@ -37,6 +41,26 @@ interface CachedWalletState {
 }
 
 let cachedWalletState: CachedWalletState | null = null;
+const DEFAULT_RESTORE_TIMEOUT_MS = 4_000;
+
+class WalletRestoreTimeoutError extends Error {}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new WalletRestoreTimeoutError("Wallet restoration timed out.")),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
 
 function readCachedWalletState(): CachedWalletState | null {
   if (!cachedWalletState) return null;
@@ -166,11 +190,13 @@ export function WalletProvider({
   config,
   adapter: adapterOverride,
   api: apiOverride,
+  restoreTimeoutMs = DEFAULT_RESTORE_TIMEOUT_MS,
 }: {
   children: React.ReactNode;
   config: StellarConfig;
   adapter?: WalletAdapter;
   api?: WalletApi;
+  restoreTimeoutMs?: number;
 }) {
   const adapter = useMemo(
     () => adapterOverride ?? createFreighterAdapter(config),
@@ -209,13 +235,13 @@ export function WalletProvider({
 
     async function restore() {
       try {
-        const session = await api.readSession();
+        const session = await withTimeout(api.readSession(), restoreTimeoutMs);
         if (!session.authenticated) {
           if (active) clearWallet();
           return;
         }
 
-        const wallet = await adapter.restore();
+        const wallet = await withTimeout(adapter.restore(), restoreTimeoutMs);
         if (!wallet || wallet.address !== session.address) {
           await api.revokeSession();
           if (active) clearWallet();
@@ -250,12 +276,14 @@ export function WalletProvider({
           if (active) setError(readableError(balanceError));
         }
       } catch (restoreError) {
-        await api.revokeSession().catch(() => undefined);
-        await adapter.disconnect().catch(() => undefined);
         if (active) {
           clearWallet();
-          setError(readableError(restoreError));
+          if (!(restoreError instanceof WalletRestoreTimeoutError)) {
+            setError(readableError(restoreError));
+          }
         }
+        void api.revokeSession().catch(() => undefined);
+        void adapter.disconnect().catch(() => undefined);
       }
     }
 
@@ -263,7 +291,7 @@ export function WalletProvider({
     return () => {
       active = false;
     };
-  }, [adapter, api, clearWallet, ensureExpectedNetwork]);
+  }, [adapter, api, clearWallet, ensureExpectedNetwork, restoreTimeoutMs]);
 
   const connect = useCallback(async () => {
     setStatus("connecting");
@@ -298,19 +326,28 @@ export function WalletProvider({
         balances: nextBalances,
         expiresAt: session.expiresAt,
       };
+      captureWalletConnected(config.network);
     } catch (connectError) {
       await api.revokeSession().catch(() => undefined);
       await adapter.disconnect().catch(() => undefined);
       clearWallet();
       setError(readableError(connectError));
     }
-  }, [adapter, api, clearWallet, config.networkPassphrase, ensureExpectedNetwork]);
+  }, [
+    adapter,
+    api,
+    clearWallet,
+    config.network,
+    config.networkPassphrase,
+    ensureExpectedNetwork,
+  ]);
 
   const disconnect = useCallback(async () => {
     setError(null);
     await Promise.allSettled([api.revokeSession(), adapter.disconnect()]);
     clearWallet();
-  }, [adapter, api, clearWallet]);
+    captureWalletDisconnected(config.network);
+  }, [adapter, api, clearWallet, config.network]);
 
   const refreshBalances = useCallback(async () => {
     if (!address) return;

@@ -28,7 +28,13 @@ export interface WrenPassEvent {
 }
 
 export interface WrenPassEventSource {
-  readRetainedEvents(): Promise<WrenPassEvent[]>;
+  readRetainedEvents(startLedger?: number): Promise<WrenPassEventBatch>;
+}
+
+export interface WrenPassEventBatch {
+  events: WrenPassEvent[];
+  nextLedger: number;
+  retentionGap: boolean;
 }
 
 const relevantEvents = [
@@ -128,7 +134,7 @@ export class StellarWrenPassEventSource implements WrenPassEventSource {
     this.server = new rpc.Server(config.rpcUrl);
   }
 
-  async readRetainedEvents(): Promise<WrenPassEvent[]> {
+  async readRetainedEvents(startLedger?: number): Promise<WrenPassEventBatch> {
     const filters: rpc.Api.EventFilter[] = [
       {
         type: "contract",
@@ -137,14 +143,27 @@ export class StellarWrenPassEventSource implements WrenPassEventSource {
       },
     ];
     const range = await resolveRetainedEventRange(this.server, filters);
+    const effectiveStart = Math.max(range.startLedger, startLedger ?? range.startLedger);
+    if (effectiveStart > range.endLedger) {
+      return {
+        events: [],
+        nextLedger: effectiveStart,
+        retentionGap: false,
+      };
+    }
     const response = await readEventPages(this.server, {
-      ...range,
+      startLedger: effectiveStart,
+      endLedger: range.endLedger,
       filters,
       limit: 10_000,
     });
-    return response.events
-      .map(decodeWrenPassEvent)
-      .filter((event): event is WrenPassEvent => event !== null)
-      .sort((left, right) => left.ledger - right.ledger || left.id.localeCompare(right.id));
+    return {
+      events: response.events
+        .map(decodeWrenPassEvent)
+        .filter((event): event is WrenPassEvent => event !== null)
+        .sort((left, right) => left.ledger - right.ledger || left.id.localeCompare(right.id)),
+      nextLedger: range.endLedger + 1,
+      retentionGap: startLedger !== undefined && startLedger < range.startLedger,
+    };
   }
 }

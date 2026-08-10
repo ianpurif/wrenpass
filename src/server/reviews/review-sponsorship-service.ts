@@ -21,11 +21,22 @@ import type { StellarConfig } from "@/lib/stellar/config";
 import type { EntityRepository } from "@/server/firestore/repositories";
 import type { IndexedBlockchainEvent } from "@/server/models";
 import { toIndexedReviewEvent } from "@/server/reviews/review-event-index";
+import {
+  ReviewSponsorBusyError,
+  type ReviewSponsorGuard,
+  ReviewSponsorRateLimitError,
+} from "@/server/reviews/review-sponsor-guard";
 
 const AUTH_VALIDITY_LEDGERS = 100;
 const MAX_SPONSORED_FEE_STROOPS = BigInt(1_000_000);
 
 export class ReviewSponsorshipError extends Error {}
+
+export class ReviewSponsorshipRateLimitError extends ReviewSponsorshipError {
+  constructor(public readonly retryAfterSeconds: number) {
+    super("Too many sponsored review requests. Try again later.");
+  }
+}
 
 interface PreparedReviewAuthorization {
   authorizationEntry: string;
@@ -115,6 +126,7 @@ export class ReviewSponsorshipService {
     private readonly config: StellarConfig,
     sponsorSecret: string,
     private readonly events: EntityRepository<IndexedBlockchainEvent>,
+    private readonly guard: ReviewSponsorGuard,
     server?: ReviewRpc,
   ) {
     this.sponsor = Keypair.fromSecret(sponsorSecret);
@@ -143,6 +155,14 @@ export class ReviewSponsorshipService {
     input: ReviewInput,
   ): Promise<PreparedReviewAuthorization> {
     const review = reviewInputSchema.parse(input);
+    try {
+      await this.guard.checkPrepare(reviewer);
+    } catch (error) {
+      if (error instanceof ReviewSponsorRateLimitError) {
+        throw new ReviewSponsorshipRateLimitError(error.retryAfterSeconds);
+      }
+      throw error;
+    }
     const transaction = await this.createTransaction(reviewer, review);
     const simulation = await this.server.simulateTransaction(transaction);
     if (!rpc.Api.isSimulationSuccess(simulation) || !simulation.result) {
@@ -199,7 +219,7 @@ export class ReviewSponsorshipService {
       throw new ReviewSponsorshipError("The review authorization is not signed.");
     }
 
-    return enqueueSubmission(async () => {
+    const submit = () => enqueueSubmission(async () => {
       const transaction = await this.createTransaction(reviewer, review, [
         signedAuthorization,
       ]);
@@ -254,5 +274,16 @@ export class ReviewSponsorshipService {
         ledger: result.ledger,
       };
     });
+    try {
+      return await this.guard.runSubmission(reviewer, submit);
+    } catch (error) {
+      if (error instanceof ReviewSponsorRateLimitError) {
+        throw new ReviewSponsorshipRateLimitError(error.retryAfterSeconds);
+      }
+      if (error instanceof ReviewSponsorBusyError) {
+        throw new ReviewSponsorshipError(error.message);
+      }
+      throw error;
+    }
   }
 }

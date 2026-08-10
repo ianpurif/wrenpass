@@ -141,6 +141,11 @@ export class StellarMetadataContractReader {
     return transaction.result ?? null;
   }
 
+  async getMerchantCampaignCount(merchant: string): Promise<bigint> {
+    const transaction = await createClient(this.config).merchant_campaign_count({ merchant });
+    return transaction.result;
+  }
+
   async getMerchantCampaigns(merchant: string): Promise<CampaignMetadata[]> {
     const client = createClient(this.config);
     const countTransaction = await client.merchant_campaign_count({ merchant });

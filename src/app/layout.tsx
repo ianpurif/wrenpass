@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import { Footer } from "@/components/layout/footer";
 import { Navigation } from "@/components/layout/navigation";
@@ -36,6 +38,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <Navigation />
             {children}
             <Footer />
+            <Analytics />
+            <SpeedInsights />
           </ReviewPromptProvider>
         </WalletProvider>
       </body>

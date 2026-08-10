@@ -30,6 +30,7 @@ const serverEnvSchema = z.object({
     StrKey.isValidEd25519SecretSeed,
     "must be a valid Stellar secret seed",
   ),
+  CRON_SECRET: requiredValue.min(32, "must be at least 32 characters"),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

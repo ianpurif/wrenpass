@@ -1,11 +1,25 @@
 import "server-only";
 
-import { Address, nativeToScVal, rpc, xdr } from "@stellar/stellar-sdk";
+import {
+  Address,
+  BASE_FEE,
+  Keypair,
+  nativeToScVal,
+  Operation,
+  rpc,
+  SorobanDataBuilder,
+  TransactionBuilder,
+  xdr,
+} from "@stellar/stellar-sdk";
 
 import type { StellarConfig } from "@/lib/stellar/config";
 
 const LEDGER_ENTRY_BATCH_SIZE = 200;
+const TTL_EXTENSION_BATCH_SIZE = 50;
+const MAX_TESTNET_TTL_FEE_STROOPS = BigInt(100_000_000);
+const MAX_MAINNET_TTL_FEE_STROOPS = BigInt(10_000_000);
 export const MIN_SAFE_TTL_LEDGERS = 250_000;
+export const TARGET_TTL_LEDGERS = 500_000;
 
 function contractDataKey(
   contractAddress: xdr.ScAddress,
@@ -53,15 +67,22 @@ export function createReviewLedgerKeys(
   return [...iterateReviewLedgerKeys(contractId, reviewCount)];
 }
 
-async function assertLedgerKeysTtlReady(
+export interface LedgerTtlInspection {
+  entryCount: number;
+  minimumRemainingLedgers: number;
+  keysBelowThreshold: xdr.LedgerKey[];
+}
+
+export async function inspectLedgerKeysTtl(
   rpcUrl: string,
   keys: Iterable<xdr.LedgerKey>,
   entryLabel: string,
-): Promise<{ entryCount: number; minimumRemainingLedgers: number }> {
+): Promise<LedgerTtlInspection> {
   const server = new rpc.Server(rpcUrl);
   const latestLedger = await server.getLatestLedger();
   let entryCount = 0;
   let minimumRemainingLedgers = Number.POSITIVE_INFINITY;
+  const keysBelowThreshold: xdr.LedgerKey[] = [];
   let batch: xdr.LedgerKey[] = [];
 
   const inspectBatch = async () => {
@@ -80,6 +101,11 @@ async function assertLedgerKeysTtlReady(
         (entry) => entry.liveUntilLedgerSeq! - latestLedger.sequence,
       ),
     );
+    response.entries.forEach((entry, index) => {
+      if (entry.liveUntilLedgerSeq! - latestLedger.sequence < MIN_SAFE_TTL_LEDGERS) {
+        keysBelowThreshold.push(batch[index]!);
+      }
+    });
     batch = [];
   };
 
@@ -88,12 +114,91 @@ async function assertLedgerKeysTtlReady(
     if (batch.length === LEDGER_ENTRY_BATCH_SIZE) await inspectBatch();
   }
   await inspectBatch();
-  if (minimumRemainingLedgers < MIN_SAFE_TTL_LEDGERS) {
+  return { entryCount, minimumRemainingLedgers, keysBelowThreshold };
+}
+
+async function assertLedgerKeysTtlReady(
+  rpcUrl: string,
+  keys: Iterable<xdr.LedgerKey>,
+  entryLabel: string,
+): Promise<{ entryCount: number; minimumRemainingLedgers: number }> {
+  const inspection = await inspectLedgerKeysTtl(rpcUrl, keys, entryLabel);
+  if (inspection.minimumRemainingLedgers < MIN_SAFE_TTL_LEDGERS) {
     throw new Error(
       `${entryLabel} TTL is below the ${MIN_SAFE_TTL_LEDGERS}-ledger release threshold. Extend the tracked entries before release.`,
     );
   }
-  return { entryCount, minimumRemainingLedgers };
+  return {
+    entryCount: inspection.entryCount,
+    minimumRemainingLedgers: inspection.minimumRemainingLedgers,
+  };
+}
+
+function transactionResultCode(response: rpc.Api.SendTransactionResponse): string {
+  return response.errorResult?.result().switch().name ?? response.status;
+}
+
+export async function extendLedgerKeysTtl(input: {
+  config: StellarConfig;
+  sponsorSecret: string;
+  keys: xdr.LedgerKey[];
+}): Promise<string[]> {
+  if (input.keys.length === 0) return [];
+  const server = new rpc.Server(input.config.rpcUrl);
+  const sponsor = Keypair.fromSecret(input.sponsorSecret);
+  const feeLimit = input.config.network === "testnet"
+    ? MAX_TESTNET_TTL_FEE_STROOPS
+    : MAX_MAINNET_TTL_FEE_STROOPS;
+  const transactionHashes: string[] = [];
+
+  for (let cursor = 0; cursor < input.keys.length; cursor += TTL_EXTENSION_BATCH_SIZE) {
+    const batch = input.keys.slice(cursor, cursor + TTL_EXTENSION_BATCH_SIZE);
+    const account = await server.getAccount(sponsor.publicKey());
+    const transaction = new TransactionBuilder(account, {
+      fee: BASE_FEE,
+      networkPassphrase: input.config.networkPassphrase,
+    })
+      .setSorobanData(new SorobanDataBuilder().setReadOnly(batch).build())
+      .addOperation(Operation.extendFootprintTtl({ extendTo: TARGET_TTL_LEDGERS }))
+      .setTimeout(60)
+      .build();
+    const prepared = await server.prepareTransaction(transaction);
+    if (BigInt(prepared.fee) > feeLimit) {
+      throw new Error(
+        `The TTL maintenance fee (${prepared.fee} stroops) exceeded the ${feeLimit}-stroop safety limit.`,
+      );
+    }
+    prepared.sign(sponsor);
+    const sent = await server.sendTransaction(prepared);
+    if (sent.status !== "PENDING" && sent.status !== "DUPLICATE") {
+      throw new Error(`Stellar rejected TTL maintenance: ${transactionResultCode(sent)}.`);
+    }
+    const result = await server.pollTransaction(sent.hash, { attempts: 20 });
+    if (result.status !== rpc.Api.GetTransactionStatus.SUCCESS) {
+      throw new Error("Stellar did not confirm TTL maintenance.");
+    }
+    transactionHashes.push(sent.hash);
+  }
+  return transactionHashes;
+}
+
+export async function readContractCodeLedgerKey(
+  rpcUrl: string,
+  contractId: string,
+): Promise<xdr.LedgerKey> {
+  const server = new rpc.Server(rpcUrl);
+  const instanceKey = contractDataKey(
+    Address.fromString(contractId).toScAddress(),
+    xdr.ScVal.scvLedgerKeyContractInstance(),
+  );
+  const response = await server.getLedgerEntries(instanceKey);
+  const executable = response.entries[0]?.val.contractData().val().instance().executable();
+  if (!executable || executable.switch().name !== "contractExecutableWasm") {
+    throw new Error(`The Wasm code for contract ${contractId} is unavailable.`);
+  }
+  return xdr.LedgerKey.contractCode(
+    new xdr.LedgerKeyContractCode({ hash: executable.wasmHash() }),
+  );
 }
 
 export function* iterateWrenPassLedgerKeys(

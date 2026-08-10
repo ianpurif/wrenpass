@@ -24,6 +24,10 @@ import {
 import type { StellarConfig } from "@/lib/stellar/config";
 import { stellarTransactionUrl } from "@/lib/stellar/explorer";
 import { StellarReviewContractWriter } from "@/lib/stellar/reviews-client";
+import {
+  captureReviewSubmitted,
+  captureTransactionSucceeded,
+} from "@/lib/analytics";
 
 interface ReviewPromptRequest {
   transactionLabel: string;
@@ -55,6 +59,7 @@ export function ReviewPromptProvider({
   const nextPromptId = useRef(0);
   const [request, setRequest] = useState<ActiveReviewPromptRequest | null>(null);
   const requestReview = useCallback((input: ReviewPromptRequest) => {
+    captureTransactionSucceeded(input.transactionLabel);
     nextPromptId.current += 1;
     setRequest({ ...input, promptId: nextPromptId.current });
   }, []);
@@ -126,6 +131,7 @@ function ReviewPrompt({
       });
       setReviewId(receipt.reviewId);
       setTransactionHash(receipt.transactionHash);
+      captureReviewSubmitted(parsed.data.rating);
       router.refresh();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "The review could not be published.");

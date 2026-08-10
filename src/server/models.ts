@@ -96,6 +96,35 @@ export const indexedBlockchainEventSchema = z.object({
   indexedAt: isoTimestamp,
 });
 
+export const eventSyncCursorSchema = z.object({
+  id: entityIdSchema,
+  kind: z.literal("event_sync_cursor"),
+  nextLedger: z.number().int().positive(),
+  updatedAt: isoTimestamp,
+});
+
+export const operationLeaseSchema = z.object({
+  id: entityIdSchema,
+  kind: z.literal("operation_lease"),
+  ownerId: entityIdSchema,
+  expiresAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+});
+
+export const rateLimitWindowSchema = z.object({
+  id: entityIdSchema,
+  kind: z.literal("rate_limit_window"),
+  count: z.number().int().positive(),
+  windowStartedAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+});
+
+export const operationalStateSchema = z.discriminatedUnion("kind", [
+  eventSyncCursorSchema,
+  operationLeaseSchema,
+  rateLimitWindowSchema,
+]);
+
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type Merchant = z.infer<typeof merchantSchema>;
 export type CampaignMetadata = z.infer<typeof campaignMetadataSchema>;
@@ -103,3 +132,7 @@ export type CloudinaryAssetReference = z.infer<typeof cloudinaryAssetReferenceSc
 export type Notification = z.infer<typeof notificationSchema>;
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 export type IndexedBlockchainEvent = z.infer<typeof indexedBlockchainEventSchema>;
+export type EventSyncCursor = z.infer<typeof eventSyncCursorSchema>;
+export type OperationLease = z.infer<typeof operationLeaseSchema>;
+export type RateLimitWindow = z.infer<typeof rateLimitWindowSchema>;
+export type OperationalState = z.infer<typeof operationalStateSchema>;

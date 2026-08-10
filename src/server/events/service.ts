@@ -11,6 +11,7 @@ import { EventSyncService } from "@/server/events/event-sync-service";
 import { StellarWrenPassEventSource } from "@/server/events/event-source";
 import { FirestoreNotificationClaimStore } from "@/server/events/firestore-notification-claim-store";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
+import { FirestoreOperationalStateStore } from "@/server/operations/operational-state-store";
 
 let eventSyncService: EventSyncService | undefined;
 let eventSyncInFlight: ReturnType<EventSyncService["sync"]> | undefined;
@@ -29,6 +30,7 @@ export function getEventSyncService(): EventSyncService {
       new FirestoreNotificationClaimStore(),
       createEmailService(),
       config.wrenPassContractId,
+      new FirestoreOperationalStateStore(),
     );
   }
   return eventSyncService;

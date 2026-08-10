@@ -2,10 +2,12 @@
 
 import { QrCode } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { useEffect } from "react";
 
 import { Dialog } from "@/components/ui/dialog";
 import { encodeRedemptionQrPayload } from "@/features/redemption/qr";
 import type { StellarConfig } from "@/lib/stellar/config";
+import { captureRedemptionQrDisplayed } from "@/lib/analytics";
 
 export function PassQrDialog({
   config,
@@ -18,6 +20,10 @@ export function PassQrDialog({
   passId: string;
   onOpenChange(open: boolean): void;
 }) {
+  useEffect(() => {
+    if (open) captureRedemptionQrDisplayed(config.network);
+  }, [config.network, open]);
+
   const payload = encodeRedemptionQrPayload({
     network: config.network,
     contractId: config.wrenPassContractId,

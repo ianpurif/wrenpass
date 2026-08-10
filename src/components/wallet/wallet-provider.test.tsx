@@ -8,6 +8,7 @@ import { WalletButton } from "@/components/wallet/wallet-button";
 import {
   WalletProvider,
   resetWalletSessionCacheForTests,
+  type WalletSession,
   type WalletApi,
   type WalletAdapter,
 } from "@/components/wallet/wallet-provider";
@@ -61,9 +62,14 @@ function createApi(overrides: Partial<WalletApi> = {}): WalletApi {
   };
 }
 
-function renderWallet(adapter: WalletAdapter, api: WalletApi) {
+function renderWallet(adapter: WalletAdapter, api: WalletApi, restoreTimeoutMs?: number) {
   return render(
-    <WalletProvider config={config} adapter={adapter} api={api}>
+    <WalletProvider
+      config={config}
+      adapter={adapter}
+      api={api}
+      restoreTimeoutMs={restoreTimeoutMs}
+    >
       <WalletButton />
     </WalletProvider>,
   );
@@ -196,5 +202,17 @@ describe("WalletProvider", () => {
     const balanceRegion = screen.getByRole("region", { name: "Wallet balances" });
     expect(balanceRegion).toHaveTextContent("USDC not added");
     expect(balanceRegion).not.toHaveTextContent("0.0000000 USDC");
+  });
+
+  it("falls back to a connect action when session restoration does not respond", async () => {
+    const api = createApi({
+      readSession: vi.fn(() => new Promise<WalletSession>(() => undefined)),
+    });
+    renderWallet(createAdapter(), api, 10);
+
+    expect(await screen.findByRole("button", { name: "Connect Freighter" }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Checking wallet" }))
+      .not.toBeInTheDocument();
   });
 });

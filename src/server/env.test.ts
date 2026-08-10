@@ -17,6 +17,7 @@ const validEnv = {
   GMAIL_SMTP_APP_PASSWORD: "abcd efgh ijkl mnop",
   EMAIL_FROM: "WrenPass <wrenpass@example.com>",
   STELLAR_REVIEW_SPONSOR_SECRET: Keypair.random().secret(),
+  CRON_SECRET: "a-production-length-cron-secret-value",
 };
 
 describe("parseServerEnv", () => {

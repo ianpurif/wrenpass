@@ -1,8 +1,12 @@
 import type { NextRequest } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 
 import { reviewInputSchema } from "@/features/reviews/validation";
-import { ReviewSponsorshipError } from "@/server/reviews/review-sponsorship-service";
+import {
+  ReviewSponsorshipError,
+  ReviewSponsorshipRateLimitError,
+} from "@/server/reviews/review-sponsorship-service";
 import { getReviewSponsorshipService } from "@/server/reviews/service";
 import { getRequestWalletAddress } from "@/server/wallet-auth/request-session";
 
@@ -32,11 +36,18 @@ export async function POST(request: NextRequest) {
         ? error.message
         : "Sponsored reviews are temporarily unavailable.";
     if (!(error instanceof ReviewSponsorshipError)) {
+      Sentry.captureException(error, { tags: { operation: "review-sponsor-prepare" } });
       console.error("Unable to prepare sponsored review", error);
     }
+    const rateLimit = error instanceof ReviewSponsorshipRateLimitError;
     return Response.json(
       { error: message },
-      { status: error instanceof ReviewSponsorshipError ? 400 : 503 },
+      {
+        status: rateLimit ? 429 : error instanceof ReviewSponsorshipError ? 400 : 503,
+        ...(rateLimit
+          ? { headers: { "Retry-After": String(error.retryAfterSeconds) } }
+          : {}),
+      },
     );
   }
 }
@@ -72,11 +83,18 @@ export async function PUT(request: NextRequest) {
         ? error.message
         : "The sponsored review could not be submitted.";
     if (!(error instanceof ReviewSponsorshipError)) {
+      Sentry.captureException(error, { tags: { operation: "review-sponsor-submit" } });
       console.error("Unable to submit sponsored review", error);
     }
+    const rateLimit = error instanceof ReviewSponsorshipRateLimitError;
     return Response.json(
       { error: message },
-      { status: error instanceof ReviewSponsorshipError ? 409 : 503 },
+      {
+        status: rateLimit ? 429 : error instanceof ReviewSponsorshipError ? 409 : 503,
+        ...(rateLimit
+          ? { headers: { "Retry-After": String(error.retryAfterSeconds) } }
+          : {}),
+      },
     );
   }
 }

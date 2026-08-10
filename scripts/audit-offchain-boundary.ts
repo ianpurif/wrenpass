@@ -6,6 +6,7 @@ import {
   cloudinaryAssetReferenceSchema,
   indexedBlockchainEventSchema,
   notificationSchema,
+  operationalStateSchema,
   userProfileSchema,
 } from "@/server/models";
 
@@ -39,6 +40,7 @@ const retainedCollections = {
   cloudinary_asset_references: cloudinaryAssetReferenceSchema,
   notifications: notificationSchema,
   indexed_blockchain_events: indexedBlockchainEventSchema,
+  operational_state: operationalStateSchema,
   walletAuthChallenges: challengeSchema,
   walletAuthSessions: sessionSchema,
 } satisfies Record<string, ZodType>;
@@ -75,6 +77,16 @@ const retainedCollectionFields: Record<string, Set<string>> = {
     "eventType",
     "payload",
     "indexedAt",
+  ]),
+  operational_state: new Set([
+    "id",
+    "kind",
+    "nextLedger",
+    "ownerId",
+    "expiresAt",
+    "count",
+    "windowStartedAt",
+    "updatedAt",
   ]),
   walletAuthChallenges: new Set(["idHash", "address", "message", "expiresAt"]),
   walletAuthSessions: new Set([

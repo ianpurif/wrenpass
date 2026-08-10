@@ -10,6 +10,7 @@ import {
   type NotificationType,
 } from "@/server/models";
 import type { WrenPassEvent, WrenPassEventSource } from "@/server/events/event-source";
+import type { EventSyncCursor } from "@/server/models";
 
 interface LifecycleReader {
   findCampaign(campaignId: bigint): Promise<Campaign | null>;
@@ -35,6 +36,13 @@ export interface EventSyncResult {
   duplicates: number;
   notificationsSent: number;
   notificationFailures: number;
+  checkpointAdvanced: boolean;
+  retentionGap: boolean;
+}
+
+export interface EventSyncCheckpointStore {
+  readEventCursor(id: string): Promise<EventSyncCursor | null>;
+  advanceEventCursor(id: string, nextLedger: number, now: Date): Promise<void>;
 }
 
 const EXPIRATION_NOTICE_WINDOW_SECONDS = BigInt(7 * 24 * 60 * 60);
@@ -92,6 +100,7 @@ export class EventSyncService {
     private readonly notificationClaims: NotificationClaimStore,
     private readonly email: Pick<EmailService, "send">,
     private readonly contractId: string,
+    private readonly checkpoints: EventSyncCheckpointStore,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
@@ -178,15 +187,19 @@ export class EventSyncService {
   }
 
   async sync(): Promise<EventSyncResult> {
-    const events = await this.source.readRetainedEvents();
+    const cursorId = `events-${this.contractId}`;
+    const cursor = await this.checkpoints.readEventCursor(cursorId);
+    const batch = await this.source.readRetainedEvents(cursor?.nextLedger);
     const result: EventSyncResult = {
       indexed: 0,
       duplicates: 0,
       notificationsSent: 0,
       notificationFailures: 0,
+      checkpointAdvanced: false,
+      retentionGap: batch.retentionGap,
     };
 
-    for (const event of events) {
+    for (const event of batch.events) {
       const existing = await this.repositories.indexedBlockchainEvents.findById(event.id);
       if (existing) {
         result.duplicates += 1;
@@ -245,6 +258,10 @@ export class EventSyncService {
       }
     }
     await this.deliverExpirationNotices(result);
+    if (result.notificationFailures === 0) {
+      await this.checkpoints.advanceEventCursor(cursorId, batch.nextLedger, this.now());
+      result.checkpointAdvanced = true;
+    }
     return result;
   }
 }

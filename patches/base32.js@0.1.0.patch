@@ -1,0 +1,16 @@
+diff --git a/.npmignore b/.npmignore
+deleted file mode 100644
+index 0397291738d72524a673e5ae6aeb07be6928171f..0000000000000000000000000000000000000000
+diff --git a/index.js b/index.js
+index e380c1686c00bb9fdc5dd4d4dbae5234d52c9f4a..c8f0f5522d96e6334caf23d2cd62f776cf672d54 100644
+--- a/index.js
++++ b/index.js
+@@ -8,7 +8,7 @@ var base32 = require("./base32");
+ var finalizeDecode = base32.Decoder.prototype.finalize;
+ base32.Decoder.prototype.finalize = function (buf) {
+   var bytes = finalizeDecode.call(this, buf);
+-  return new Buffer(bytes);
++  return Buffer.from(bytes);
+ };
+ 
+ 

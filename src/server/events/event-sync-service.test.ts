@@ -1,6 +1,7 @@
 import type { Campaign, Pass } from "@/generated/wrenpass-contract/src";
 import {
   EventSyncService,
+  type EventSyncCheckpointStore,
   type NotificationClaimStore,
 } from "@/server/events/event-sync-service";
 import type { WrenPassEvent } from "@/server/events/event-source";
@@ -64,6 +65,25 @@ function createClaimStore(
   };
 }
 
+function eventBatch(events: WrenPassEvent[], nextLedger = 1_234_568) {
+  return { events, nextLedger, retentionGap: false };
+}
+
+function createCheckpointStore(): EventSyncCheckpointStore {
+  let nextLedger: number | null = null;
+  return {
+    readEventCursor: vi.fn(async (id) => nextLedger === null ? null : {
+      id,
+      kind: "event_sync_cursor" as const,
+      nextLedger,
+      updatedAt: "2026-08-09T10:00:00.000Z",
+    }),
+    advanceEventCursor: vi.fn(async (_id, next) => {
+      nextLedger = Math.max(nextLedger ?? 0, next);
+    }),
+  };
+}
+
 const redeemedEvent: WrenPassEvent = {
   id: "000001-000002-000003",
   transactionHash: "a".repeat(64),
@@ -88,7 +108,7 @@ describe("EventSyncService", () => {
         updatedAt: "2026-08-09T10:00:00.000Z",
       }),
     );
-    const source = { readRetainedEvents: vi.fn().mockResolvedValue([redeemedEvent]) };
+    const source = { readRetainedEvents: vi.fn().mockResolvedValue(eventBatch([redeemedEvent])) };
     const email = { send: vi.fn().mockRejectedValueOnce(new Error("smtp unavailable")).mockResolvedValue("message-1") };
     const campaigns = {
       findCampaign: vi.fn<() => Promise<Campaign | null>>().mockResolvedValue(null),
@@ -102,6 +122,7 @@ describe("EventSyncService", () => {
       createClaimStore(repositories),
       email,
       testStellarConfig.wrenPassContractId,
+      createCheckpointStore(),
       () => new Date("2026-08-09T10:01:00.000Z"),
     );
 
@@ -189,12 +210,13 @@ describe("EventSyncService", () => {
     };
     const email = { send: vi.fn().mockResolvedValue("message-1") };
     const service = new EventSyncService(
-      { readRetainedEvents: vi.fn().mockResolvedValue([]) },
+      { readRetainedEvents: vi.fn().mockResolvedValue(eventBatch([])) },
       repositories,
       lifecycle,
       createClaimStore(repositories),
       email,
       testStellarConfig.wrenPassContractId,
+      createCheckpointStore(),
       () => new Date("2026-08-09T10:00:00.000Z"),
     );
 
@@ -216,7 +238,7 @@ describe("EventSyncService", () => {
         updatedAt: "2026-08-09T10:00:00.000Z",
       }),
     );
-    const source = { readRetainedEvents: vi.fn().mockResolvedValue([redeemedEvent]) };
+    const source = { readRetainedEvents: vi.fn().mockResolvedValue(eventBatch([redeemedEvent])) };
     const lifecycle = {
       findCampaign: vi.fn().mockResolvedValue(null),
       getPassCount: vi.fn().mockResolvedValue(BigInt(0)),
@@ -231,11 +253,58 @@ describe("EventSyncService", () => {
       claims,
       email,
       testStellarConfig.wrenPassContractId,
+      createCheckpointStore(),
       () => new Date("2026-08-09T10:01:00.000Z"),
     );
 
     await Promise.all([service.sync(), service.sync()]);
 
     expect(email.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries from the same ledger after notification failure and advances after recovery", async () => {
+    const repositories = createOffchainRepositories(createStore());
+    await repositories.userProfiles.save(
+      userProfileSchema.parse({
+        id: owner,
+        email: "owner@example.com",
+        createdAt: "2026-08-09T10:00:00.000Z",
+        updatedAt: "2026-08-09T10:00:00.000Z",
+      }),
+    );
+    const source = {
+      readRetainedEvents: vi.fn().mockResolvedValue(eventBatch([redeemedEvent], 1_234_600)),
+    };
+    const checkpoints = createCheckpointStore();
+    const email = {
+      send: vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue("sent"),
+    };
+    const service = new EventSyncService(
+      source,
+      repositories,
+      {
+        findCampaign: vi.fn().mockResolvedValue(null),
+        getPassCount: vi.fn().mockResolvedValue(BigInt(0)),
+        findPass: vi.fn().mockResolvedValue(null),
+      },
+      createClaimStore(repositories),
+      email,
+      testStellarConfig.wrenPassContractId,
+      checkpoints,
+      () => new Date("2026-08-09T10:01:00.000Z"),
+    );
+
+    await expect(service.sync()).resolves.toMatchObject({
+      checkpointAdvanced: false,
+      notificationFailures: 1,
+    });
+    await expect(service.sync()).resolves.toMatchObject({
+      checkpointAdvanced: true,
+      notificationsSent: 1,
+    });
+    expect(source.readRetainedEvents).toHaveBeenNthCalledWith(1, undefined);
+    expect(source.readRetainedEvents).toHaveBeenNthCalledWith(2, undefined);
+    await service.sync();
+    expect(source.readRetainedEvents).toHaveBeenNthCalledWith(3, 1_234_600);
   });
 });

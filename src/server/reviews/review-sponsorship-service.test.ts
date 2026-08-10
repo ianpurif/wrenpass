@@ -18,6 +18,7 @@ import {
   ReviewSponsorshipError,
   ReviewSponsorshipService,
 } from "@/server/reviews/review-sponsorship-service";
+import type { ReviewSponsorGuard } from "@/server/reviews/review-sponsor-guard";
 import { testStellarConfig } from "@/test/fixtures/customer";
 
 function createStore(): DocumentStore {
@@ -34,6 +35,11 @@ function createStore(): DocumentStore {
     }),
   };
 }
+
+const allowGuard: ReviewSponsorGuard = {
+  checkPrepare: vi.fn(async () => undefined),
+  runSubmission: vi.fn(async (_reviewer, task) => task()),
+};
 
 async function signedReviewAuthorization(input: {
   reviewer: Keypair;
@@ -95,8 +101,9 @@ describe("ReviewSponsorshipService", () => {
       testStellarConfig,
       sponsor.secret(),
       events,
+      allowGuard,
       server as unknown as NonNullable<
-        ConstructorParameters<typeof ReviewSponsorshipService>[3]
+        ConstructorParameters<typeof ReviewSponsorshipService>[4]
       >,
     );
 
@@ -139,8 +146,9 @@ describe("ReviewSponsorshipService", () => {
       testStellarConfig,
       sponsor.secret(),
       createOffchainRepositories(createStore()).indexedBlockchainEvents,
+      allowGuard,
       server as unknown as NonNullable<
-        ConstructorParameters<typeof ReviewSponsorshipService>[3]
+        ConstructorParameters<typeof ReviewSponsorshipService>[4]
       >,
     );
 
