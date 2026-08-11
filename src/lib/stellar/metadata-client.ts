@@ -13,6 +13,8 @@ import type { StellarConfig } from "@/lib/stellar/config";
 
 type SignTransaction = NonNullable<ClientOptions["signTransaction"]>;
 
+const campaignVisibilityRetryDelaysMs = [750, 1_500, 3_000, 5_000] as const;
+
 const contractErrorMessages: Record<string, string> = {
   CampaignNotFound: "The on-chain campaign was not found.",
   InvalidBusinessDescription: "Check the business description.",
@@ -53,6 +55,31 @@ function createClient(
 
 function hashBuffer(value: string | undefined): Buffer | undefined {
   return value ? Buffer.from(value, "hex") : undefined;
+}
+
+function isCampaignNotFoundSimulationError(error: unknown): boolean {
+  return error instanceof Error && /Error\(Contract,\s*#8\)/.test(error.message);
+}
+
+async function wait(milliseconds: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function assembleCampaignMetadataRegistration(
+  client: Client,
+  input: Parameters<Client["register_campaign_metadata"]>[0],
+) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await client.register_campaign_metadata(input);
+    } catch (error) {
+      const retryDelay = campaignVisibilityRetryDelaysMs[attempt];
+      if (!isCampaignNotFoundSimulationError(error) || retryDelay === undefined) {
+        throw error;
+      }
+      await wait(retryDelay);
+    }
+  }
 }
 
 export interface MerchantProfileContractInput {
@@ -103,10 +130,11 @@ export class StellarMetadataContractWriter {
       name: input.metadata.name,
       service_description: input.metadata.serviceDescription,
     };
-    const transaction = await createClient(this.config, {
+    const client = createClient(this.config, {
       publicKey: input.merchant,
       signTransaction: input.signTransaction,
-    }).register_campaign_metadata({
+    });
+    const transaction = await assembleCampaignMetadataRegistration(client, {
       campaign_id: input.campaignId,
       merchant: input.merchant,
       metadata,
