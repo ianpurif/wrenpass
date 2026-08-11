@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Campaign, Pass } from "@/generated/wrenpass-contract/src";
+import { campaignEventKey } from "@/server/campaign-transactions/campaign-event-key";
 import { buildNotificationEmail, type EmailService } from "@/server/email/email-service";
 import type { OffchainRepositories } from "@/server/firestore/repositories";
 import {
@@ -209,12 +210,16 @@ export class EventSyncService {
             id: event.id,
             contractId: this.contractId,
             transactionHash: event.transactionHash,
+            ...(event.eventType === "pass_purchased"
+              ? { campaignEventKey: campaignEventKey(event.campaignId, event.id) }
+              : {}),
             eventIndex: event.eventIndex,
             ledger: event.ledger,
             eventType: event.eventType,
             payload: {
               campaignId: event.campaignId,
               ...(event.passId ? { passId: event.passId } : {}),
+              ...(event.customer ? { customer: event.customer } : {}),
               ...event.payload,
             },
             indexedAt: this.now().toISOString(),

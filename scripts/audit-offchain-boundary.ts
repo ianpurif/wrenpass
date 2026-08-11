@@ -72,6 +72,7 @@ const retainedCollectionFields: Record<string, Set<string>> = {
     "id",
     "contractId",
     "transactionHash",
+    "campaignEventKey",
     "eventIndex",
     "ledger",
     "eventType",

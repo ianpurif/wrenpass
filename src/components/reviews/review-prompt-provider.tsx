@@ -1,6 +1,12 @@
 "use client";
 
-import { CheckCircle2, ExternalLink, LoaderCircle, Sparkles, Star } from "lucide-react";
+import {
+  CheckCircle2,
+  ExternalLink,
+  LoaderCircle,
+  Sparkles,
+  Star,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   createContext,
@@ -57,7 +63,9 @@ export function ReviewPromptProvider({
   config: StellarConfig;
 }) {
   const nextPromptId = useRef(0);
-  const [request, setRequest] = useState<ActiveReviewPromptRequest | null>(null);
+  const [request, setRequest] = useState<ActiveReviewPromptRequest | null>(
+    null,
+  );
   const requestReview = useCallback((input: ReviewPromptRequest) => {
     captureTransactionSucceeded(input.transactionLabel);
     nextPromptId.current += 1;
@@ -95,7 +103,10 @@ function ReviewPrompt({
 }) {
   const router = useRouter();
   const { address, signAuthEntry } = useWallet();
-  const writer = useMemo(() => new StellarReviewContractWriter(config), [config]);
+  const writer = useMemo(
+    () => new StellarReviewContractWriter(config),
+    [config],
+  );
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [message, setMessage] = useState("");
@@ -104,20 +115,27 @@ function ReviewPrompt({
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
 
-  const handleDialogOpenChange = useCallback((nextOpen: boolean) => {
-    if (!submitting) onOpenChange(nextOpen);
-  }, [onOpenChange, submitting]);
+  const handleDialogOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!submitting) onOpenChange(nextOpen);
+    },
+    [onOpenChange, submitting],
+  );
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!address) {
-      setError("Reconnect the wallet that completed the transaction to publish a review.");
+      setError(
+        "Reconnect the wallet that completed the transaction to publish a review.",
+      );
       return;
     }
 
     const parsed = reviewInputSchema.safeParse({ rating, message });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Check your review and try again.");
+      setError(
+        parsed.error.issues[0]?.message ?? "Check your review and try again.",
+      );
       return;
     }
 
@@ -134,7 +152,11 @@ function ReviewPrompt({
       captureReviewSubmitted(parsed.data.rating);
       router.refresh();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "The review could not be published.");
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "The review could not be published.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -142,9 +164,11 @@ function ReviewPrompt({
 
   return (
     <Dialog
-      description={reviewId
-        ? "Your wallet-authorized review is now part of the public WrenPass review ledger."
-        : `Your ${transactionLabel} succeeded. Share a short public review tied to your wallet.`}
+      description={
+        reviewId
+          ? "Your wallet-authorized review is now part of the public WrenPass review ledger."
+          : `Your ${transactionLabel} succeeded. Share a short public review tied to your wallet.`
+      }
       open={open}
       title={reviewId ? "Review published" : "How was your experience?"}
       onOpenChange={handleDialogOpenChange}
@@ -154,10 +178,17 @@ function ReviewPrompt({
           <div className="mx-auto grid size-16 place-items-center rounded-full bg-mint-soft text-forest">
             <CheckCircle2 aria-hidden="true" className="size-8" />
           </div>
-          <p className="mt-5 text-lg font-bold text-ink">Thank you for helping others decide.</p>
-          <p className="mt-2 text-sm leading-6 text-ink-muted">Review #{reviewId} is stored on Stellar and will appear in the public review feed.</p>
+          <p className="mt-5 text-lg font-bold text-ink">
+            Thank you for helping others decide.
+          </p>
+          <p className="mt-2 text-sm leading-6 text-ink-muted">
+            Review #{reviewId} is stored on Stellar and will appear in the
+            public review feed.
+          </p>
           <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-center">
-            <Button variant="secondary" onClick={() => onOpenChange(false)}>Done</Button>
+            <Button variant="secondary" onClick={() => onOpenChange(false)}>
+              Done
+            </Button>
             {transactionHash && (
               <a
                 className={buttonStyles()}
@@ -165,7 +196,8 @@ function ReviewPrompt({
                 rel="noreferrer noopener"
                 target="_blank"
               >
-                View on-chain <ExternalLink aria-hidden="true" className="size-4" />
+                View on-chain{" "}
+                <ExternalLink aria-hidden="true" className="size-4" />
               </a>
             )}
           </div>
@@ -173,13 +205,14 @@ function ReviewPrompt({
       ) : (
         <form onSubmit={submit}>
           <div className="rounded-2xl border border-line bg-workspace p-4">
-            <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-ink-faint">Publishing as</p>
-            <p className="mt-1 font-mono text-sm font-semibold text-ink" title={address ?? undefined}>
-              {address ? shortenStellarAddress(address) : "Wallet disconnected"}
+            <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-ink-faint">
+              Publishing as
             </p>
-            <p className="mt-3 flex items-center gap-2 text-xs font-semibold text-forest">
-              <Sparkles aria-hidden="true" className="size-3.5" />
-              WrenPass pays the Stellar network fee
+            <p
+              className="mt-1 font-mono text-sm font-semibold text-ink"
+              title={address ?? undefined}
+            >
+              {address ? shortenStellarAddress(address) : "Wallet disconnected"}
             </p>
           </div>
 
@@ -204,7 +237,12 @@ function ReviewPrompt({
                     onBlur={() => setHoveredRating(0)}
                     onMouseEnter={() => setHoveredRating(value)}
                   >
-                    <Star aria-hidden="true" className="size-7" fill={active ? "currentColor" : "none"} strokeWidth={1.8} />
+                    <Star
+                      aria-hidden="true"
+                      className="size-7"
+                      fill={active ? "currentColor" : "none"}
+                      strokeWidth={1.8}
+                    />
                   </button>
                 );
               })}
@@ -213,8 +251,15 @@ function ReviewPrompt({
 
           <div className="mt-5">
             <div className="flex items-center justify-between gap-4">
-              <label className="text-sm font-bold text-ink" htmlFor="review-message">Review message</label>
-              <span className="text-xs tabular-nums text-ink-faint">{message.length}/{REVIEW_MESSAGE_MAX_CHARACTERS}</span>
+              <label
+                className="text-sm font-bold text-ink"
+                htmlFor="review-message"
+              >
+                Review message
+              </label>
+              <span className="text-xs tabular-nums text-ink-faint">
+                {message.length}/{REVIEW_MESSAGE_MAX_CHARACTERS}
+              </span>
             </div>
             <textarea
               id="review-message"
@@ -225,15 +270,33 @@ function ReviewPrompt({
               value={message}
               onChange={(event) => setMessage(event.target.value)}
             />
-            <p className="mt-2 text-xs leading-5 text-ink-faint">Reviews are public and permanent once submitted on-chain.</p>
+            <p className="mt-2 text-xs leading-5 text-ink-faint">
+              Reviews are public and permanent once submitted on-chain.
+            </p>
           </div>
 
-          {error && <p role="alert" className="mt-4 text-sm font-semibold text-danger">{error}</p>}
+          {error && (
+            <p role="alert" className="mt-4 text-sm font-semibold text-danger">
+              {error}
+            </p>
+          )}
 
           <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button disabled={submitting} type="button" variant="secondary" onClick={() => onOpenChange(false)}>Not now</Button>
+            <Button
+              disabled={submitting}
+              type="button"
+              variant="secondary"
+              onClick={() => onOpenChange(false)}
+            >
+              Not now
+            </Button>
             <Button disabled={submitting} type="submit">
-              {submitting && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
+              {submitting && (
+                <LoaderCircle
+                  aria-hidden="true"
+                  className="size-4 animate-spin"
+                />
+              )}
               Publish review
             </Button>
           </div>

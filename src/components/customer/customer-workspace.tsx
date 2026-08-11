@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle, RefreshCcw, TicketCheck, WalletCards } from "lucide-react";
+import { ExternalLink, LoaderCircle, RefreshCcw, TicketCheck, WalletCards } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CustomerPassCard } from "@/components/customer/customer-pass-card";
@@ -15,7 +15,8 @@ import type {
   CustomerPassStatusDto,
 } from "@/features/customer/dto";
 import { displayUsdc, shortenStellarAddress } from "@/features/merchant/display";
-import type { StellarConfig } from "@/lib/stellar/config";
+import type { StellarConfig, StellarNetwork } from "@/lib/stellar/config";
+import { stellarTransactionUrl } from "@/lib/stellar/explorer";
 
 const passTabs: Array<{ label: string; status: CustomerPassStatusDto }> = [
   { label: "Active", status: "Active" },
@@ -34,7 +35,13 @@ const activityLabels: Record<CustomerActivityDto["kind"], string> = {
   Refunded: "Refunded",
 };
 
-function ActivityTable({ activity }: { activity: CustomerActivityDto[] }) {
+function ActivityTable({
+  activity,
+  network,
+}: {
+  activity: CustomerActivityDto[];
+  network: StellarNetwork;
+}) {
   if (!activity.length) {
     return (
       <div className="rounded-card border border-dashed border-line bg-white px-6 py-10 text-center">
@@ -74,12 +81,20 @@ function ActivityTable({ activity }: { activity: CustomerActivityDto[] }) {
             </div>
             <div className="flex items-center justify-between gap-4 md:block">
               <span className="text-xs font-semibold text-ink-faint md:hidden">Details</span>
-              <span className="text-right text-xs text-ink-muted md:text-left">
+              <span className="flex flex-col items-end gap-1 text-right text-xs text-ink-muted md:items-start md:text-left">
                 {item.amount
                   ? displayUsdc(item.amount)
                   : item.counterparty
                     ? `${counterpartyLabel} ${shortenStellarAddress(item.counterparty)}`
                     : "—"}
+                <a
+                  className="inline-flex items-center gap-1 font-semibold text-forest hover:text-forest-strong"
+                  href={stellarTransactionUrl(network, item.transactionHash)}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  View on-chain <ExternalLink aria-hidden="true" className="size-3" />
+                </a>
               </span>
             </div>
             <div className="flex items-center justify-between md:block">
@@ -298,7 +313,7 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
                 Retained contract events since {new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(dashboard.activityWindowStartsAt))}.
               </p>
             </div>
-            <div className="mt-4"><ActivityTable activity={dashboard.activity} /></div>
+            <div className="mt-4"><ActivityTable activity={dashboard.activity} network={config.network} /></div>
           </section>
         )}
 

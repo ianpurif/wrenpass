@@ -89,6 +89,7 @@ export const indexedBlockchainEventSchema = z.object({
   id: entityIdSchema,
   contractId: entityIdSchema,
   transactionHash: entityIdSchema,
+  campaignEventKey: z.string().trim().min(1).max(256).optional(),
   eventIndex: z.number().int().nonnegative(),
   ledger: z.number().int().nonnegative(),
   eventType: z.string().trim().min(1).max(120),

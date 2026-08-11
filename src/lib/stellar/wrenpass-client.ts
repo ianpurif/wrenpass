@@ -106,13 +106,18 @@ export interface CustomerContractWriter {
     campaignId: bigint;
     customer: string;
     signTransaction: SignTransaction;
-  }): Promise<bigint>;
+  }): Promise<PurchaseReceipt>;
   gift(input: {
     passId: bigint;
     owner: string;
     recipient: string;
     signTransaction: SignTransaction;
   }): Promise<void>;
+}
+
+export interface PurchaseReceipt {
+  passId: bigint;
+  transactionHash: string;
 }
 
 export class StellarCustomerContractWriter implements CustomerContractWriter {
@@ -122,7 +127,7 @@ export class StellarCustomerContractWriter implements CustomerContractWriter {
     campaignId: bigint;
     customer: string;
     signTransaction: SignTransaction;
-  }): Promise<bigint> {
+  }): Promise<PurchaseReceipt> {
     const client = createClient(this.config, {
       publicKey: input.customer,
       signTransaction: input.signTransaction,
@@ -132,7 +137,12 @@ export class StellarCustomerContractWriter implements CustomerContractWriter {
       customer: input.customer,
     });
     const sent = await transaction.signAndSend();
-    return unwrapContractResult(sent.result);
+    const passId = unwrapContractResult(sent.result);
+    const transactionHash = sent.sendTransactionResponse?.hash;
+    if (!transactionHash) {
+      throw new Error("Stellar accepted the purchase without returning its hash.");
+    }
+    return { passId, transactionHash };
   }
 
   async gift(input: {

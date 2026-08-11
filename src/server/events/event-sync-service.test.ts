@@ -5,6 +5,7 @@ import {
   type NotificationClaimStore,
 } from "@/server/events/event-sync-service";
 import type { WrenPassEvent } from "@/server/events/event-source";
+import { campaignEventKey } from "@/server/campaign-transactions/campaign-event-key";
 import type { DocumentStore } from "@/server/firestore/document-store";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
 import { userProfileSchema } from "@/server/models";
@@ -97,7 +98,55 @@ const redeemedEvent: WrenPassEvent = {
   payload: { reserve_released: "10000000" },
 };
 
+const purchasedEvent: WrenPassEvent = {
+  id: "000001-000002-000004",
+  transactionHash: "b".repeat(64),
+  eventIndex: 4,
+  ledger: 1_234_568,
+  eventType: "pass_purchased",
+  campaignId: "1",
+  passId: "2",
+  customer: owner,
+  payload: {
+    total: "50000000",
+    merchant_release: "37500000",
+    protected_reserve: "10000000",
+    platform_fee: "2500000",
+  },
+};
+
 describe("EventSyncService", () => {
+  it("indexes purchases with a campaign-specific pagination key", async () => {
+    const repositories = createOffchainRepositories(createStore());
+    const service = new EventSyncService(
+      { readRetainedEvents: vi.fn().mockResolvedValue(eventBatch([purchasedEvent])) },
+      repositories,
+      {
+        findCampaign: vi.fn().mockResolvedValue(null),
+        getPassCount: vi.fn().mockResolvedValue(BigInt(0)),
+        findPass: vi.fn().mockResolvedValue(null),
+      },
+      createClaimStore(repositories),
+      { send: vi.fn() },
+      testStellarConfig.wrenPassContractId,
+      createCheckpointStore(),
+      () => new Date("2026-08-11T00:00:00.000Z"),
+    );
+
+    await expect(service.sync()).resolves.toMatchObject({ indexed: 1 });
+    await expect(
+      repositories.indexedBlockchainEvents.findById(purchasedEvent.id),
+    ).resolves.toMatchObject({
+      campaignEventKey: campaignEventKey("1", purchasedEvent.id),
+      payload: {
+        campaignId: "1",
+        passId: "2",
+        customer: owner,
+        total: "50000000",
+      },
+    });
+  });
+
   it("indexes duplicate events once and retries a failed notification", async () => {
     const repositories = createOffchainRepositories(createStore());
     await repositories.userProfiles.save(

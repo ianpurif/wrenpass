@@ -48,7 +48,10 @@ vi.mock("@/components/reviews/review-prompt-provider", () => ({
 
 describe("PurchasePanel", () => {
   beforeEach(() => {
-    mocks.purchase.mockReset().mockResolvedValue(BigInt(9));
+    mocks.purchase.mockReset().mockResolvedValue({
+      passId: BigInt(9),
+      transactionHash: "d".repeat(64),
+    });
     mocks.refreshBalances.mockReset().mockResolvedValue(undefined);
     mocks.refreshRoute.mockReset();
     mocks.requestReview.mockReset();
@@ -71,6 +74,10 @@ describe("PurchasePanel", () => {
       expect.objectContaining({ campaignId: BigInt(1), customer: testCustomerAddress }),
     );
     expect(await screen.findByText("Pass #9 purchased.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /View on-chain/ })).toHaveAttribute(
+      "href",
+      `https://stellar.expert/explorer/testnet/tx/${"d".repeat(64)}`,
+    );
     expect(mocks.refreshBalances).toHaveBeenCalledOnce();
     expect(mocks.refreshRoute).toHaveBeenCalledOnce();
     expect(mocks.syncEventsAfterMutation).toHaveBeenCalledOnce();

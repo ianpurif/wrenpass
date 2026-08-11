@@ -63,6 +63,13 @@ describe("CustomerWorkspace", () => {
     expect(screen.getByText("Gifted")).toBeInTheDocument();
     expect(screen.getByText("Received")).toBeInTheDocument();
     expect(screen.getByText("5 USDC")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /View on-chain/ })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          href: `https://stellar.expert/explorer/testnet/tx/${"a".repeat(64)}`,
+        }),
+      ]),
+    );
 
     await user.click(screen.getByRole("tab", { name: "Owned Passes" }));
     expect(screen.getByRole("heading", { name: "Owned passes" })).toBeInTheDocument();

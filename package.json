@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "services:smoke": "node --conditions=react-server --env-file=.env.local --import tsx scripts/smoke-services.ts",
     "offchain:audit": "node --conditions=react-server --env-file=.env.local --import tsx scripts/audit-offchain-boundary.ts",
+    "offchain:migrate-campaign-transactions": "node --conditions=react-server --env-file=.env.local --import tsx scripts/migrate-campaign-transaction-index.ts",
     "offchain:cleanup-auth": "node --conditions=react-server --env-file=.env.local --import tsx scripts/cleanup-expired-wallet-auth.ts",
     "operations:run": "node --conditions=react-server --env-file=.env.local --import tsx scripts/run-scheduled-operations.ts",
     "stellar:smoke": "node --conditions=react-server --env-file=.env.local --import tsx scripts/smoke-stellar.ts",

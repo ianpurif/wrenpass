@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, CheckCircle2, CircleDollarSign, Gift, LoaderCircle, ShieldCheck, TicketCheck, WalletCards } from "lucide-react";
+import { CalendarClock, CheckCircle2, CircleDollarSign, ExternalLink, Gift, LoaderCircle, ShieldCheck, TicketCheck, WalletCards } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -14,6 +14,7 @@ import { displayExpiration, displayUsdc } from "@/features/merchant/display";
 import type { PublicCampaignDto } from "@/features/merchant/dto";
 import { syncEventsAfterMutation } from "@/features/notifications/api";
 import type { StellarConfig } from "@/lib/stellar/config";
+import { stellarTransactionUrl } from "@/lib/stellar/explorer";
 import { StellarCustomerContractWriter } from "@/lib/stellar/wrenpass-client";
 
 function readableError(error: unknown): string {
@@ -43,7 +44,10 @@ export function PurchasePanel({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [purchasedPassId, setPurchasedPassId] = useState<string | null>(null);
+  const [purchaseReceipt, setPurchaseReceipt] = useState<{
+    passId: string;
+    transactionHash: string;
+  } | null>(null);
   const price = BigInt(campaign.onchain.passPrice);
   const value = BigInt(campaign.onchain.serviceValue);
   const bonus = value - price;
@@ -70,16 +74,18 @@ export function PurchasePanel({
     setPending(true);
     setError(null);
     try {
-      const passId = await writer.purchase({
+      const receipt = await writer.purchase({
         campaignId: BigInt(campaign.onchain.id),
         customer: address,
         signTransaction: (transactionXdr: string) => signTransaction(transactionXdr),
       });
-      setPurchasedPassId(passId.toString());
+      setPurchaseReceipt({
+        passId: receipt.passId.toString(),
+        transactionHash: receipt.transactionHash,
+      });
       setDialogOpen(false);
       requestReview({ transactionLabel: "pass purchase" });
-      void syncEventsAfterMutation();
-      await refreshBalances();
+      await Promise.allSettled([syncEventsAfterMutation(), refreshBalances()]);
       router.refresh();
     } catch (purchaseError) {
       setError(readableError(purchaseError));
@@ -133,10 +139,20 @@ export function PurchasePanel({
           <p role="alert" className="mt-3 text-center text-sm font-semibold text-danger">{walletError}</p>
         )}
         {error && !dialogOpen && <p role="alert" className="mt-3 text-center text-sm font-semibold text-danger">{error}</p>}
-        {purchasedPassId && (
-          <p role="status" className="mt-3 flex items-center justify-center gap-2 text-sm font-semibold text-forest">
-            <CheckCircle2 aria-hidden="true" className="size-4" /> Pass #{purchasedPassId} purchased.
-          </p>
+        {purchaseReceipt && (
+          <div role="status" className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-semibold text-forest">
+            <span className="inline-flex items-center gap-2">
+              <CheckCircle2 aria-hidden="true" className="size-4" /> Pass #{purchaseReceipt.passId} purchased.
+            </span>
+            <a
+              className="inline-flex items-center gap-1.5 underline-offset-4 hover:underline"
+              href={stellarTransactionUrl(config.network, purchaseReceipt.transactionHash)}
+              rel="noreferrer"
+              target="_blank"
+            >
+              View on-chain <ExternalLink aria-hidden="true" className="size-3.5" />
+            </a>
+          </div>
         )}
       </Card>
 
