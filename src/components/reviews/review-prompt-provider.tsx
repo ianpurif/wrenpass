@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   ExternalLink,
   LoaderCircle,
-  Sparkles,
   Star,
 } from "lucide-react";
 import { useRouter } from "next/navigation";

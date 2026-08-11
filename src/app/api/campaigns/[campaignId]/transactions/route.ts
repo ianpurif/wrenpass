@@ -12,9 +12,13 @@ const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(20).default(10),
 });
 
+interface CampaignTransactionsRouteContext {
+  params: Promise<{ campaignId: string }>;
+}
+
 export async function GET(
   request: NextRequest,
-  context: RouteContext<"/api/campaigns/[campaignId]/transactions">,
+  context: CampaignTransactionsRouteContext,
 ) {
   const { campaignId: rawCampaignId } = await context.params;
   const campaignId = campaignIdSchema.safeParse(rawCampaignId);
