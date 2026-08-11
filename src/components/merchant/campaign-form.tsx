@@ -1,12 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, ImagePlus, LoaderCircle, Rocket, ShieldCheck } from "lucide-react";
+import { CheckCircle2, LoaderCircle, Rocket, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Input } from "@/components/ui/input";
 import { useReviewPrompt } from "@/components/reviews/review-prompt-provider";
 import { useWallet } from "@/components/wallet/wallet-provider";
@@ -262,12 +263,13 @@ export function CampaignForm({
           </section>
 
           <section aria-labelledby="campaign-image-heading" className="border-t border-line pt-8">
-            <h3 id="campaign-image-heading" className="text-sm font-bold text-ink">Campaign image <span className="font-normal text-ink-faint">(optional)</span></h3>
-            <label className="mt-4 flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-workspace px-4 py-4 text-sm font-semibold text-ink-muted transition hover:border-forest/40">
-              <ImagePlus aria-hidden="true" className="size-4 text-forest" />
-              <span className="min-w-0 truncate">{image?.name ?? "Choose JPG, PNG, or WebP up to 5 MB"}</span>
-              <input id="campaign-image" aria-label="Campaign image" className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setImage(event.target.files?.[0] ?? null)} />
-            </label>
+            <h3 id="campaign-image-heading" className="sr-only">Campaign image</h3>
+            <ImageUploadField
+              id="campaign-image"
+              label="Campaign image"
+              selectedFile={image}
+              onFileChange={setImage}
+            />
           </section>
         </div>
 

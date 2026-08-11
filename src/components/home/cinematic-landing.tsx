@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AnimatePresence,
   motion,
   useReducedMotion,
   useScroll,
@@ -11,7 +12,7 @@ import { ArrowDown, ArrowRight, Check, QrCode, ShieldCheck } from "lucide-react"
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import { PassPreview } from "@/components/home/pass-preview";
+import { PassPreview, type PassPreviewContent } from "@/components/home/pass-preview";
 import { RecentReviews } from "@/components/reviews/recent-reviews";
 import { Container } from "@/components/ui/container";
 import { ConnectedWalletLink } from "@/components/wallet/connected-wallet-link";
@@ -37,6 +38,62 @@ const steps = [
       "The owner approves redemption only when the merchant delivers the promised service.",
   },
 ];
+
+interface CampaignStory {
+  description: string;
+  eyebrow: string;
+  headline: string;
+  id: string;
+  preview: PassPreviewContent;
+}
+
+export const campaignStories: readonly CampaignStory[] = [
+  {
+    id: "northline",
+    eyebrow: "One pass. Tangible value.",
+    headline: "Five today. Six in service.",
+    description:
+      "Northline Studio pre-sells a limited run of appointments. Customers unlock more service value; the studio gets working capital when it matters.",
+    preview: {
+      businessName: "Northline Studio",
+      icon: "scissors",
+      issueNumber: "000064",
+      issued: 100,
+      passTitle: "Studio supporter pass",
+      payToday: "5 USDC",
+      remaining: 36,
+      serial: "0064 0100 0506",
+      serviceValue: "6 USDC",
+      sold: 64,
+      validThrough: "31 DEC 2027",
+    },
+  },
+  {
+    id: "harbor-cycle",
+    eyebrow: "Local support. Road-ready service.",
+    headline: "Eight today. Ten in service.",
+    description:
+      "Harbor Cycle Works funds a new repair stand by pre-selling tune-ups to neighborhood riders. Regulars receive extra service value while the workshop grows capacity.",
+    preview: {
+      businessName: "Harbor Cycle Works",
+      icon: "bike",
+      issueNumber: "000041",
+      issued: 60,
+      passTitle: "Quick tune-up pass",
+      payToday: "8 USDC",
+      remaining: 19,
+      serial: "0041 0060 0810",
+      serviceValue: "10 USDC",
+      sold: 41,
+      validThrough: "30 SEP 2027",
+    },
+  },
+];
+
+export function campaignStoryIndex(progress: number, currentIndex: number): number {
+  if (currentIndex === 0) return progress >= 0.54 ? 1 : 0;
+  return progress <= 0.46 ? 0 : 1;
+}
 
 function useCompactMotion() {
   const [isCompact, setIsCompact] = useState(false);
@@ -69,6 +126,8 @@ export function CinematicLanding({
   const reduceMotion = useReducedMotion();
   const compactMotion = useCompactMotion();
   const motionEnabled = !reduceMotion && !compactMotion;
+  const activeCampaignIndexRef = useRef(0);
+  const [activeCampaignIndex, setActiveCampaignIndex] = useState(0);
 
   const { scrollYProgress: pageProgress } = useScroll({
     target: rootRef,
@@ -102,6 +161,42 @@ export function CinematicLanding({
   const campaignY = useTransform(smoothCampaign, [0, 0.42, 1], [90, 0, -40]);
   const campaignRotateY = useTransform(smoothCampaign, [0, 0.42, 1], [-9, 0, 2]);
   const campaignCopyY = useTransform(smoothCampaign, [0.12, 0.55, 0.9], [52, 0, -42]);
+
+  useEffect(() => {
+    let frame = 0;
+
+    const updateStory = () => {
+      frame = 0;
+      const section = campaignRef.current;
+      if (!section) return;
+
+      const scrollDistance = Math.max(section.offsetHeight - window.innerHeight, 1);
+      const progress = Math.min(Math.max(-section.getBoundingClientRect().top / scrollDistance, 0), 1);
+      const nextIndex = campaignStoryIndex(progress, activeCampaignIndexRef.current);
+
+      if (nextIndex === activeCampaignIndexRef.current) return;
+      activeCampaignIndexRef.current = nextIndex;
+      setActiveCampaignIndex(nextIndex);
+    };
+
+    const scheduleUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(updateStory);
+    };
+
+    updateStory();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+
+    return () => {
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  const activeCampaign = campaignStories[activeCampaignIndex];
+  const campaignDirection = activeCampaignIndex === 0 ? -1 : 1;
 
   const { scrollYProgress: stepsProgress } = useScroll({
     target: stepsRef,
@@ -210,35 +305,50 @@ export function CinematicLanding({
       <section
         ref={campaignRef}
         id="campaign-example"
-        aria-labelledby="campaign-title"
-        className="relative border-b border-line lg:min-h-[165vh]"
+        aria-label="Campaign examples"
+        className="relative min-h-[150svh] border-b border-line lg:min-h-[240vh]"
       >
         <div className="lg:sticky lg:top-18 lg:flex lg:min-h-[calc(100svh-4.5rem)] lg:items-center">
           <Container className="grid gap-14 py-22 sm:py-28 lg:grid-cols-[0.82fr_1.18fr] lg:items-center lg:gap-20 lg:py-18">
             <motion.div className="mobile-motion-reset" style={motionEnabled ? { y: campaignCopyY } : undefined}>
-              <p className="eyebrow">One pass. Tangible value.</p>
-              <h2
-                id="campaign-title"
-                className="landing-display mt-5 max-w-[9ch] text-[clamp(3.2rem,7vw,6.8rem)] leading-[0.9] tracking-[-0.065em] text-ink"
-              >
-                Five today. Six in service.
-              </h2>
-              <p className="mt-7 max-w-md text-base leading-8 text-ink-muted">
-                Northline Studio pre-sells a limited run of appointments. Customers unlock more service value; the studio gets working capital when it matters.
-              </p>
-              <div className="mt-10 grid max-w-md grid-cols-3 border-y border-line py-5">
-                <div>
-                  <p className="text-2xl font-bold tracking-tight text-ink">100</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.14em] text-ink-faint">Issued</p>
-                </div>
-                <div className="border-x border-line px-5">
-                  <p className="text-2xl font-bold tracking-tight text-ink">64</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.14em] text-ink-faint">Sold</p>
-                </div>
-                <div className="pl-5">
-                  <p className="text-2xl font-bold tracking-tight text-ink">36</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.14em] text-ink-faint">Remain</p>
-                </div>
+              <div aria-live="polite" className="grid" aria-atomic="true">
+                <AnimatePresence initial={false}>
+                  <motion.div
+                    key={activeCampaign.id}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="col-start-1 row-start-1"
+                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: campaignDirection * 22 }}
+                    initial={reduceMotion ? false : { opacity: 0, y: campaignDirection * 26 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.48, ease: "easeOut" }}
+                  >
+                    <div className="flex max-w-md items-center justify-between gap-5">
+                      <p className="eyebrow">{activeCampaign.eyebrow}</p>
+                      <p className="shrink-0 font-mono text-[0.62rem] uppercase tracking-[0.14em] text-ink-faint">
+                        0{activeCampaignIndex + 1} / 02
+                      </p>
+                    </div>
+                    <h2 className="landing-display mt-5 max-w-[9ch] text-[clamp(3.2rem,7vw,6.8rem)] leading-[0.9] tracking-[-0.065em] text-ink">
+                      {activeCampaign.headline}
+                    </h2>
+                    <p className="mt-7 max-w-md text-base leading-8 text-ink-muted">
+                      {activeCampaign.description}
+                    </p>
+                    <div className="mt-10 grid max-w-md grid-cols-3 border-y border-line py-5">
+                      <div>
+                        <p className="text-2xl font-bold tracking-tight text-ink">{activeCampaign.preview.issued}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.14em] text-ink-faint">Issued</p>
+                      </div>
+                      <div className="border-x border-line px-5">
+                        <p className="text-2xl font-bold tracking-tight text-ink">{activeCampaign.preview.sold}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.14em] text-ink-faint">Sold</p>
+                      </div>
+                      <div className="pl-5">
+                        <p className="text-2xl font-bold tracking-tight text-ink">{activeCampaign.preview.remaining}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.14em] text-ink-faint">Remain</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
               </div>
             </motion.div>
 
@@ -256,7 +366,28 @@ export function CinematicLanding({
                     : undefined
                 }
               >
-                <PassPreview />
+                <div className="grid">
+                  <AnimatePresence initial={false}>
+                    <motion.div
+                      key={activeCampaign.id}
+                      animate={{ opacity: 1, rotateZ: 0, scale: 1, y: 0 }}
+                      className="col-start-1 row-start-1"
+                      exit={
+                        reduceMotion
+                          ? { opacity: 0 }
+                          : { opacity: 0, rotateZ: campaignDirection * 1.4, scale: 0.975, y: campaignDirection * 28 }
+                      }
+                      initial={
+                        reduceMotion
+                          ? false
+                          : { opacity: 0, rotateZ: campaignDirection * 1.6, scale: 0.975, y: campaignDirection * 36 }
+                      }
+                      transition={{ duration: reduceMotion ? 0 : 0.56, ease: "easeOut" }}
+                    >
+                      <PassPreview campaign={activeCampaign.preview} />
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
               </motion.div>
             </div>
           </Container>

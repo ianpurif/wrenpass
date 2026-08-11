@@ -85,4 +85,25 @@ describe("MerchantProfileForm", () => {
       mocks.saveProfile.mock.invocationCallOrder[0],
     );
   });
+
+  it("shows the currently uploaded business logo and hosted filename", () => {
+    render(
+      <MerchantProfileForm
+        config={config}
+        merchant={{
+          id: walletAddress,
+          ownerWalletAddress: walletAddress,
+          businessName: "Wren Studio",
+          description: "A neighborhood studio providing complete haircut services.",
+          logoUrl: "https://res.cloudinary.com/wrenpass/image/upload/current-logo.png",
+          createdAt: "2026-08-10T00:00:00.000Z",
+          updatedAt: "2026-08-10T00:00:00.000Z",
+        }}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Current image preview: current-logo.png" })).toBeInTheDocument();
+    expect(screen.getByText("current-logo.png")).toBeInTheDocument();
+  });
 });

@@ -2,7 +2,11 @@ import { render, screen } from "@testing-library/react";
 import type { AnchorHTMLAttributes } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import { CinematicLanding } from "@/components/home/cinematic-landing";
+import {
+  campaignStories,
+  campaignStoryIndex,
+  CinematicLanding,
+} from "@/components/home/cinematic-landing";
 
 vi.mock("@/components/wallet/connected-wallet-link", () => ({
   ConnectedWalletLink: ({ children, href, ...props }: AnchorHTMLAttributes<HTMLAnchorElement>) => (
@@ -27,6 +31,23 @@ beforeAll(() => {
 });
 
 describe("CinematicLanding", () => {
+  it("defines two internally consistent campaign stories", () => {
+    expect(campaignStories.map((story) => story.preview.businessName)).toEqual([
+      "Northline Studio",
+      "Harbor Cycle Works",
+    ]);
+    for (const story of campaignStories) {
+      expect(story.preview.sold + story.preview.remaining).toBe(story.preview.issued);
+    }
+  });
+
+  it("uses a small threshold buffer so the card does not flicker while scrolling", () => {
+    expect(campaignStoryIndex(0.53, 0)).toBe(0);
+    expect(campaignStoryIndex(0.54, 0)).toBe(1);
+    expect(campaignStoryIndex(0.47, 1)).toBe(1);
+    expect(campaignStoryIndex(0.46, 1)).toBe(0);
+  });
+
   it("keeps the background video decorative, local to the hero, and autoplay-safe", () => {
     const { container } = render(<CinematicLanding />);
     const video = container.querySelector("video");
@@ -58,6 +79,8 @@ describe("CinematicLanding", () => {
       "What people say after using WrenPass.",
       "Let tomorrow's service fund today's possibility.",
     ]);
+    expect(screen.getByText("Northline Studio")).toBeInTheDocument();
+    expect(screen.queryByText("Harbor Cycle Works")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /All reviews/ })).toHaveAttribute("href", "/reviews");
   });
 });
