@@ -45,9 +45,9 @@ export function PassQrDialog({
             fgColor="#153d32"
             className="block h-auto w-full overflow-hidden rounded-[1.35rem] border border-line bg-white"
             imageSettings={{
-              src: "/logo-qr.svg",
-              height: 60,
-              width: 88,
+              src: "/logo-qr.png",
+              height: 58,
+              width: 84,
               excavate: true,
             }}
             level="H"
