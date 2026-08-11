@@ -4,7 +4,7 @@ export function PassPreview() {
   return (
     <article
       aria-label="Sample WrenPass campaign"
-      className="relative overflow-hidden rounded-[3px] border border-ink/15 bg-[#f3efe4] text-ink shadow-[0_34px_90px_rgba(23,36,31,0.18)]"
+      className="relative overflow-hidden rounded-[3px] border border-ink/15 bg-paper text-ink shadow-[0_34px_90px_rgba(23,36,31,0.18)]"
     >
       <div className="flex items-center justify-between border-b border-ink/15 px-5 py-4 sm:px-7">
         <div className="flex items-center gap-3">

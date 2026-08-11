@@ -62,6 +62,8 @@ describe("PurchasePanel", () => {
     const user = userEvent.setup();
     render(<PurchasePanel campaign={testPublicCampaign} config={testStellarConfig} />);
 
+    expect(screen.getByText("Remaining passes")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Passes sold" })).toHaveAttribute("aria-valuenow", "0");
     await user.click(screen.getByRole("button", { name: "Buy with USDC" }));
     const dialog = screen.getByRole("dialog", { name: "Buy Future haircut" });
     expect(dialog).toHaveTextContent("5 USDC");

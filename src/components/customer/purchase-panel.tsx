@@ -1,11 +1,10 @@
 "use client";
 
-import { CalendarClock, CheckCircle2, CircleDollarSign, ExternalLink, Gift, LoaderCircle, ShieldCheck, TicketCheck, WalletCards } from "lucide-react";
+import { CalendarClock, CheckCircle2, ExternalLink, LoaderCircle, ShieldCheck, WalletCards } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { useReviewPrompt } from "@/components/reviews/review-prompt-provider";
 import { useWallet } from "@/components/wallet/wallet-provider";
@@ -55,6 +54,10 @@ export function PurchasePanel({
   const reservePercent = campaign.onchain.financialRules.reserveBps / 100;
   const active = campaign.onchain.status === "Active";
   const soldOut = campaign.onchain.remaining === 0;
+  const soldPercent = Math.min(
+    100,
+    Math.round((campaign.onchain.sold / campaign.onchain.maxSupply) * 100),
+  );
   const connected = status === "connected" && Boolean(address);
   const hasTrustline = balances?.asset.hasTrustline ?? false;
   const balance = balances?.asset.balance ? parseUsdcBalance(balances.asset.balance) : BigInt(0);
@@ -102,71 +105,107 @@ export function PurchasePanel({
   else if (insufficientBalance) actionLabel = `Insufficient ${config.assetCode}`;
 
   return (
-    <div className="grid gap-5">
-      <Card className="p-7">
-        <p className="eyebrow">Pass terms</p>
-        <div className="mt-5 grid grid-cols-2 gap-5">
-          {[
-            ["Pay today", displayUsdc(price, config.assetCode), CircleDollarSign],
-            ["Service value", displayUsdc(value, config.assetCode), Gift],
-            ["Customer bonus", displayUsdc(bonus, config.assetCode), TicketCheck],
-            ["Remaining", `${campaign.onchain.remaining} of ${campaign.onchain.maxSupply}`, TicketCheck],
-          ].map(([label, content, Icon]) => {
-            const IconComponent = Icon as typeof CircleDollarSign;
-            return (
-              <div key={String(label)}>
-                <IconComponent aria-hidden="true" className="size-4 text-forest" />
-                <p className="mt-3 text-xs font-bold uppercase tracking-[0.1em] text-ink-faint">{String(label)}</p>
-                <p className="mt-1 font-extrabold text-ink">{String(content)}</p>
-              </div>
-            );
-          })}
-        </div>
-        <p className="mt-6 flex items-start gap-2 border-t border-line pt-5 text-sm leading-6 text-ink-muted">
-          <CalendarClock aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          Expires {displayExpiration(campaign.onchain.expiresAt)}
-        </p>
-        <Button
-          className="mt-6 w-full"
-          disabled={!active || soldOut || (connected && (!hasTrustline || insufficientBalance)) || pending}
-          size="lg"
-          onClick={() => void beginPurchase()}
-        >
-          {pending ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <WalletCards aria-hidden="true" className="size-4" />}
-          {actionLabel}
-        </Button>
-        {walletError && !connected && (
-          <p role="alert" className="mt-3 text-center text-sm font-semibold text-danger">{walletError}</p>
-        )}
-        {error && !dialogOpen && <p role="alert" className="mt-3 text-center text-sm font-semibold text-danger">{error}</p>}
-        {purchaseReceipt && (
-          <div role="status" className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-semibold text-forest">
-            <span className="inline-flex items-center gap-2">
-              <CheckCircle2 aria-hidden="true" className="size-4" /> Pass #{purchaseReceipt.passId} purchased.
-            </span>
-            <a
-              className="inline-flex items-center gap-1.5 underline-offset-4 hover:underline"
-              href={stellarTransactionUrl(config.network, purchaseReceipt.transactionHash)}
-              rel="noreferrer"
-              target="_blank"
-            >
-              View on-chain <ExternalLink aria-hidden="true" className="size-3.5" />
-            </a>
-          </div>
-        )}
-      </Card>
+    <div>
+      <p className="text-[0.68rem] font-extrabold uppercase tracking-[0.18em] text-coral-strong">
+        Pass terms
+      </p>
 
-      <Card className="border-forest/15 bg-mint-soft p-6">
+      <dl className="mt-5 grid grid-cols-2 border-y border-ink/15">
+        <div className="py-5 pr-4">
+          <dt className="text-[0.64rem] font-bold uppercase tracking-[0.15em] text-ink-faint">
+            Pay today
+          </dt>
+          <dd className="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-ink sm:text-3xl">
+            {displayUsdc(price, config.assetCode)}
+          </dd>
+        </div>
+        <div className="border-l border-ink/15 py-5 pl-4">
+          <dt className="text-[0.64rem] font-bold uppercase tracking-[0.15em] text-ink-faint">
+            Service value
+          </dt>
+          <dd className="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-ink sm:text-3xl">
+            {displayUsdc(value, config.assetCode)}
+          </dd>
+        </div>
+        <div className="border-t border-ink/15 py-5 pr-4">
+          <dt className="text-[0.64rem] font-bold uppercase tracking-[0.15em] text-ink-faint">
+            Customer bonus
+          </dt>
+          <dd className="mt-2 text-base font-extrabold text-forest">
+            +{displayUsdc(bonus, config.assetCode)}
+          </dd>
+        </div>
+        <div className="border-l border-t border-ink/15 py-5 pl-4">
+          <dt className="text-[0.64rem] font-bold uppercase tracking-[0.15em] text-ink-faint">
+            Remaining passes
+          </dt>
+          <dd className="mt-2 text-base font-extrabold text-ink">
+            {campaign.onchain.remaining} of {campaign.onchain.maxSupply}
+          </dd>
+        </div>
+      </dl>
+
+      <div className="mt-6">
+        <div className="flex items-center justify-between gap-4 text-xs">
+          <span className="font-bold text-ink">{campaign.onchain.sold} sold</span>
+          <span className="text-ink-muted">{campaign.onchain.remaining} remaining</span>
+        </div>
+        <div
+          aria-label="Passes sold"
+          aria-valuemax={campaign.onchain.maxSupply}
+          aria-valuemin={0}
+          aria-valuenow={campaign.onchain.sold}
+          className="mt-3 h-1 bg-ink/10"
+          role="progressbar"
+        >
+          <div className="h-full bg-coral" style={{ width: `${soldPercent}%` }} />
+        </div>
+      </div>
+
+      <p className="mt-6 flex items-start gap-2 text-sm leading-6 text-ink-muted">
+        <CalendarClock aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+        Expires {displayExpiration(campaign.onchain.expiresAt)}
+      </p>
+      <Button
+        className="mt-6 w-full rounded-[3px] px-3 text-sm sm:px-6 sm:text-base"
+        disabled={!active || soldOut || (connected && (!hasTrustline || insufficientBalance)) || pending}
+        size="lg"
+        onClick={() => void beginPurchase()}
+      >
+        {pending ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <WalletCards aria-hidden="true" className="size-4" />}
+        {actionLabel}
+      </Button>
+      {walletError && !connected && (
+        <p role="alert" className="mt-3 text-center text-sm font-semibold text-danger">{walletError}</p>
+      )}
+      {error && !dialogOpen && <p role="alert" className="mt-3 text-center text-sm font-semibold text-danger">{error}</p>}
+      {purchaseReceipt && (
+        <div role="status" className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-semibold text-forest">
+          <span className="inline-flex items-center gap-2">
+            <CheckCircle2 aria-hidden="true" className="size-4" /> Pass #{purchaseReceipt.passId} purchased.
+          </span>
+          <a
+            className="inline-flex items-center gap-1.5 underline-offset-4 hover:underline"
+            href={stellarTransactionUrl(config.network, purchaseReceipt.transactionHash)}
+            rel="noreferrer"
+            target="_blank"
+          >
+            View on-chain <ExternalLink aria-hidden="true" className="size-3.5" />
+          </a>
+        </div>
+      )}
+
+      <div className="mt-8 border-t border-ink/15 pt-6">
         <div className="flex gap-3">
-          <ShieldCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-forest" />
+          <ShieldCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-forest" strokeWidth={1.7} />
           <div>
-            <h2 className="font-extrabold text-ink">Customer-protection reserve</h2>
+            <h2 className="text-sm font-extrabold text-ink">Customer-protection reserve</h2>
             <p className="mt-2 text-sm leading-6 text-ink-muted">
               {displayUsdc(reserve, config.assetCode)} ({reservePercent}%) stays contract-controlled. This is not a guaranteed full refund; eligibility follows the campaign&apos;s deterministic contract rules.
             </p>
           </div>
         </div>
-      </Card>
+      </div>
 
       <Dialog
         description="Review the exact on-chain terms before asking Freighter to approve the transaction."
