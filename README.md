@@ -1,6 +1,6 @@
 # WrenPass
 
-WrenPass is a Stellar-powered platform for small businesses to pre-sell limited future-service passes. Customers pay with a configured Stellar asset, receive an owner-authorized pass, and can later gift or redeem it. Financial state, supply, ownership, settlement, and lifecycle transitions remain on Stellar/Soroban.
+WrenPass is a platform for small businesses to pre-sell limited future-service passes. Customers pay with a configured Stellar asset, receive an owner-authorized pass, and can later gift or redeem it. Financial state, supply, ownership, settlement, and lifecycle transitions remain on Stellar/Soroban.
 
 Production: [wrenpass.vercel.app](https://wrenpass.vercel.app)
 
@@ -16,12 +16,12 @@ Production: [wrenpass.vercel.app](https://wrenpass.vercel.app)
 
 ## Testnet contracts
 
-| Contract | Address | Deployed WASM SHA-256 |
-| --- | --- | --- |
-| Campaign | [`CAFVI2...N76V5D`](https://stellar.expert/explorer/testnet/contract/CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D) | `aeec070bd69017b5201f25317908e3bdd9349971a7c8cf39ff9d1f1095c1ff33` |
-| Metadata | [`CCPREV...IOVFDR`](https://stellar.expert/explorer/testnet/contract/CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR) | `56ff566c2f2732deb02d690ec5e68316cc12b73f8a4a2fafc53840685c976e97` |
+| Contract    | Address                                                                                                                        | Deployed WASM SHA-256                                              |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Campaign    | [`CAFVI2...N76V5D`](https://stellar.expert/explorer/testnet/contract/CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D) | `aeec070bd69017b5201f25317908e3bdd9349971a7c8cf39ff9d1f1095c1ff33` |
+| Metadata    | [`CCPREV...IOVFDR`](https://stellar.expert/explorer/testnet/contract/CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR) | `56ff566c2f2732deb02d690ec5e68316cc12b73f8a4a2fafc53840685c976e97` |
 | Redemptions | [`CB6HZL...Y65QHN`](https://stellar.expert/explorer/testnet/contract/CB6HZLQJGSZBN6NCII2KGOHIQUSG33YQCM7XWGTUK6JTJ4HLSKY65QHN) | `3e7e47cc108d6376079b0453e1499248a84f7f09fde3e769df32a8e9f2c36c40` |
-| Reviews | [`CCZ7KC...M6WY3`](https://stellar.expert/explorer/testnet/contract/CCZ7KC6SGTFJKOPVUFD6WYNBSYGOCHBUNV5HNR2AVGFP23KBOOMF6WY3) | `b0605d6e1da7fcb1229aa18a25ddd22ded196058945bc26577a145ab2fcb427c` |
+| Reviews     | [`CCZ7KC...M6WY3`](https://stellar.expert/explorer/testnet/contract/CCZ7KC6SGTFJKOPVUFD6WYNBSYGOCHBUNV5HNR2AVGFP23KBOOMF6WY3)  | `b0605d6e1da7fcb1229aa18a25ddd22ded196058945bc26577a145ab2fcb427c` |
 
 The machine-readable [Testnet deployment manifest](deployments/testnet.json) pins the exact source commit, toolchain, contract address, and deployed WASM hash for every contract. `pnpm contract:verify:testnet` rebuilds each historical artifact and compares it to the code currently installed on Testnet.
 
