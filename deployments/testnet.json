@@ -35,6 +35,18 @@
       "explorerUrl": "https://stellar.expert/explorer/testnet/contract/CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR"
     },
     {
+      "name": "WrenPass campaign publisher",
+      "package": "wrenpass-publisher",
+      "sourcePath": "contracts/wrenpass-publisher",
+      "sourceCommit": "924afd20ef9d8d0fe8c9662b0bd984574a0b9388",
+      "artifact": "wrenpass_publisher.wasm",
+      "optimized": false,
+      "contractId": "CALEYUTH2ZJOU3DXREQG5IGGZ3JWIRUS6P6OT6F25ER5IGTXVSAL5JXS",
+      "wasmSha256": "4a1183fecc93e185b5a917e6ddf675715765e7311951cdbb48259597cc290342",
+      "deploymentTransactionHash": "86d607741f55f09204e5ac0b5c0306886c5c1c927909cf0ba5faf92c006d3db9",
+      "explorerUrl": "https://stellar.expert/explorer/testnet/contract/CALEYUTH2ZJOU3DXREQG5IGGZ3JWIRUS6P6OT6F25ER5IGTXVSAL5JXS"
+    },
+    {
       "name": "WrenPass redemptions",
       "package": "wrenpass-redemptions",
       "sourcePath": "contracts/wrenpass-redemptions",
@@ -69,6 +81,11 @@
       "label": "Pass redemption",
       "transactionHash": "44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e",
       "explorerUrl": "https://stellar.expert/explorer/testnet/tx/44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e"
+    },
+    {
+      "label": "Atomic publisher initialization",
+      "transactionHash": "d081ae9dd92d628be48d90b9e743c8871560be4c9fde7d78533c5e0114fa3455",
+      "explorerUrl": "https://stellar.expert/explorer/testnet/tx/d081ae9dd92d628be48d90b9e743c8871560be4c9fde7d78533c5e0114fa3455"
     }
   ],
   "notes": [
