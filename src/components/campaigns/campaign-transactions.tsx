@@ -1,12 +1,13 @@
 "use client";
 
 import { ExternalLink, LoaderCircle } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/feedback-state";
 import { campaignTransactionsApi } from "@/features/campaign-transactions/api";
 import type { CampaignTransactionPageDto } from "@/features/campaign-transactions/dto";
+import { subscribeToCampaignPurchases } from "@/features/campaign-transactions/updates";
 import { displayUsdc } from "@/features/merchant/display";
 import type { StellarNetwork } from "@/lib/stellar/config";
 import { stellarTransactionUrl } from "@/lib/stellar/explorer";
@@ -65,6 +66,18 @@ export function CampaignTransactions({
       setLoading(false);
     }
   }, [campaignId, hasMore, nextCursor]);
+
+  useEffect(() => subscribeToCampaignPurchases((detail) => {
+    if (detail.campaignId !== campaignId) return;
+    setTransactions((current) => [
+      detail.transaction,
+      ...current.filter(
+        (transaction) =>
+          transaction.transactionHash !== detail.transaction.transactionHash,
+      ),
+    ]);
+    setError(null);
+  }), [campaignId]);
 
   return (
     <section aria-labelledby="campaign-transactions-heading" className="mt-12 border-t border-line pt-9">

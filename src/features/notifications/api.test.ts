@@ -69,4 +69,25 @@ describe("notificationApi", () => {
 
     await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
   });
+
+  it("sends the confirmed transaction ledger to the event reconciler", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      indexed: 1,
+      duplicates: 0,
+      notificationsSent: 0,
+      notificationFailures: 0,
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(syncEventsAfterMutation("a".repeat(64), 123_456)).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/events/sync",
+      expect.objectContaining({
+        body: JSON.stringify({
+          transactionHash: "a".repeat(64),
+          ledger: 123_456,
+        }),
+      }),
+    );
+  });
 });

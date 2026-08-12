@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CampaignTransactions } from "@/components/campaigns/campaign-transactions";
+import { announceCampaignPurchase } from "@/features/campaign-transactions/updates";
 
 const mocks = vi.hoisted(() => ({ list: vi.fn() }));
 
@@ -62,5 +63,26 @@ describe("CampaignTransactions", () => {
       limit: 10,
     }));
     expect(screen.queryByRole("button", { name: "Load 10 more" })).not.toBeInTheDocument();
+  });
+
+  it("shows a confirmed purchase immediately without waiting for a page reload", async () => {
+    render(
+      <CampaignTransactions
+        assetCode="USDC"
+        campaignId="1"
+        initialPage={{ transactions: [], nextCursor: null, hasMore: false }}
+        network="testnet"
+      />,
+    );
+
+    await act(async () => {
+      announceCampaignPurchase({
+        campaignId: "1",
+        transaction: transaction("confirmed-hash", "9", "d"),
+      });
+    });
+
+    expect(await screen.findByText("#9")).toBeInTheDocument();
+    expect(screen.queryByText("No purchases yet")).not.toBeInTheDocument();
   });
 });

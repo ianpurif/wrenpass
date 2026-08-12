@@ -36,6 +36,7 @@ import {
 
 interface ReviewPromptRequest {
   transactionLabel: string;
+  promptTitle?: string;
 }
 
 interface ActiveReviewPromptRequest extends ReviewPromptRequest {
@@ -79,6 +80,7 @@ export function ReviewPromptProvider({
           key={request.promptId}
           config={config}
           open
+          promptTitle={request.promptTitle}
           transactionLabel={request.transactionLabel}
           onOpenChange={(open) => {
             if (!open) setRequest(null);
@@ -92,11 +94,13 @@ export function ReviewPromptProvider({
 function ReviewPrompt({
   config,
   open,
+  promptTitle,
   transactionLabel,
   onOpenChange,
 }: {
   config: StellarConfig;
   open: boolean;
+  promptTitle?: string;
   transactionLabel: string;
   onOpenChange(open: boolean): void;
 }) {
@@ -169,7 +173,7 @@ function ReviewPrompt({
           : `Your ${transactionLabel} succeeded. Share a short public review tied to your wallet.`
       }
       open={open}
-      title={reviewId ? "Review published" : "How was your experience?"}
+      title={reviewId ? "Review successful" : (promptTitle ?? "How was your experience?")}
       onOpenChange={handleDialogOpenChange}
     >
       {reviewId ? (

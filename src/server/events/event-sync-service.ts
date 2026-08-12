@@ -46,9 +46,22 @@ export interface EventSyncCheckpointStore {
   advanceEventCursor(id: string, nextLedger: number, now: Date): Promise<void>;
 }
 
+export interface ExpectedTransaction {
+  transactionHash: string;
+  ledger: number;
+}
+
+export class EventNotAvailableYetError extends Error {
+  constructor(transactionHash: string) {
+    super(`Stellar RPC has not exposed transaction ${transactionHash} to the event index yet.`);
+    this.name = "EventNotAvailableYetError";
+  }
+}
+
 const EXPIRATION_NOTICE_WINDOW_SECONDS = BigInt(7 * 24 * 60 * 60);
 const MAX_EXPIRATION_PASS_READS = BigInt(2_000);
 const NOTIFICATION_CLAIM_MS = 5 * 60 * 1_000;
+const EVENT_REPLAY_LEDGERS = 10;
 
 function notificationTargets(event: WrenPassEvent): NotificationTarget[] {
   if (event.eventType === "pass_purchased" && event.customer) {
@@ -187,10 +200,15 @@ export class EventSyncService {
     }
   }
 
-  async sync(): Promise<EventSyncResult> {
+  async sync(expectedTransaction?: ExpectedTransaction): Promise<EventSyncResult> {
     const cursorId = `events-${this.contractId}`;
     const cursor = await this.checkpoints.readEventCursor(cursorId);
-    const batch = await this.source.readRetainedEvents(cursor?.nextLedger);
+    const startLedger = expectedTransaction
+      ? Math.min(cursor?.nextLedger ?? expectedTransaction.ledger, expectedTransaction.ledger)
+      : cursor
+        ? Math.max(1, cursor.nextLedger - EVENT_REPLAY_LEDGERS)
+        : undefined;
+    const batch = await this.source.readRetainedEvents(startLedger);
     const result: EventSyncResult = {
       indexed: 0,
       duplicates: 0,
@@ -199,6 +217,14 @@ export class EventSyncService {
       checkpointAdvanced: false,
       retentionGap: batch.retentionGap,
     };
+    if (
+      expectedTransaction &&
+      !batch.events.some(
+        (event) => event.transactionHash.toLowerCase() === expectedTransaction.transactionHash.toLowerCase(),
+      )
+    ) {
+      throw new EventNotAvailableYetError(expectedTransaction.transactionHash);
+    }
 
     for (const event of batch.events) {
       const existing = await this.repositories.indexedBlockchainEvents.findById(event.id);

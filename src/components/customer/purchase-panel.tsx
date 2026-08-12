@@ -1,13 +1,14 @@
 "use client";
 
 import { CalendarClock, CheckCircle2, ExternalLink, LoaderCircle, ShieldCheck, WalletCards } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useReviewPrompt } from "@/components/reviews/review-prompt-provider";
 import { useWallet } from "@/components/wallet/wallet-provider";
+import { announceCampaignPurchase } from "@/features/campaign-transactions/updates";
 import { parseUsdcBalance } from "@/features/merchant/campaign-terms";
 import { displayExpiration, displayUsdc } from "@/features/merchant/display";
 import type { PublicCampaignDto } from "@/features/merchant/dto";
@@ -41,12 +42,15 @@ export function PurchasePanel({
   } = useWallet();
   const writer = useMemo(() => new StellarCustomerContractWriter(config), [config]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [purchaseReceipt, setPurchaseReceipt] = useState<{
     passId: string;
     transactionHash: string;
+    ledger: number;
   } | null>(null);
+  const reviewRequestedFor = useRef<string | null>(null);
   const price = BigInt(campaign.onchain.passPrice);
   const value = BigInt(campaign.onchain.serviceValue);
   const bonus = value - price;
@@ -85,16 +89,45 @@ export function PurchasePanel({
       setPurchaseReceipt({
         passId: receipt.passId.toString(),
         transactionHash: receipt.transactionHash,
+        ledger: receipt.ledger,
       });
       setDialogOpen(false);
-      requestReview({ transactionLabel: "pass purchase" });
-      await Promise.allSettled([syncEventsAfterMutation(), refreshBalances()]);
+      setSuccessDialogOpen(true);
+      announceCampaignPurchase({
+        campaignId: campaign.onchain.id,
+        transaction: {
+          id: `confirmed-${receipt.transactionHash}`,
+          transactionHash: receipt.transactionHash,
+          passId: receipt.passId.toString(),
+          total: campaign.onchain.passPrice,
+          ledger: receipt.ledger,
+        },
+      });
+      await Promise.allSettled([
+        syncEventsAfterMutation(receipt.transactionHash, receipt.ledger),
+        refreshBalances(),
+      ]);
       router.refresh();
     } catch (purchaseError) {
       setError(readableError(purchaseError));
     } finally {
       setPending(false);
     }
+  }
+
+  function continueToReview() {
+    if (
+      !purchaseReceipt ||
+      reviewRequestedFor.current === purchaseReceipt.transactionHash
+    ) {
+      return;
+    }
+    reviewRequestedFor.current = purchaseReceipt.transactionHash;
+    setSuccessDialogOpen(false);
+    requestReview({
+      promptTitle: "Buy with USDC successful",
+      transactionLabel: "Buy with USDC",
+    });
   }
 
   let actionLabel = "Buy with USDC";
@@ -228,6 +261,40 @@ export function PurchasePanel({
             Approve {displayUsdc(price, config.assetCode)}
           </Button>
         </div>
+      </Dialog>
+
+      <Dialog
+        description="Your purchase is confirmed on Stellar and your WrenPass is ready."
+        open={successDialogOpen}
+        title="Thanks for purchasing!"
+        onOpenChange={(open) => {
+          if (!open) continueToReview();
+        }}
+      >
+        {purchaseReceipt && (
+          <div className="text-center">
+            <div className="mx-auto grid size-16 place-items-center rounded-full bg-mint-soft text-forest">
+              <CheckCircle2 aria-hidden="true" className="size-8" />
+            </div>
+            <p className="mt-5 text-lg font-bold text-ink">
+              Pass #{purchaseReceipt.passId} is now yours.
+            </p>
+            <p className="mt-2 text-sm leading-6 text-ink-muted">
+              The transaction is also being added to this campaign&apos;s on-chain activity.
+            </p>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-center">
+              <a
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[3px] border border-line bg-white px-5 text-sm font-bold text-ink transition hover:border-ink/30 hover:bg-canvas"
+                href={stellarTransactionUrl(config.network, purchaseReceipt.transactionHash)}
+                rel="noreferrer noopener"
+                target="_blank"
+              >
+                View on-chain <ExternalLink aria-hidden="true" className="size-4" />
+              </a>
+              <Button onClick={continueToReview}>Continue</Button>
+            </div>
+          </div>
+        )}
       </Dialog>
     </div>
   );

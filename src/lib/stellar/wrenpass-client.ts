@@ -129,6 +129,7 @@ export interface CustomerContractWriter {
 export interface PurchaseReceipt {
   passId: bigint;
   transactionHash: string;
+  ledger: number;
 }
 
 export class StellarCustomerContractWriter implements CustomerContractWriter {
@@ -153,7 +154,14 @@ export class StellarCustomerContractWriter implements CustomerContractWriter {
     if (!transactionHash) {
       throw new Error("Stellar accepted the purchase without returning its hash.");
     }
-    return { passId, transactionHash };
+    const transactionResult = sent.getTransactionResponse;
+    if (
+      !transactionResult ||
+      transactionResult.status !== rpc.Api.GetTransactionStatus.SUCCESS
+    ) {
+      throw new Error("Stellar confirmed the purchase without returning its ledger.");
+    }
+    return { passId, transactionHash, ledger: transactionResult.ledger };
   }
 
   async gift(input: {

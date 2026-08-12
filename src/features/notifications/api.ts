@@ -7,9 +7,10 @@ const syncResultSchema = z.object({
   notificationsSent: z.number().int().nonnegative(),
   notificationFailures: z.number().int().nonnegative(),
 });
+const sha256Schema = z.string().regex(/^[a-f\d]{64}$/i);
 
 type SyncResult = z.infer<typeof syncResultSchema>;
-let eventSyncInFlight: Promise<boolean> | null = null;
+const eventSyncRequests = new Map<string, Promise<boolean>>();
 
 async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
   const response = await fetch(url, {
@@ -51,20 +52,39 @@ export const notificationApi = {
     if (!result.email) throw new Error("The notification email was not saved.");
     return { email: result.email };
   },
-  async syncEvents(): Promise<SyncResult> {
-    return syncResultSchema.parse(await requestJson("/api/events/sync", { method: "POST" }));
+  async syncEvents(expectedTransaction?: {
+    transactionHash: string;
+    ledger: number;
+  }): Promise<SyncResult> {
+    return syncResultSchema.parse(await requestJson("/api/events/sync", {
+      method: "POST",
+      body: JSON.stringify({
+        transactionHash: expectedTransaction
+          ? sha256Schema.parse(expectedTransaction.transactionHash)
+          : undefined,
+        ledger: expectedTransaction?.ledger,
+      }),
+    }));
   },
 };
 
-export function syncEventsAfterMutation(): Promise<boolean> {
-  if (eventSyncInFlight) return eventSyncInFlight;
+export function syncEventsAfterMutation(
+  transactionHash?: string,
+  ledger?: number,
+): Promise<boolean> {
+  const key = transactionHash?.toLowerCase() ?? "latest";
+  const current = eventSyncRequests.get(key);
+  if (current) return current;
 
-  const request = notificationApi.syncEvents().then(
+  const expectedTransaction = transactionHash && ledger
+    ? { transactionHash, ledger }
+    : undefined;
+  const request = notificationApi.syncEvents(expectedTransaction).then(
     () => true,
     () => false,
   ).finally(() => {
-    if (eventSyncInFlight === request) eventSyncInFlight = null;
+    if (eventSyncRequests.get(key) === request) eventSyncRequests.delete(key);
   });
-  eventSyncInFlight = request;
+  eventSyncRequests.set(key, request);
   return request;
 }

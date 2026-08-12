@@ -1,17 +1,61 @@
 import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { z } from "zod";
 
+import { EventNotAvailableYetError } from "@/server/events/event-sync-service";
 import { syncEvents } from "@/server/events/service";
 import { getRequestWalletAddress } from "@/server/wallet-auth/request-session";
 
 export const runtime = "nodejs";
+
+const requestSchema = z.object({
+  transactionHash: z.string().regex(/^[a-f\d]{64}$/i).optional(),
+  ledger: z.number().int().positive().optional(),
+}).refine(
+  (value) => Boolean(value.transactionHash) === Boolean(value.ledger),
+  "Transaction hash and ledger must be provided together.",
+);
+
+const retryDelaysMs = [0, 400, 800, 1_200] as const;
+
+async function syncExpectedTransaction(input?: {
+  transactionHash: string;
+  ledger: number;
+}) {
+  for (const [index, delayMs] of retryDelaysMs.entries()) {
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    try {
+      return await syncEvents(input);
+    } catch (error) {
+      if (
+        !(error instanceof EventNotAvailableYetError) ||
+        index === retryDelaysMs.length - 1
+      ) {
+        throw error;
+      }
+    }
+  }
+  throw new Error("Event synchronization did not complete.");
+}
 
 export async function POST(request: NextRequest) {
   if (!(await getRequestWalletAddress(request))) {
     return Response.json({ error: "Connect your wallet first." }, { status: 401 });
   }
   try {
-    return Response.json(await syncEvents());
+    const body = requestSchema.safeParse(await request.json().catch(() => ({})));
+    if (!body.success) {
+      return Response.json({ error: "Invalid event sync request." }, { status: 400 });
+    }
+    const expectedTransaction = body.data.transactionHash && body.data.ledger
+      ? {
+          transactionHash: body.data.transactionHash,
+          ledger: body.data.ledger,
+        }
+      : undefined;
+    return Response.json(await syncExpectedTransaction(expectedTransaction));
   } catch (error) {
     Sentry.captureException(error, { tags: { operation: "event-sync" } });
     console.error("Event synchronization failed.", error);

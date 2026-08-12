@@ -34,7 +34,10 @@ vi.mock("@/lib/stellar/reviews-client", () => ({
 function TransactionSuccessTrigger() {
   const { requestReview } = useReviewPrompt();
   return (
-    <button type="button" onClick={() => requestReview({ transactionLabel: "pass purchase" })}>
+    <button type="button" onClick={() => requestReview({
+      promptTitle: "Buy with USDC successful",
+      transactionLabel: "Buy with USDC",
+    })}>
       Complete transaction
     </button>
   );
@@ -60,7 +63,7 @@ describe("ReviewPromptProvider", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Complete transaction" }));
-    expect(screen.getByRole("dialog", { name: "How was your experience?" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Buy with USDC successful" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "5 stars" }));
     await user.type(screen.getByLabelText("Review message"), "Fast, clear, and easy to trust.");
@@ -73,7 +76,7 @@ describe("ReviewPromptProvider", () => {
       message: "Fast, clear, and easy to trust.",
       signAuthEntry: expect.any(Function),
     }));
-    expect(await screen.findByRole("heading", { name: "Review published" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Review successful" })).toBeInTheDocument();
     expect(screen.getByText(/Review #7 is stored on Stellar/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /View on-chain/i })).toHaveAttribute(
       "href",

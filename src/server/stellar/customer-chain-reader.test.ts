@@ -115,7 +115,7 @@ describe("readEventPages", () => {
     });
     expect(getEvents).toHaveBeenNthCalledWith(2, {
       startLedger: 3_942_798,
-      endLedger: 3_943_000,
+      endLedger: 3_943_001,
       filters: [],
       limit: 10_000,
     });
@@ -151,7 +151,36 @@ describe("readEventPages", () => {
     expect(getEvents).toHaveBeenCalledTimes(2);
     expect(getEvents).toHaveBeenLastCalledWith({
       startLedger: 10_001,
-      endLedger: 20_000,
+      endLedger: 20_001,
+      filters: [],
+      limit: 10_000,
+    });
+  });
+
+  it("includes events from the newest ledger in the requested range", async () => {
+    const purchased = {
+      ...event(
+        "pass_purchased",
+        testCustomerAddress,
+        mapValue({ total: nativeToScVal(BigInt(50_000_000), { type: "i128" }) }),
+        "latest-purchase",
+      ),
+      ledger: 100,
+    };
+    const getEvents = vi.fn().mockResolvedValue({
+      events: [purchased],
+      oldestLedgerCloseTime: "2026-08-01T00:00:00Z",
+    });
+
+    await expect(
+      readEventPages(
+        { getEvents },
+        { startLedger: 100, endLedger: 100, filters: [], limit: 10_000 },
+      ),
+    ).resolves.toMatchObject({ events: [purchased] });
+    expect(getEvents).toHaveBeenCalledWith({
+      startLedger: 100,
+      endLedger: 101,
       filters: [],
       limit: 10_000,
     });

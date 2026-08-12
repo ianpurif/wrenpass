@@ -55,16 +55,16 @@ export async function readEventPages(
     if (pageCount >= MAX_EVENT_PAGES) {
       throw new Error("Stellar RPC event scan exceeded the safe page limit.");
     }
-    const endLedger = Math.min(
-      request.endLedger,
-      nextLedger + EVENT_LEDGER_BATCH_SIZE - 1,
+    const endLedgerExclusive = Math.min(
+      request.endLedger + 1,
+      nextLedger + EVENT_LEDGER_BATCH_SIZE,
     );
 
     let page: EventPage;
     try {
       page = await reader.getEvents({
         startLedger: nextLedger,
-        endLedger,
+        endLedger: endLedgerExclusive,
         filters: request.filters,
         limit: request.limit,
       });
@@ -86,7 +86,7 @@ export async function readEventPages(
     if (request.limit !== undefined && page.events.length >= request.limit) {
       throw new Error("Stellar RPC event density exceeded the safe range limit.");
     }
-    nextLedger = endLedger + 1;
+    nextLedger = endLedgerExclusive;
     pageCount += 1;
     rangeRetries = 0;
   }

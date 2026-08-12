@@ -118,8 +118,11 @@ const purchasedEvent: WrenPassEvent = {
 describe("EventSyncService", () => {
   it("indexes purchases with a campaign-specific pagination key", async () => {
     const repositories = createOffchainRepositories(createStore());
+    const source = {
+      readRetainedEvents: vi.fn().mockResolvedValue(eventBatch([purchasedEvent])),
+    };
     const service = new EventSyncService(
-      { readRetainedEvents: vi.fn().mockResolvedValue(eventBatch([purchasedEvent])) },
+      source,
       repositories,
       {
         findCampaign: vi.fn().mockResolvedValue(null),
@@ -133,7 +136,11 @@ describe("EventSyncService", () => {
       () => new Date("2026-08-11T00:00:00.000Z"),
     );
 
-    await expect(service.sync()).resolves.toMatchObject({ indexed: 1 });
+    await expect(service.sync({
+      transactionHash: purchasedEvent.transactionHash,
+      ledger: purchasedEvent.ledger,
+    })).resolves.toMatchObject({ indexed: 1 });
+    expect(source.readRetainedEvents).toHaveBeenCalledWith(purchasedEvent.ledger);
     await expect(
       repositories.indexedBlockchainEvents.findById(purchasedEvent.id),
     ).resolves.toMatchObject({
@@ -145,6 +152,42 @@ describe("EventSyncService", () => {
         total: "50000000",
       },
     });
+  });
+
+  it("does not advance past a confirmed transaction that RPC has not exposed yet", async () => {
+    const repositories = createOffchainRepositories(createStore());
+    const source = {
+      readRetainedEvents: vi.fn().mockResolvedValue(eventBatch([], 1_234_600)),
+    };
+    const checkpoints: EventSyncCheckpointStore = {
+      readEventCursor: vi.fn().mockResolvedValue({
+        id: `events-${testStellarConfig.wrenPassContractId}`,
+        kind: "event_sync_cursor",
+        nextLedger: 1_234_590,
+        updatedAt: "2026-08-11T00:00:00.000Z",
+      }),
+      advanceEventCursor: vi.fn(),
+    };
+    const service = new EventSyncService(
+      source,
+      repositories,
+      {
+        findCampaign: vi.fn().mockResolvedValue(null),
+        getPassCount: vi.fn().mockResolvedValue(BigInt(0)),
+        findPass: vi.fn().mockResolvedValue(null),
+      },
+      createClaimStore(repositories),
+      { send: vi.fn() },
+      testStellarConfig.wrenPassContractId,
+      checkpoints,
+    );
+
+    await expect(service.sync({
+      transactionHash: purchasedEvent.transactionHash,
+      ledger: purchasedEvent.ledger,
+    })).rejects.toThrow("has not exposed transaction");
+    expect(source.readRetainedEvents).toHaveBeenCalledWith(purchasedEvent.ledger);
+    expect(checkpoints.advanceEventCursor).not.toHaveBeenCalled();
   });
 
   it("indexes duplicate events once and retries a failed notification", async () => {
@@ -354,6 +397,6 @@ describe("EventSyncService", () => {
     expect(source.readRetainedEvents).toHaveBeenNthCalledWith(1, undefined);
     expect(source.readRetainedEvents).toHaveBeenNthCalledWith(2, undefined);
     await service.sync();
-    expect(source.readRetainedEvents).toHaveBeenNthCalledWith(3, 1_234_600);
+    expect(source.readRetainedEvents).toHaveBeenNthCalledWith(3, 1_234_590);
   });
 });

@@ -8,13 +8,15 @@ import {
 } from "@/lib/stellar/wrenpass-client";
 import { createEmailService } from "@/server/email/email-service";
 import { EventSyncService } from "@/server/events/event-sync-service";
+import type { ExpectedTransaction } from "@/server/events/event-sync-service";
 import { StellarWrenPassEventSource } from "@/server/events/event-source";
 import { FirestoreNotificationClaimStore } from "@/server/events/firestore-notification-claim-store";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
 import { FirestoreOperationalStateStore } from "@/server/operations/operational-state-store";
 
 let eventSyncService: EventSyncService | undefined;
-let eventSyncInFlight: ReturnType<EventSyncService["sync"]> | undefined;
+const eventSyncRequests = new Map<string, ReturnType<EventSyncService["sync"]>>();
+let eventSyncTail: Promise<void> = Promise.resolve();
 
 export function getEventSyncService(): EventSyncService {
   if (!eventSyncService) {
@@ -36,11 +38,21 @@ export function getEventSyncService(): EventSyncService {
   return eventSyncService;
 }
 
-export function syncEvents() {
-  if (!eventSyncInFlight) {
-    eventSyncInFlight = getEventSyncService().sync().finally(() => {
-      eventSyncInFlight = undefined;
+export function syncEvents(expectedTransaction?: ExpectedTransaction) {
+  const key = expectedTransaction?.transactionHash.toLowerCase() ?? "latest";
+  const current = eventSyncRequests.get(key);
+  if (current) return current;
+
+  const request = eventSyncTail
+    .catch(() => undefined)
+    .then(() => getEventSyncService().sync(expectedTransaction))
+    .finally(() => {
+      if (eventSyncRequests.get(key) === request) eventSyncRequests.delete(key);
     });
-  }
-  return eventSyncInFlight;
+  eventSyncTail = request.then(
+    () => undefined,
+    () => undefined,
+  );
+  eventSyncRequests.set(key, request);
+  return request;
 }

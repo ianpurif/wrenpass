@@ -51,6 +51,7 @@ describe("PurchasePanel", () => {
     mocks.purchase.mockReset().mockResolvedValue({
       passId: BigInt(9),
       transactionHash: "d".repeat(64),
+      ledger: 1_234_509,
     });
     mocks.refreshBalances.mockReset().mockResolvedValue(undefined);
     mocks.refreshRoute.mockReset();
@@ -75,6 +76,13 @@ describe("PurchasePanel", () => {
     expect(mocks.purchase).toHaveBeenCalledWith(
       expect.objectContaining({ campaignId: BigInt(1), customer: testCustomerAddress }),
     );
+    const successDialog = await screen.findByRole("dialog", {
+      name: "Thanks for purchasing!",
+    });
+    expect(successDialog).toHaveTextContent("Pass #9 is now yours.");
+    expect(mocks.requestReview).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
     expect(await screen.findByText("Pass #9 purchased.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /View on-chain/ })).toHaveAttribute(
       "href",
@@ -82,8 +90,14 @@ describe("PurchasePanel", () => {
     );
     expect(mocks.refreshBalances).toHaveBeenCalledOnce();
     expect(mocks.refreshRoute).toHaveBeenCalledOnce();
-    expect(mocks.syncEventsAfterMutation).toHaveBeenCalledOnce();
-    expect(mocks.requestReview).toHaveBeenCalledWith({ transactionLabel: "pass purchase" });
+    expect(mocks.syncEventsAfterMutation).toHaveBeenCalledWith(
+      "d".repeat(64),
+      1_234_509,
+    );
+    expect(mocks.requestReview).toHaveBeenCalledWith({
+      promptTitle: "Buy with USDC successful",
+      transactionLabel: "Buy with USDC",
+    });
   });
 
   it("surfaces a rejected wallet transaction", async () => {
