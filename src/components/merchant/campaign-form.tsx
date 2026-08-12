@@ -21,9 +21,6 @@ import {
 } from "@/features/merchant/campaign-terms";
 import {
   createAndPublishCampaign,
-  recoverableCampaignDraftSchema,
-  resumeCampaignPublishing,
-  type RecoverableCampaignDraft,
 } from "@/features/merchant/campaign-workflow";
 import { syncEventsAfterMutation } from "@/features/notifications/api";
 import type { StellarConfig } from "@/lib/stellar/config";
@@ -35,20 +32,6 @@ function defaultExpiration(): string {
   date.setMinutes(0, 0, 0);
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return local.toISOString().slice(0, 16);
-}
-
-function pendingKey(address: string): string {
-  return `wrenpass:pending-campaign:${address}`;
-}
-
-function readPending(address: string): RecoverableCampaignDraft | null {
-  try {
-    const stored = window.localStorage.getItem(pendingKey(address));
-    if (!stored) return null;
-    return recoverableCampaignDraftSchema.parse(JSON.parse(stored));
-  } catch {
-    return null;
-  }
 }
 
 export function CampaignForm({
@@ -66,9 +49,6 @@ export function CampaignForm({
     [config],
   );
   const [image, setImage] = useState<File | null>(null);
-  const [pending, setPending] = useState<RecoverableCampaignDraft | null>(() =>
-    address ? readPending(address) : null,
-  );
   const [stage, setStage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -99,24 +79,13 @@ export function CampaignForm({
     quote = null;
   }
 
-  function rememberDraft(draft: RecoverableCampaignDraft) {
-    if (!address) return;
-    window.localStorage.setItem(pendingKey(address), JSON.stringify(draft));
-    setPending(draft);
-  }
-
-  function clearDraft() {
-    if (address) window.localStorage.removeItem(pendingKey(address));
-    setPending(null);
-  }
-
   const walletContext = address
     ? { merchant: address, signTransaction: (transactionXdr: string) => signTransaction(transactionXdr) }
     : null;
 
   const dependencies = {
     writer,
-    saveMetadata: async (metadata: RecoverableCampaignDraft) => {
+    saveMetadata: async (metadata: Parameters<typeof merchantApi.saveCampaignMetadata>[0]) => {
       if (walletContext) {
         setStage("Approve public campaign details in Freighter…");
         await metadataWriter.registerCampaignMetadata({
@@ -129,8 +98,6 @@ export function CampaignForm({
       setStage("Verifying campaign metadata…");
       return merchantApi.saveCampaignMetadata(metadata);
     },
-    onPending: rememberDraft,
-    onComplete: clearDraft,
   };
 
   const submit = handleSubmit(async (values) => {
@@ -165,9 +132,6 @@ export function CampaignForm({
             setStage("Approve publishing in Freighter…");
             return result;
           },
-          onPending: (draft) => {
-            rememberDraft(draft);
-          },
         },
       );
       setSuccess(`Campaign #${campaignId} is live on Stellar Testnet.`);
@@ -190,45 +154,8 @@ export function CampaignForm({
     }
   });
 
-  async function resume() {
-    if (!pending || !walletContext) return;
-    setError(null);
-    setSuccess(null);
-    setStage("Restoring campaign metadata…");
-    try {
-      await resumeCampaignPublishing(pending, walletContext, {
-        ...dependencies,
-        saveMetadata: async (metadata) => {
-          const result = await dependencies.saveMetadata(metadata);
-          setStage("Approve publishing in Freighter…");
-          return result;
-        },
-      });
-      setSuccess(`Campaign #${pending.campaignId} is live on Stellar Testnet.`);
-      requestReview({ transactionLabel: "campaign publishing" });
-      void syncEventsAfterMutation();
-      await onPublished();
-    } catch (resumeError) {
-      setError(resumeError instanceof Error ? resumeError.message : "Unable to resume publishing.");
-    } finally {
-      setStage(null);
-    }
-  }
-
   return (
     <div>
-      {pending && (
-        <div className="mb-7 border-l-2 border-coral bg-coral-soft p-5">
-          <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-coral-strong">Recoverable draft</p>
-          <p className="mt-2 font-bold text-ink">Campaign #{pending.campaignId}: {pending.name}</p>
-          <p className="mt-1 text-sm leading-6 text-ink-muted">The draft transaction is confirmed. Complete metadata registration and publishing without creating another campaign.</p>
-          <Button className="mt-4" size="sm" disabled={Boolean(stage)} onClick={() => void resume()}>
-            {stage ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <Rocket aria-hidden="true" className="size-4" />}
-            Resume publishing
-          </Button>
-        </div>
-      )}
-
       <form className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_19rem] xl:items-start" onSubmit={submit}>
         <div className="min-w-0 space-y-8">
           <section aria-labelledby="campaign-details-heading">
@@ -300,7 +227,7 @@ export function CampaignForm({
           {stage && <p role="status" className="mt-4 flex items-start gap-2 text-sm font-semibold text-forest"><LoaderCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0 animate-spin" />{stage}</p>}
           {error && <p role="alert" className="mt-4 text-sm font-semibold text-danger">{error}</p>}
           {success && <p role="status" className="mt-4 flex items-start gap-2 text-sm font-semibold text-forest"><CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0" />{success}</p>}
-          <Button className="mt-5 w-full" disabled={isSubmitting || Boolean(stage) || Boolean(pending)} type="submit">
+          <Button className="mt-5 w-full" disabled={isSubmitting || Boolean(stage)} type="submit">
             {isSubmitting || stage ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <Rocket aria-hidden="true" className="size-4" />}
             Create and publish campaign
           </Button>

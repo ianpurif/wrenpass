@@ -62,7 +62,6 @@ const config: StellarConfig = {
 
 describe("CampaignForm", () => {
   beforeEach(() => {
-    window.localStorage.clear();
     mocks.createDraft.mockReset().mockResolvedValue(BigInt(12));
     mocks.publish.mockReset().mockResolvedValue(undefined);
     mocks.requestReview.mockReset();

@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  createAndPublishCampaign,
-  resumeCampaignPublishing,
-  type RecoverableCampaignDraft,
-} from "@/features/merchant/campaign-workflow";
+import { createAndPublishCampaign } from "@/features/merchant/campaign-workflow";
 import type { CampaignContractWriter } from "@/lib/stellar/wrenpass-client";
 
 const merchant = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
@@ -22,8 +18,7 @@ const terms = {
 };
 
 describe("campaign publishing workflow", () => {
-  it("records the on-chain draft before metadata registration", async () => {
-    const pending: RecoverableCampaignDraft[] = [];
+  it("does not publish when metadata registration fails", async () => {
     const writer: CampaignContractWriter = {
       createDraft: vi.fn().mockResolvedValue(BigInt(7)),
       publish: vi.fn(),
@@ -36,37 +31,39 @@ describe("campaign publishing workflow", () => {
         {
           writer,
           saveMetadata,
-          onPending: (draft) => pending.push(draft),
-          onComplete: vi.fn(),
         },
       ),
     ).rejects.toThrow("Metadata registration unavailable");
 
-    expect(pending).toEqual([{ ...metadata, campaignId: "7" }]);
+    expect(saveMetadata).toHaveBeenCalledWith({ ...metadata, campaignId: "7" });
     expect(writer.publish).not.toHaveBeenCalled();
   });
 
-  it("resumes metadata registration and publishes an existing draft", async () => {
+  it("registers metadata and publishes the created campaign", async () => {
     const writer: CampaignContractWriter = {
-      createDraft: vi.fn(),
+      createDraft: vi.fn().mockResolvedValue(BigInt(7)),
       publish: vi.fn(),
     };
     const saveMetadata = vi.fn();
-    const onComplete = vi.fn();
-    const draft = { ...metadata, campaignId: "7" };
 
-    await resumeCampaignPublishing(
-      draft,
-      { merchant, signTransaction },
-      { writer, saveMetadata, onPending: vi.fn(), onComplete },
-    );
+    await expect(
+      createAndPublishCampaign(
+        { merchant, signTransaction, metadata, terms },
+        { writer, saveMetadata },
+      ),
+    ).resolves.toBe("7");
 
-    expect(saveMetadata).toHaveBeenCalledWith(draft);
+    expect(saveMetadata).toHaveBeenCalledWith({
+      ...metadata,
+      campaignId: "7",
+    });
     expect(writer.publish).toHaveBeenCalledWith({
       campaignId: BigInt(7),
       merchant,
       signTransaction,
     });
-    expect(onComplete).toHaveBeenCalledOnce();
+    expect(saveMetadata.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(writer.publish).mock.invocationCallOrder[0],
+    );
   });
 });
