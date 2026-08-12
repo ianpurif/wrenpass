@@ -10,6 +10,7 @@ import {
   type Pass,
 } from "@/generated/wrenpass-contract/src";
 import type { StellarConfig } from "@/lib/stellar/config";
+import { submitWithFreshAccountSequence } from "@/lib/stellar/transaction-submission";
 
 type SignTransaction = NonNullable<ClientOptions["signTransaction"]>;
 type SignAuthEntry = NonNullable<ClientOptions["signAuthEntry"]>;
@@ -71,16 +72,21 @@ export class StellarCampaignContractWriter implements CampaignContractWriter {
     terms: CampaignTerms;
     signTransaction: SignTransaction;
   }): Promise<bigint> {
-    const client = createClient(this.config, {
-      publicKey: input.merchant,
-      signTransaction: input.signTransaction,
+    return submitWithFreshAccountSequence({
+      account: input.merchant,
+      assembleSignAndSend: async () => {
+        const client = createClient(this.config, {
+          publicKey: input.merchant,
+          signTransaction: input.signTransaction,
+        });
+        const transaction = await client.create_campaign({
+          merchant: input.merchant,
+          terms: input.terms,
+        });
+        const sent = await transaction.signAndSend();
+        return unwrapContractResult(sent.result);
+      },
     });
-    const transaction = await client.create_campaign({
-      merchant: input.merchant,
-      terms: input.terms,
-    });
-    const sent = await transaction.signAndSend();
-    return unwrapContractResult(sent.result);
   }
 
   async publish(input: {
@@ -88,16 +94,21 @@ export class StellarCampaignContractWriter implements CampaignContractWriter {
     merchant: string;
     signTransaction: SignTransaction;
   }): Promise<void> {
-    const client = createClient(this.config, {
-      publicKey: input.merchant,
-      signTransaction: input.signTransaction,
+    await submitWithFreshAccountSequence({
+      account: input.merchant,
+      assembleSignAndSend: async () => {
+        const client = createClient(this.config, {
+          publicKey: input.merchant,
+          signTransaction: input.signTransaction,
+        });
+        const transaction = await client.publish_campaign({
+          campaign_id: input.campaignId,
+          merchant: input.merchant,
+        });
+        const sent = await transaction.signAndSend();
+        unwrapContractResult(sent.result);
+      },
     });
-    const transaction = await client.publish_campaign({
-      campaign_id: input.campaignId,
-      merchant: input.merchant,
-    });
-    const sent = await transaction.signAndSend();
-    unwrapContractResult(sent.result);
   }
 }
 

@@ -2,7 +2,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, LoaderCircle, Rocket, ShieldCheck } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -49,6 +50,7 @@ export function CampaignForm({
     [config],
   );
   const [image, setImage] = useState<File | null>(null);
+  const submissionActiveRef = useRef(false);
   const [stage, setStage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export function CampaignForm({
     },
   };
 
-  const submit = handleSubmit(async (values) => {
+  const submitCampaign = handleSubmit(async (values) => {
     if (!walletContext) return;
     setError(null);
     setSuccess(null);
@@ -153,6 +155,19 @@ export function CampaignForm({
       setStage(null);
     }
   });
+
+  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    if (submissionActiveRef.current) {
+      event.preventDefault();
+      return;
+    }
+    submissionActiveRef.current = true;
+    try {
+      await submitCampaign(event);
+    } finally {
+      submissionActiveRef.current = false;
+    }
+  }
 
   return (
     <div>

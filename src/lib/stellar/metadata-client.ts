@@ -10,6 +10,7 @@ import {
   type RegistryConfig,
 } from "@/generated/metadata-contract/src";
 import type { StellarConfig } from "@/lib/stellar/config";
+import { submitWithFreshAccountSequence } from "@/lib/stellar/transaction-submission";
 
 type SignTransaction = NonNullable<ClientOptions["signTransaction"]>;
 
@@ -130,17 +131,22 @@ export class StellarMetadataContractWriter {
       name: input.metadata.name,
       service_description: input.metadata.serviceDescription,
     };
-    const client = createClient(this.config, {
-      publicKey: input.merchant,
-      signTransaction: input.signTransaction,
+    return submitWithFreshAccountSequence({
+      account: input.merchant,
+      assembleSignAndSend: async () => {
+        const client = createClient(this.config, {
+          publicKey: input.merchant,
+          signTransaction: input.signTransaction,
+        });
+        const transaction = await assembleCampaignMetadataRegistration(client, {
+          campaign_id: input.campaignId,
+          merchant: input.merchant,
+          metadata,
+        });
+        const sent = await transaction.signAndSend();
+        return unwrapContractResult(sent.result);
+      },
     });
-    const transaction = await assembleCampaignMetadataRegistration(client, {
-      campaign_id: input.campaignId,
-      merchant: input.merchant,
-      metadata,
-    });
-    const sent = await transaction.signAndSend();
-    return unwrapContractResult(sent.result);
   }
 }
 

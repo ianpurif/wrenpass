@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -104,5 +104,56 @@ describe("CampaignForm", () => {
     expect(mocks.syncEventsAfterMutation).toHaveBeenCalledOnce();
     expect(screen.getByText("Campaign #12 is live on Stellar Testnet.")).toBeInTheDocument();
     expect(mocks.requestReview).toHaveBeenCalledWith({ transactionLabel: "campaign publishing" });
+  });
+
+  it("ignores a duplicate submission while the first one is active", async () => {
+    const user = userEvent.setup();
+    let resolveDraft!: (campaignId: bigint) => void;
+    mocks.createDraft.mockReturnValueOnce(new Promise<bigint>((resolve) => {
+      resolveDraft = resolve;
+    }));
+    render(<CampaignForm config={config} onPublished={vi.fn().mockResolvedValue(undefined)} />);
+
+    await user.type(screen.getByLabelText("Campaign name"), "Five haircuts forward");
+    await user.type(
+      screen.getByLabelText("Service description"),
+      "One complete haircut service delivered at the merchant studio.",
+    );
+    const button = screen.getByRole("button", { name: "Create and publish campaign" });
+    const form = button.closest("form");
+    expect(form).not.toBeNull();
+
+    fireEvent.submit(form!);
+    fireEvent.submit(form!);
+
+    await waitFor(() => expect(mocks.createDraft).toHaveBeenCalledOnce());
+    await act(async () => resolveDraft(BigInt(12)));
+    await waitFor(() => expect(mocks.publish).toHaveBeenCalledOnce());
+    expect(mocks.createDraft).toHaveBeenCalledOnce();
+  });
+
+  it("allows a fresh submission after a failed transaction", async () => {
+    const user = userEvent.setup();
+    mocks.createDraft
+      .mockRejectedValueOnce(new Error("The transaction sequence changed. Please try again."))
+      .mockResolvedValueOnce(BigInt(12));
+    render(<CampaignForm config={config} onPublished={vi.fn().mockResolvedValue(undefined)} />);
+
+    await user.type(screen.getByLabelText("Campaign name"), "Five haircuts forward");
+    await user.type(
+      screen.getByLabelText("Service description"),
+      "One complete haircut service delivered at the merchant studio.",
+    );
+    const button = screen.getByRole("button", { name: "Create and publish campaign" });
+    await user.click(button);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The transaction sequence changed. Please try again.",
+    );
+    await user.click(button);
+
+    expect(await screen.findByText("Campaign #12 is live on Stellar Testnet.")).toBeInTheDocument();
+    expect(mocks.createDraft).toHaveBeenCalledTimes(2);
+    expect(mocks.publish).toHaveBeenCalledOnce();
   });
 });
