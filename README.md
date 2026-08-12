@@ -7,21 +7,19 @@
 <p align="center"><strong>Invest in a business you trust. Get more value back.</strong></p>
 
 <p align="center">
-  WrenPass lets small businesses raise working capital by pre-selling limited future-service passes.<br />
+  WrenPass helps small businesses unlock working capital by pre-selling limited future-service passes.<br />
   Customers pay with a Stellar asset today and receive more service value later.
 </p>
 
-| Judge link | Evidence |
-| --- | --- |
-| Live product | [wrenpass.vercel.app](https://wrenpass.vercel.app) |
-| Demo video | [Watch the WrenPass demo](https://x.com/wrenpasscorp/status/2087435276172120326?s=20) |
-| On-chain reviews | [wrenpass.vercel.app/reviews](https://wrenpass.vercel.app/reviews) |
-| Testnet contracts | [Deployment manifest](deployments/testnet.json) |
-| User-wallet proof | [11-wallet evidence table](#proof-of-10-user-wallets) |
-| CI pipeline | [CI workflow](https://github.com/ianpurif/wrenpass/actions/workflows/ci.yml) |
+| Name              | Evidence                                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------- |
+| Live product      | [wrenpass.vercel.app](https://wrenpass.vercel.app)                                             |
+| Demo video        | [Watch the WrenPass demo](https://x.com/wrenpasscorp/status/2087435276172120326?s=20)          |
+| On-chain reviews  | [wrenpass.vercel.app/reviews](https://wrenpass.vercel.app/reviews)                             |
+| Testnet contracts | [Deployment manifest](deployments/testnet.json)                                                |
+| User-wallet proof | [11-wallet evidence table](#proof-of-10-user-wallets)                                          |
+| CI pipeline       | [CI workflow](https://github.com/ianpurif/wrenpass/actions/workflows/ci.yml)                   |
 | Delivery pipeline | [Deploy to Vercel workflow](https://github.com/ianpurif/wrenpass/actions/workflows/deploy.yml) |
-
-> **Network notice:** WrenPass is deployed on Stellar Testnet. The configured USDC-like Testnet asset has no real monetary value. Mainnet use requires a reviewed contract release, a production asset, funded operational accounts, and an external security audit.
 
 ![WrenPass landing page](public/productui1.png)
 
@@ -148,20 +146,20 @@ The current product does not claim to solve merchant KYB or subjective service d
 
 ## Implemented product
 
-| Area | Current implementation |
-| --- | --- |
-| Wallet | Freighter through Stellar Wallets Kit, persisted client connection, network checks, balances, and server-verified SEP-53 sessions |
-| Merchant profile | Wallet-authenticated public business metadata stored in the metadata contract; images stored in Cloudinary |
-| Campaign publishing | Atomic publisher contract calls campaign and metadata contracts before making the campaign public |
-| Campaign rules | Fixed supply, price, service value, expiration, payment split, protection reserve, immutable financial terms after sales start |
-| Purchase | Customer-authorized Stellar asset transfer, unique pass assignment, payment distribution, event emission, and explorer link |
-| Pass lifecycle | Active, Redeemed, Expired, and Refunded states; gifting changes ownership without creating another pass |
-| Redemption | Branded QR identifies the pass; short-lived sponsored request plus current-owner wallet approval is required |
-| Refunds | Deterministic contract-defined eligibility; the UI does not promise a guaranteed full refund |
-| Reviews | Wallet-authorized rating and message stored in the review contract; platform-sponsored fee; public paginated review feed |
-| Activity | Cursor-based Stellar event ingestion, idempotent indexing, immediate post-transaction reconciliation, and scheduled recovery |
-| Notifications | Optional Gmail email for purchase, gift, receipt, redemption, expiration, refund, and sold-out events |
-| Operations | Sentry, PostHog, Vercel Analytics, Speed Insights, protected cron recovery, and Soroban TTL maintenance |
+| Area                | Current implementation                                                                                                            |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Wallet              | Freighter through Stellar Wallets Kit, persisted client connection, network checks, balances, and server-verified SEP-53 sessions |
+| Merchant profile    | Wallet-authenticated public business metadata stored in the metadata contract; images stored in Cloudinary                        |
+| Campaign publishing | Atomic publisher contract calls campaign and metadata contracts before making the campaign public                                 |
+| Campaign rules      | Fixed supply, price, service value, expiration, payment split, protection reserve, immutable financial terms after sales start    |
+| Purchase            | Customer-authorized Stellar asset transfer, unique pass assignment, payment distribution, event emission, and explorer link       |
+| Pass lifecycle      | Active, Redeemed, Expired, and Refunded states; gifting changes ownership without creating another pass                           |
+| Redemption          | Branded QR identifies the pass; short-lived sponsored request plus current-owner wallet approval is required                      |
+| Refunds             | Deterministic contract-defined eligibility; the UI does not promise a guaranteed full refund                                      |
+| Reviews             | Wallet-authorized rating and message stored in the review contract; platform-sponsored fee; public paginated review feed          |
+| Activity            | Cursor-based Stellar event ingestion, idempotent indexing, immediate post-transaction reconciliation, and scheduled recovery      |
+| Notifications       | Optional Gmail email for purchase, gift, receipt, redemption, expiration, refund, and sold-out events                             |
+| Operations          | Sentry, PostHog, Vercel Analytics, Speed Insights, protected cron recovery, and Soroban TTL maintenance                           |
 
 ## Architecture
 
@@ -189,15 +187,15 @@ flowchart LR
 
 ### Source of truth
 
-| On-chain and authoritative | Off-chain and operational |
-| --- | --- |
-| Campaign financial configuration and status | Opaque wallet challenges and sessions |
-| Fixed supply, sold count, and redeemed count | Idempotent event index and recovery cursor |
-| Pass IDs, owners, and lifecycle states | Notification delivery records |
-| Stellar asset settlement and protection reserve | Optional notification email setting |
-| Public merchant profile and campaign descriptions | Cloudinary provider-management references |
-| Pending owner-approved redemption requests | Leases, rate limits, and operational checkpoints |
-| Review wallet, rating, and message | Monitoring and privacy-safe analytics |
+| On-chain and authoritative                        | Off-chain and operational                        |
+| ------------------------------------------------- | ------------------------------------------------ |
+| Campaign financial configuration and status       | Opaque wallet challenges and sessions            |
+| Fixed supply, sold count, and redeemed count      | Idempotent event index and recovery cursor       |
+| Pass IDs, owners, and lifecycle states            | Notification delivery records                    |
+| Stellar asset settlement and protection reserve   | Optional notification email setting              |
+| Public merchant profile and campaign descriptions | Cloudinary provider-management references        |
+| Pending owner-approved redemption requests        | Leases, rate limits, and operational checkpoints |
+| Review wallet, rating, and message                | Monitoring and privacy-safe analytics            |
 
 Firestore is never treated as the authority for balances, payments, pass ownership, supply, or redemption. If indexing or email delivery is unavailable, the on-chain state remains valid.
 
@@ -219,13 +217,13 @@ See [SECURITY.md](SECURITY.md) for the complete trust model.
 
 The repository contains five focused Rust contracts in the [contracts](contracts) workspace.
 
-| Contract | Responsibility | Inter-contract work |
-| --- | --- | --- |
-| [Campaign](contracts/wrenpass-campaign/src/lib.rs) | Campaign configuration, fixed supply, Stellar asset payment split, pass ownership, gift, redeem, refund, cancellation, storage TTL, and lifecycle events | Uses the configured Stellar Asset Contract token client |
-| [Metadata](contracts/wrenpass-metadata/src/lib.rs) | Authoritative merchant profile and campaign text metadata | Calls `get_campaign` to verify the campaign and merchant before metadata registration |
-| [Campaign publisher](contracts/wrenpass-publisher/src/lib.rs) | One merchant-authorized transaction creates the campaign, registers metadata, and publishes it | Calls campaign and metadata contracts atomically |
-| [Redemptions](contracts/wrenpass-redemptions/src/lib.rs) | Short-lived, platform-sponsored redemption request and owner approval state | Calls the campaign contract to validate pass and campaign data |
-| [Reviews](contracts/wrenpass-reviews/src/lib.rs) | Stores reviewer wallet, 1-5 rating, message, timestamp, and events | Accepts reviewer authorization while the platform sponsors the transaction fee |
+| Contract                                                      | Responsibility                                                                                                                                           | Inter-contract work                                                                   |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [Campaign](contracts/wrenpass-campaign/src/lib.rs)            | Campaign configuration, fixed supply, Stellar asset payment split, pass ownership, gift, redeem, refund, cancellation, storage TTL, and lifecycle events | Uses the configured Stellar Asset Contract token client                               |
+| [Metadata](contracts/wrenpass-metadata/src/lib.rs)            | Authoritative merchant profile and campaign text metadata                                                                                                | Calls `get_campaign` to verify the campaign and merchant before metadata registration |
+| [Campaign publisher](contracts/wrenpass-publisher/src/lib.rs) | One merchant-authorized transaction creates the campaign, registers metadata, and publishes it                                                           | Calls campaign and metadata contracts atomically                                      |
+| [Redemptions](contracts/wrenpass-redemptions/src/lib.rs)      | Short-lived, platform-sponsored redemption request and owner approval state                                                                              | Calls the campaign contract to validate pass and campaign data                        |
+| [Reviews](contracts/wrenpass-reviews/src/lib.rs)              | Stores reviewer wallet, 1-5 rating, message, timestamp, and events                                                                                       | Accepts reviewer authorization while the platform sponsors the transaction fee        |
 
 The campaign contract emits meaningful events for campaign creation and status, purchase, gift, redemption, refund, and cancellation. Other contracts emit profile, metadata, redemption-request, and review events. The indexer derives sold-out notifications from the authoritative campaign state after a purchase.
 
@@ -237,19 +235,19 @@ Deployment manifest: [deployments/testnet.json](deployments/testnet.json)
 
 Configured Testnet payment asset:
 
-| Code | Issuer | Stellar Asset Contract |
-| --- | --- | --- |
+| Code                   | Issuer                                                                                                                                                                 | Stellar Asset Contract                                                                                                                                                  |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `USDC` (Testnet label) | [`GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`](https://stellar.expert/explorer/testnet/account/GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5) | [`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`](https://stellar.expert/explorer/testnet/contract/CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA) |
 
 This is a configured Testnet asset, not Circle mainnet USDC.
 
-| Contract | Testnet address | Deployed WASM SHA-256 | Deployment transaction |
-| --- | --- | --- | --- |
-| Campaign | [`CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D`](https://stellar.expert/explorer/testnet/contract/CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D) | `aeec070bd69017b5201f25317908e3bdd9349971a7c8cf39ff9d1f1095c1ff33` | Historical hash not retained; WASM verified |
-| Metadata | [`CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR`](https://stellar.expert/explorer/testnet/contract/CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR) | `56ff566c2f2732deb02d690ec5e68316cc12b73f8a4a2fafc53840685c976e97` | Historical hash not retained; WASM verified |
+| Contract           | Testnet address                                                                                                                                                         | Deployed WASM SHA-256                                              | Deployment transaction                                                                                                                                                            |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Campaign           | [`CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D`](https://stellar.expert/explorer/testnet/contract/CAFVI2IDYFQKBWVQ7V6JIEUSH63HWVPS2YAVGASW6QUKB24AA6N76V5D) | `aeec070bd69017b5201f25317908e3bdd9349971a7c8cf39ff9d1f1095c1ff33` | Historical hash not retained; WASM verified                                                                                                                                       |
+| Metadata           | [`CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR`](https://stellar.expert/explorer/testnet/contract/CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR) | `56ff566c2f2732deb02d690ec5e68316cc12b73f8a4a2fafc53840685c976e97` | Historical hash not retained; WASM verified                                                                                                                                       |
 | Campaign publisher | [`CALEYUTH2ZJOU3DXREQG5IGGZ3JWIRUS6P6OT6F25ER5IGTXVSAL5JXS`](https://stellar.expert/explorer/testnet/contract/CALEYUTH2ZJOU3DXREQG5IGGZ3JWIRUS6P6OT6F25ER5IGTXVSAL5JXS) | `4a1183fecc93e185b5a917e6ddf675715765e7311951cdbb48259597cc290342` | [`86d607741f55f09204e5ac0b5c0306886c5c1c927909cf0ba5faf92c006d3db9`](https://stellar.expert/explorer/testnet/tx/86d607741f55f09204e5ac0b5c0306886c5c1c927909cf0ba5faf92c006d3db9) |
-| Redemptions | [`CB6HZLQJGSZBN6NCII2KGOHIQUSG33YQCM7XWGTUK6JTJ4HLSKY65QHN`](https://stellar.expert/explorer/testnet/contract/CB6HZLQJGSZBN6NCII2KGOHIQUSG33YQCM7XWGTUK6JTJ4HLSKY65QHN) | `3e7e47cc108d6376079b0453e1499248a84f7f09fde3e769df32a8e9f2c36c40` | Historical hash not retained; WASM verified |
-| Reviews | [`CCZ7KC6SGTFJKOPVUFD6WYNBSYGOCHBUNV5HNR2AVGFP23KBOOMF6WY3`](https://stellar.expert/explorer/testnet/contract/CCZ7KC6SGTFJKOPVUFD6WYNBSYGOCHBUNV5HNR2AVGFP23KBOOMF6WY3) | `b0605d6e1da7fcb1229aa18a25ddd22ded196058945bc26577a145ab2fcb427c` | Historical hash not retained; WASM verified |
+| Redemptions        | [`CB6HZLQJGSZBN6NCII2KGOHIQUSG33YQCM7XWGTUK6JTJ4HLSKY65QHN`](https://stellar.expert/explorer/testnet/contract/CB6HZLQJGSZBN6NCII2KGOHIQUSG33YQCM7XWGTUK6JTJ4HLSKY65QHN) | `3e7e47cc108d6376079b0453e1499248a84f7f09fde3e769df32a8e9f2c36c40` | Historical hash not retained; WASM verified                                                                                                                                       |
+| Reviews            | [`CCZ7KC6SGTFJKOPVUFD6WYNBSYGOCHBUNV5HNR2AVGFP23KBOOMF6WY3`](https://stellar.expert/explorer/testnet/contract/CCZ7KC6SGTFJKOPVUFD6WYNBSYGOCHBUNV5HNR2AVGFP23KBOOMF6WY3) | `b0605d6e1da7fcb1229aa18a25ddd22ded196058945bc26577a145ab2fcb427c` | Historical hash not retained; WASM verified                                                                                                                                       |
 
 Four early deployment transaction hashes were not retained. This limitation is recorded in the manifest instead of being hidden. Each contract entry pins its exact historical source commit, toolchain, contract address, and WASM hash. The CI provenance job rebuilds the historical source and checks the installed Testnet WASM:
 
@@ -259,13 +257,13 @@ pnpm contract:verify:testnet
 
 ### Successful contract interactions
 
-| Interaction | Transaction hash | Ledger | Indexed at (UTC) |
-| --- | --- | ---: | --- |
-| Atomic publisher initialization | [`d081ae9dd92d628be48d90b9e743c8871560be4c9fde7d78533c5e0114fa3455`](https://stellar.expert/explorer/testnet/tx/d081ae9dd92d628be48d90b9e743c8871560be4c9fde7d78533c5e0114fa3455) | See explorer | See explorer |
-| Pass purchase | [`ec8da8a6aceeb6e9ae62fb0a7499f510831cbe0577a17d49bbff8a14a09ca6ec`](https://stellar.expert/explorer/testnet/tx/ec8da8a6aceeb6e9ae62fb0a7499f510831cbe0577a17d49bbff8a14a09ca6ec) | 4,069,759 | 2026-08-10 13:52:42.611 |
-| Pass gift | [`98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf`](https://stellar.expert/explorer/testnet/tx/98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf) | 4,098,213 | 2026-08-12 05:23:26.982 |
-| Pass redemption | [`44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e`](https://stellar.expert/explorer/testnet/tx/44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e) | 4,069,805 | 2026-08-10 14:02:14.763 |
-| Review submission | [`faa00e0de414f3f50dffb3ed4013c711c5bf00bb538d777337e1e178869db044`](https://stellar.expert/explorer/testnet/tx/faa00e0de414f3f50dffb3ed4013c711c5bf00bb538d777337e1e178869db044) | 4,097,490 | 2026-08-12 04:23:03.633 |
+| Interaction                     | Transaction hash                                                                                                                                                                  |       Ledger | Indexed at (UTC)        |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------: | ----------------------- |
+| Atomic publisher initialization | [`d081ae9dd92d628be48d90b9e743c8871560be4c9fde7d78533c5e0114fa3455`](https://stellar.expert/explorer/testnet/tx/d081ae9dd92d628be48d90b9e743c8871560be4c9fde7d78533c5e0114fa3455) | See explorer | See explorer            |
+| Pass purchase                   | [`ec8da8a6aceeb6e9ae62fb0a7499f510831cbe0577a17d49bbff8a14a09ca6ec`](https://stellar.expert/explorer/testnet/tx/ec8da8a6aceeb6e9ae62fb0a7499f510831cbe0577a17d49bbff8a14a09ca6ec) |    4,069,759 | 2026-08-10 13:52:42.611 |
+| Pass gift                       | [`98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf`](https://stellar.expert/explorer/testnet/tx/98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf) |    4,098,213 | 2026-08-12 05:23:26.982 |
+| Pass redemption                 | [`44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e`](https://stellar.expert/explorer/testnet/tx/44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e) |    4,069,805 | 2026-08-10 14:02:14.763 |
+| Review submission               | [`faa00e0de414f3f50dffb3ed4013c711c5bf00bb538d777337e1e178869db044`](https://stellar.expert/explorer/testnet/tx/faa00e0de414f3f50dffb3ed4013c711c5bf00bb538d777337e1e178869db044) |    4,097,490 | 2026-08-12 04:23:03.633 |
 
 `indexedAt` is the application's cache time. The ledger number and Stellar transaction are the authoritative order and proof.
 
@@ -275,61 +273,61 @@ The local root export `wallet-report.json` was generated from real retained appl
 
 ### Snapshot totals
 
-| Metric | Result |
-| --- | ---: |
-| Distinct Stellar wallet addresses | **11** |
-| Unique on-chain event IDs | **40** |
-| Unique Stellar transaction hashes | **40** |
-| Wallet-attributed blockchain records | **45** |
-| Verified wallet sessions retained at export time | 2 |
-| Notification records | 6 |
-| Managed Cloudinary asset references | 8 |
+| Metric                                           | Result |
+| ------------------------------------------------ | -----: |
+| Distinct Stellar wallet addresses                | **11** |
+| Unique on-chain event IDs                        | **40** |
+| Unique Stellar transaction hashes                | **40** |
+| Wallet-attributed blockchain records             | **45** |
+| Verified wallet sessions retained at export time |      2 |
+| Notification records                             |      6 |
+| Managed Cloudinary asset references              |      8 |
 
 The 45 count is an attribution count. A two-party gift or redemption is attached to both participant wallets. After deduplication, the report contains 40 unique event IDs and 40 unique transaction hashes. Wallet addresses prove distinct accounts; they should not be interpreted as proof of 11 unique human identities.
 
 ### Event distribution
 
-| Event type | Unique on-chain events | Wallet attributions |
-| --- | ---: | ---: |
-| `campaign_created` | 8 | 8 |
-| `merchant_profile_set` | 3 | 3 |
-| `pass_purchased` | 13 | 13 |
-| `pass_gifted` | 2 | 4 |
-| `pass_redeemed` | 3 | 6 |
-| `review_submitted` | 11 | 11 |
-| **Total** | **40** | **45** |
+| Event type             | Unique on-chain events | Wallet attributions |
+| ---------------------- | ---------------------: | ------------------: |
+| `campaign_created`     |                      8 |                   8 |
+| `merchant_profile_set` |                      3 |                   3 |
+| `pass_purchased`       |                     13 |                  13 |
+| `pass_gifted`          |                      2 |                   4 |
+| `pass_redeemed`        |                      3 |                   6 |
+| `review_submitted`     |                     11 |                  11 |
+| **Total**              |                 **40** |              **45** |
 
 ### Wallet-level proof
 
-| ID | Wallet address | Interactions | Event types | Roles | Ledger range |
-| --- | --- | ---: | --- | --- | ---: |
-| W1 | `GA27SB63Y3TKTUOW3GBE7BF6ZU6NOCPX6PSO3TCNBVOCDUYQQ7O2GD2H` | 3 | Gift, purchase, review | Customer, previous owner, reviewer | 4,097,486-4,098,213 |
-| W2 | `GA2LG25AK4TPIZH7S2LVVIOYRTNTQRLOXEDZEKPWBRL66NQESSPZQVRZ` | 2 | Gift, purchase | Customer, previous owner | 4,048,437-4,048,485 |
-| W3 | `GA5GX6HXCZVXWJ6W5ZEQSLH5FCLGDBYOGJMYO5B3SMJBF5YXDD3MYL3W` | 2 | Gift, redemption | Owner, recipient | 4,098,213-4,098,289 |
-| W4 | `GA5P65P3SDKNH7OV6WBRGL2EOM7MABZC6VDS6BQRPNH4K6HBGVCKCD2O` | 3 | Merchant profile, purchase, review | Customer, merchant, reviewer | 4,066,506-4,069,034 |
-| W5 | `GADRDDWDRMVMA3UBOSZAA5NYPO6RPH6NRYMA5SCGDE33E7NC46P7KGDO` | 11 | Campaign, merchant profile, redemption, review | Merchant, reviewer | 4,047,981-4,096,849 |
-| W6 | `GAV5YXNQ5LD3SRTCHMXVYWS7BVHE5ZTZODZF2DOQA7F2J2IARWB5BL6D` | 3 | Purchase | Customer | 4,099,799-4,099,810 |
-| W7 | `GBLYXTXRCTOA5C2FN4GDHGUPEBFFAHZVA46HB6NYJMHCL3GWMPKBPL3D` | 3 | Campaign, redemption, review | Merchant, reviewer | 4,097,458-4,098,289 |
-| W8 | `GC4LXTPHSIV2UQWTQACO7ZHJRQA4KJLIPOJ2NJTNYRMKIILZV3RYNQJH` | 10 | Merchant profile, gift, purchase, redemption, review | Customer, merchant, owner, recipient, reviewer | 4,048,485-4,069,805 |
-| W9 | `GCR4JB3TV7FZCXD4GKLYOWUYMHJL4KQIUUN23UGNKQRRP2L33NE6L4LM` | 2 | Purchase, review | Customer, reviewer | 4,081,469-4,081,475 |
-| W10 | `GDJ44GXZZDDCXVQPGPFWQ6J37CLV46MHQRJUHWHO6YQLKIMYWRXVYPNK` | 4 | Purchase, review | Customer, reviewer | 4,096,585-4,096,609 |
-| W11 | `GDMQTZTIFMIJ2B6S26XADEOGXWGEU25EOMAUPWTG7FCC3HGG7ZYFU4NM` | 2 | Purchase, review | Customer, reviewer | 4,088,539-4,088,545 |
+| ID  | Wallet address                                             | Interactions | Event types                                          | Roles                                          |        Ledger range |
+| --- | ---------------------------------------------------------- | -----------: | ---------------------------------------------------- | ---------------------------------------------- | ------------------: |
+| W1  | `GA27SB63Y3TKTUOW3GBE7BF6ZU6NOCPX6PSO3TCNBVOCDUYQQ7O2GD2H` |            3 | Gift, purchase, review                               | Customer, previous owner, reviewer             | 4,097,486-4,098,213 |
+| W2  | `GA2LG25AK4TPIZH7S2LVVIOYRTNTQRLOXEDZEKPWBRL66NQESSPZQVRZ` |            2 | Gift, purchase                                       | Customer, previous owner                       | 4,048,437-4,048,485 |
+| W3  | `GA5GX6HXCZVXWJ6W5ZEQSLH5FCLGDBYOGJMYO5B3SMJBF5YXDD3MYL3W` |            2 | Gift, redemption                                     | Owner, recipient                               | 4,098,213-4,098,289 |
+| W4  | `GA5P65P3SDKNH7OV6WBRGL2EOM7MABZC6VDS6BQRPNH4K6HBGVCKCD2O` |            3 | Merchant profile, purchase, review                   | Customer, merchant, reviewer                   | 4,066,506-4,069,034 |
+| W5  | `GADRDDWDRMVMA3UBOSZAA5NYPO6RPH6NRYMA5SCGDE33E7NC46P7KGDO` |           11 | Campaign, merchant profile, redemption, review       | Merchant, reviewer                             | 4,047,981-4,096,849 |
+| W6  | `GAV5YXNQ5LD3SRTCHMXVYWS7BVHE5ZTZODZF2DOQA7F2J2IARWB5BL6D` |            3 | Purchase                                             | Customer                                       | 4,099,799-4,099,810 |
+| W7  | `GBLYXTXRCTOA5C2FN4GDHGUPEBFFAHZVA46HB6NYJMHCL3GWMPKBPL3D` |            3 | Campaign, redemption, review                         | Merchant, reviewer                             | 4,097,458-4,098,289 |
+| W8  | `GC4LXTPHSIV2UQWTQACO7ZHJRQA4KJLIPOJ2NJTNYRMKIILZV3RYNQJH` |           10 | Merchant profile, gift, purchase, redemption, review | Customer, merchant, owner, recipient, reviewer | 4,048,485-4,069,805 |
+| W9  | `GCR4JB3TV7FZCXD4GKLYOWUYMHJL4KQIUUN23UGNKQRRP2L33NE6L4LM` |            2 | Purchase, review                                     | Customer, reviewer                             | 4,081,469-4,081,475 |
+| W10 | `GDJ44GXZZDDCXVQPGPFWQ6J37CLV46MHQRJUHWHO6YQLKIMYWRXVYPNK` |            4 | Purchase, review                                     | Customer, reviewer                             | 4,096,585-4,096,609 |
+| W11 | `GDMQTZTIFMIJ2B6S26XADEOGXWGEU25EOMAUPWTG7FCC3HGG7ZYFU4NM` |            2 | Purchase, review                                     | Customer, reviewer                             | 4,088,539-4,088,545 |
 
 ### Latest retained transaction for each wallet
 
-| Wallet | Event | Transaction hash | Ledger | Indexed at (UTC) |
-| --- | --- | --- | ---: | --- |
-| W1 | `pass_gifted` | [`98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf`](https://stellar.expert/explorer/testnet/tx/98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf) | 4,098,213 | 2026-08-12 05:23:26.982 |
-| W2 | `pass_gifted` | [`33aff12d6f8155ded2723b927b4d8b1256b7d5ed5ffff9844f471c844f22c040`](https://stellar.expert/explorer/testnet/tx/33aff12d6f8155ded2723b927b4d8b1256b7d5ed5ffff9844f471c844f22c040) | 4,048,485 | 2026-08-09 10:38:53.301 |
-| W3 | `pass_redeemed` | [`0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c`](https://stellar.expert/explorer/testnet/tx/0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c) | 4,098,289 | 2026-08-12 05:29:48.331 |
-| W4 | `merchant_profile_set` | [`ae1cfc7f2fd0b3c96aa14e7aedc8224d352cd63a64a3ced9f2d756765d730d9a`](https://stellar.expert/explorer/testnet/tx/ae1cfc7f2fd0b3c96aa14e7aedc8224d352cd63a64a3ced9f2d756765d730d9a) | 4,069,034 | 2026-08-10 12:48:05.000 |
-| W5 | `campaign_created` | [`9553c88314dbbd9b8f037a8b5c9c910fc2dedf0f793597d919cc105c8bf6f987`](https://stellar.expert/explorer/testnet/tx/9553c88314dbbd9b8f037a8b5c9c910fc2dedf0f793597d919cc105c8bf6f987) | 4,096,849 | 2026-08-12 04:20:27.051 |
-| W6 | `pass_purchased` | [`fcbe6b15a812c5ce56a4ba4f4a6cd7640f575df31fdf03bc14c2708430908f88`](https://stellar.expert/explorer/testnet/tx/fcbe6b15a812c5ce56a4ba4f4a6cd7640f575df31fdf03bc14c2708430908f88) | 4,099,810 | 2026-08-12 07:36:42.991 |
-| W7 | `pass_redeemed` | [`0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c`](https://stellar.expert/explorer/testnet/tx/0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c) | 4,098,289 | 2026-08-12 05:29:48.331 |
-| W8 | `pass_redeemed` | [`44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e`](https://stellar.expert/explorer/testnet/tx/44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e) | 4,069,805 | 2026-08-10 14:02:14.763 |
-| W9 | `review_submitted` | [`3d464a520615491ff78cacb06aacd6e6258c544182fdda317f967f5cda97214a`](https://stellar.expert/explorer/testnet/tx/3d464a520615491ff78cacb06aacd6e6258c544182fdda317f967f5cda97214a) | 4,081,475 | 2026-08-11 06:06:27.875 |
-| W10 | `review_submitted` | [`0d350bf63c73ee7782d53d0ff6259db732833ec62e4d864e24c29a18f7a4d130`](https://stellar.expert/explorer/testnet/tx/0d350bf63c73ee7782d53d0ff6259db732833ec62e4d864e24c29a18f7a4d130) | 4,096,609 | 2026-08-12 03:09:32.377 |
-| W11 | `review_submitted` | [`6d2f60dbdec212657d4d87b12a640f8c50ea764e365d53494a38a7878c6c2d8c`](https://stellar.expert/explorer/testnet/tx/6d2f60dbdec212657d4d87b12a640f8c50ea764e365d53494a38a7878c6c2d8c) | 4,088,545 | 2026-08-11 15:56:29.650 |
+| Wallet | Event                  | Transaction hash                                                                                                                                                                  |    Ledger | Indexed at (UTC)        |
+| ------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------: | ----------------------- |
+| W1     | `pass_gifted`          | [`98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf`](https://stellar.expert/explorer/testnet/tx/98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf) | 4,098,213 | 2026-08-12 05:23:26.982 |
+| W2     | `pass_gifted`          | [`33aff12d6f8155ded2723b927b4d8b1256b7d5ed5ffff9844f471c844f22c040`](https://stellar.expert/explorer/testnet/tx/33aff12d6f8155ded2723b927b4d8b1256b7d5ed5ffff9844f471c844f22c040) | 4,048,485 | 2026-08-09 10:38:53.301 |
+| W3     | `pass_redeemed`        | [`0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c`](https://stellar.expert/explorer/testnet/tx/0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c) | 4,098,289 | 2026-08-12 05:29:48.331 |
+| W4     | `merchant_profile_set` | [`ae1cfc7f2fd0b3c96aa14e7aedc8224d352cd63a64a3ced9f2d756765d730d9a`](https://stellar.expert/explorer/testnet/tx/ae1cfc7f2fd0b3c96aa14e7aedc8224d352cd63a64a3ced9f2d756765d730d9a) | 4,069,034 | 2026-08-10 12:48:05.000 |
+| W5     | `campaign_created`     | [`9553c88314dbbd9b8f037a8b5c9c910fc2dedf0f793597d919cc105c8bf6f987`](https://stellar.expert/explorer/testnet/tx/9553c88314dbbd9b8f037a8b5c9c910fc2dedf0f793597d919cc105c8bf6f987) | 4,096,849 | 2026-08-12 04:20:27.051 |
+| W6     | `pass_purchased`       | [`fcbe6b15a812c5ce56a4ba4f4a6cd7640f575df31fdf03bc14c2708430908f88`](https://stellar.expert/explorer/testnet/tx/fcbe6b15a812c5ce56a4ba4f4a6cd7640f575df31fdf03bc14c2708430908f88) | 4,099,810 | 2026-08-12 07:36:42.991 |
+| W7     | `pass_redeemed`        | [`0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c`](https://stellar.expert/explorer/testnet/tx/0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c) | 4,098,289 | 2026-08-12 05:29:48.331 |
+| W8     | `pass_redeemed`        | [`44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e`](https://stellar.expert/explorer/testnet/tx/44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e) | 4,069,805 | 2026-08-10 14:02:14.763 |
+| W9     | `review_submitted`     | [`3d464a520615491ff78cacb06aacd6e6258c544182fdda317f967f5cda97214a`](https://stellar.expert/explorer/testnet/tx/3d464a520615491ff78cacb06aacd6e6258c544182fdda317f967f5cda97214a) | 4,081,475 | 2026-08-11 06:06:27.875 |
+| W10    | `review_submitted`     | [`0d350bf63c73ee7782d53d0ff6259db732833ec62e4d864e24c29a18f7a4d130`](https://stellar.expert/explorer/testnet/tx/0d350bf63c73ee7782d53d0ff6259db732833ec62e4d864e24c29a18f7a4d130) | 4,096,609 | 2026-08-12 03:09:32.377 |
+| W11    | `review_submitted`     | [`6d2f60dbdec212657d4d87b12a640f8c50ea764e365d53494a38a7878c6c2d8c`](https://stellar.expert/explorer/testnet/tx/6d2f60dbdec212657d4d87b12a640f8c50ea764e365d53494a38a7878c6c2d8c) | 4,088,545 | 2026-08-11 15:56:29.650 |
 
 ### Reproduce the report
 
@@ -417,14 +415,14 @@ PostHog receives privacy-safe product and web analytics.
 
 ### Requirements
 
-| Tool | Pinned version |
-| --- | --- |
-| Node.js | `22.20.0` |
-| pnpm | `11.16.0` |
-| Rust | `1.96.1` |
+| Tool        | Pinned version  |
+| ----------- | --------------- |
+| Node.js     | `22.20.0`       |
+| pnpm        | `11.16.0`       |
+| Rust        | `1.96.1`        |
 | Rust target | `wasm32v1-none` |
-| Stellar CLI | `27.0.0` |
-| Soroban SDK | `27.0.5` |
+| Stellar CLI | `27.0.0`        |
+| Soroban SDK | `27.0.5`        |
 
 Freighter must be installed and set to Testnet for real wallet flows. Never share a secret seed or recovery phrase.
 
@@ -450,19 +448,19 @@ Copy-Item .env.example .env.local
 
 Use [.env.example](.env.example) as the only template. Replace its placeholders in `.env.local`. Never commit `.env.local`.
 
-| Group | Variables | Purpose |
-| --- | --- | --- |
-| Firebase Admin | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Server sessions, event cache, notifications, leases, and operational records |
-| Cloudinary | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Merchant and campaign image management |
-| Gmail SMTP | `GMAIL_SMTP_USER`, `GMAIL_SMTP_APP_PASSWORD`, `EMAIL_FROM` | Essential email notifications |
-| Stellar network | `NEXT_PUBLIC_STELLAR_NETWORK`, `NEXT_PUBLIC_STELLAR_RPC_URL` | Network and RPC selection |
-| Stellar asset | `NEXT_PUBLIC_STELLAR_ASSET_CODE`, `NEXT_PUBLIC_STELLAR_ASSET_ISSUER`, `NEXT_PUBLIC_STELLAR_ASSET_CONTRACT_ID` | Configured payment asset |
-| Contracts | `NEXT_PUBLIC_WRENPASS_CONTRACT_ID`, `NEXT_PUBLIC_WRENPASS_METADATA_CONTRACT_ID`, `NEXT_PUBLIC_WRENPASS_PUBLISHER_CONTRACT_ID`, `NEXT_PUBLIC_WRENPASS_REDEMPTION_CONTRACT_ID`, `NEXT_PUBLIC_WRENPASS_REVIEW_CONTRACT_ID` | Deployed suite addresses |
-| Sponsorship | `STELLAR_REVIEW_SPONSOR_SECRET` | Server-held sponsored review and redemption-request account |
-| Sentry | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` | Error monitoring and source maps |
-| PostHog | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | Privacy-safe product analytics |
-| Operations | `CRON_SECRET` | Protected scheduled recovery endpoint |
-| Vercel workflow | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | Protected GitHub deployment environment |
+| Group           | Variables                                                                                                                                                                                                               | Purpose                                                                      |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Firebase Admin  | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`                                                                                                                                                  | Server sessions, event cache, notifications, leases, and operational records |
+| Cloudinary      | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`                                                                                                                                                  | Merchant and campaign image management                                       |
+| Gmail SMTP      | `GMAIL_SMTP_USER`, `GMAIL_SMTP_APP_PASSWORD`, `EMAIL_FROM`                                                                                                                                                              | Essential email notifications                                                |
+| Stellar network | `NEXT_PUBLIC_STELLAR_NETWORK`, `NEXT_PUBLIC_STELLAR_RPC_URL`                                                                                                                                                            | Network and RPC selection                                                    |
+| Stellar asset   | `NEXT_PUBLIC_STELLAR_ASSET_CODE`, `NEXT_PUBLIC_STELLAR_ASSET_ISSUER`, `NEXT_PUBLIC_STELLAR_ASSET_CONTRACT_ID`                                                                                                           | Configured payment asset                                                     |
+| Contracts       | `NEXT_PUBLIC_WRENPASS_CONTRACT_ID`, `NEXT_PUBLIC_WRENPASS_METADATA_CONTRACT_ID`, `NEXT_PUBLIC_WRENPASS_PUBLISHER_CONTRACT_ID`, `NEXT_PUBLIC_WRENPASS_REDEMPTION_CONTRACT_ID`, `NEXT_PUBLIC_WRENPASS_REVIEW_CONTRACT_ID` | Deployed suite addresses                                                     |
+| Sponsorship     | `STELLAR_REVIEW_SPONSOR_SECRET`                                                                                                                                                                                         | Server-held sponsored review and redemption-request account                  |
+| Sentry          | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN`                                                                                                                                           | Error monitoring and source maps                                             |
+| PostHog         | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`                                                                                                                                                                   | Privacy-safe product analytics                                               |
+| Operations      | `CRON_SECRET`                                                                                                                                                                                                           | Protected scheduled recovery endpoint                                        |
+| Vercel workflow | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`                                                                                                                                                                    | Protected GitHub deployment environment                                      |
 
 The three Vercel values belong in GitHub environment secrets, not in a committed file. The Stellar sponsor secret is server-only and must belong to a dedicated funded Testnet account.
 
@@ -509,14 +507,14 @@ pnpm users:wallet-report --output ./wallet-report.json --force
 
 Validation completed on 2026-08-12 against the current workspace:
 
-| Check | Result |
-| --- | --- |
-| `pnpm lint` | Passed |
-| `pnpm typecheck` | Passed |
-| `pnpm test` | 61 files passed; 180 tests passed |
-| `pnpm contract:test` | 60 Rust contract tests passed |
+| Check                          | Result                                                                             |
+| ------------------------------ | ---------------------------------------------------------------------------------- |
+| `pnpm lint`                    | Passed                                                                             |
+| `pnpm typecheck`               | Passed                                                                             |
+| `pnpm test`                    | 61 files passed; 180 tests passed                                                  |
+| `pnpm contract:test`           | 60 Rust contract tests passed                                                      |
 | `pnpm contract:verify:testnet` | Five deployed contract WASM hashes and three interaction evidence records verified |
-| `pnpm build` | Production build passed; 23 routes generated or registered |
+| `pnpm build`                   | Production build passed; 23 routes generated or registered                         |
 
 The test strategy focuses on financial rules, authorization, invalid state transitions, event idempotency, wallet/session races, UI loading and errors, responsive workflows, and critical browser journeys. Contract tests include positive and negative cases for campaign creation, supply limits, purchases, payment distribution, gifting, redemption, refunds, metadata authorization, sponsored requests, and reviews.
 
@@ -553,43 +551,43 @@ At snapshot commit [`6ec06fc659187bb2c4375ee50c10ad1165685e5e`](https://github.c
 
 ## Level 3 evidence
 
-| Orange Belt requirement | Implementation and proof |
-| --- | --- |
-| Advanced smart contract development | Five Rust/Soroban contracts implement integer-safe asset distribution, protected reserves, fixed supply, ownership, lifecycle state, refunds, auth, events, storage indexes, and TTL maintenance. See [contracts](contracts). |
-| Inter-contract communication | The publisher calls campaign and metadata contracts atomically; metadata and redemptions validate against the campaign contract. See [publisher source](contracts/wrenpass-publisher/src/lib.rs). |
+| Orange Belt requirement               | Implementation and proof                                                                                                                                                                                                                                                              |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Advanced smart contract development   | Five Rust/Soroban contracts implement integer-safe asset distribution, protected reserves, fixed supply, ownership, lifecycle state, refunds, auth, events, storage indexes, and TTL maintenance. See [contracts](contracts).                                                         |
+| Inter-contract communication          | The publisher calls campaign and metadata contracts atomically; metadata and redemptions validate against the campaign contract. See [publisher source](contracts/wrenpass-publisher/src/lib.rs).                                                                                     |
 | Event streaming and real-time updates | Contract events are read through Stellar RPC, indexed with a cursor and idempotent event ID, reconciled after transactions, and recovered by scheduled operations. See [event source](src/server/events/event-source.ts) and [sync service](src/server/events/event-sync-service.ts). |
-| CI/CD pipeline | Three-job CI plus a protected Vercel workflow. See the [successful CI screenshot](public/ci-cd2.png), [deployment screenshot](public/ci-cd3.png), and workflow sources. |
-| Smart contract deployment workflow | Pinned toolchain, locked build, deterministic/restart-safe deployment, manifest, generated bindings, and Testnet WASM verification. See [deployment guide](docs/DEPLOYMENT.md). |
-| Mobile responsive frontend | Landing, campaign form, scanner, campaign purchase, merchant dashboard, and customer workspace adapt to small screens. See the [mobile screenshots](#mobile-responsive-ui). |
-| Error handling and loading states | Shared feedback states, route-level errors, transaction-state UI, explicit timeouts/retries, and Sentry capture. See [feedback state](src/components/ui/feedback-state.tsx) and [Sentry evidence](public/sentry2.png). |
-| Contract and frontend tests | Rust contract tests, Vitest unit/integration/component tests, and Playwright critical journeys. See [test output](public/Test-output.png) and CI. |
-| Production-ready architecture | Clear trust boundaries, validated inputs, server-only secrets, SEP-53 sessions, on-chain financial authority, operational recovery, monitoring, and security documentation. |
-| Documentation and demo | This README, [deployment](docs/DEPLOYMENT.md), [operations](docs/OPERATIONS.md), [production evidence](docs/PRODUCTION.md), [security](SECURITY.md), and the [demo video](https://x.com/wrenpasscorp/status/2087435276172120326?s=20). |
-| Live demo | [https://wrenpass.vercel.app](https://wrenpass.vercel.app) |
-| Contract deployment address | Five linked Testnet addresses are listed in [Testnet deployment proof](#testnet-deployment-proof). |
-| Transaction hash | Purchase, gift, redemption, review, publisher initialization, and deployment transactions are linked above. |
-| Required screenshots | [Mobile UI](#mobile-responsive-ui), [CI/CD and test output](#cicd-and-test-output), and [monitoring](#monitoring-and-analytics). |
+| CI/CD pipeline                        | Three-job CI plus a protected Vercel workflow. See the [successful CI screenshot](public/ci-cd2.png), [deployment screenshot](public/ci-cd3.png), and workflow sources.                                                                                                               |
+| Smart contract deployment workflow    | Pinned toolchain, locked build, deterministic/restart-safe deployment, manifest, generated bindings, and Testnet WASM verification. See [deployment guide](docs/DEPLOYMENT.md).                                                                                                       |
+| Mobile responsive frontend            | Landing, campaign form, scanner, campaign purchase, merchant dashboard, and customer workspace adapt to small screens. See the [mobile screenshots](#mobile-responsive-ui).                                                                                                           |
+| Error handling and loading states     | Shared feedback states, route-level errors, transaction-state UI, explicit timeouts/retries, and Sentry capture. See [feedback state](src/components/ui/feedback-state.tsx) and [Sentry evidence](public/sentry2.png).                                                                |
+| Contract and frontend tests           | Rust contract tests, Vitest unit/integration/component tests, and Playwright critical journeys. See [test output](public/Test-output.png) and CI.                                                                                                                                     |
+| Production-ready architecture         | Clear trust boundaries, validated inputs, server-only secrets, SEP-53 sessions, on-chain financial authority, operational recovery, monitoring, and security documentation.                                                                                                           |
+| Documentation and demo                | This README, [deployment](docs/DEPLOYMENT.md), [operations](docs/OPERATIONS.md), [production evidence](docs/PRODUCTION.md), [security](SECURITY.md), and the [demo video](https://x.com/wrenpasscorp/status/2087435276172120326?s=20).                                                |
+| Live demo                             | [https://wrenpass.vercel.app](https://wrenpass.vercel.app)                                                                                                                                                                                                                            |
+| Contract deployment address           | Five linked Testnet addresses are listed in [Testnet deployment proof](#testnet-deployment-proof).                                                                                                                                                                                    |
+| Transaction hash                      | Purchase, gift, redemption, review, publisher initialization, and deployment transactions are linked above.                                                                                                                                                                           |
+| Required screenshots                  | [Mobile UI](#mobile-responsive-ui), [CI/CD and test output](#cicd-and-test-output), and [monitoring](#monitoring-and-analytics).                                                                                                                                                      |
 
 ## Level 4 evidence
 
-| Green Belt requirement | Implementation and proof |
-| --- | --- |
-| Proper structure and documentation | Next.js code is separated into UI, features, Stellar clients, server services, generated bindings, contracts, scripts, and docs. This README provides setup, testing, architecture, proof, and limitations. |
-| Technical complexity | Cross-contract atomic publishing, Stellar asset distribution, owner-authorized QR redemption, fee-sponsored authorized reviews, decentralized metadata, event recovery, and historical WASM provenance. |
-| Product quality | A live responsive product supports the full merchant-to-customer lifecycle with clear financial terms, transaction feedback, explorer links, and operational monitoring. |
-| Architecture quality | On-chain authority is separated from operational off-chain services; contract responsibilities are focused; server actions use verified wallet sessions; failures are recoverable and idempotent. |
-| Real-world usefulness | Service businesses receive working capital without debt or equity. Customers receive useful bonus service value instead of a speculative token. |
-| Production deployment | [wrenpass.vercel.app](https://wrenpass.vercel.app) with [recorded production release evidence](docs/PRODUCTION.md). |
-| Monitoring and analytics | Sentry, PostHog, Vercel Analytics, and Speed Insights are integrated. See [monitoring screenshots](#monitoring-and-analytics). |
-| Optimized UX | Persisted wallet connection, responsive product pages, immediate event reconciliation, paginated campaign transactions, virtualized review browsing, clear loading/errors, and sponsored reviews. |
-| Stellar Testnet contracts | Five deployed contracts with explorer links and verifiable WASM hashes. |
-| Minimum 15 meaningful commits | 65 commits at the recorded snapshot, covering product, contract, operations, CI, performance, security, and fixes. |
-| Complete README | Product, architecture, contracts, setup, testing, CI/CD, monitoring, wallet evidence, feedback, screenshots, and limitations are documented here. |
-| Demo video | [WrenPass demo](https://x.com/wrenpasscorp/status/2087435276172120326?s=20) |
-| Product and mobile screenshots | [Product UI](#product-ui) and [mobile responsive UI](#mobile-responsive-ui). |
-| Analytics or monitoring screenshot | [Sentry and PostHog evidence](#monitoring-and-analytics). |
-| Basic user feedback summary | 11 on-chain reviews, 4.64/5 snapshot average, themes, raw screenshot, public page, and transaction-backed records. |
-| Proof of 10+ user wallet interactions | 11 wallet addresses, 40 unique transaction hashes, 40 unique events, 45 wallet-role attributions, roles, ledger ranges, timestamps, and explorer links in [wallet proof](#proof-of-10-user-wallets). |
+| Green Belt requirement                | Implementation and proof                                                                                                                                                                                    |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Proper structure and documentation    | Next.js code is separated into UI, features, Stellar clients, server services, generated bindings, contracts, scripts, and docs. This README provides setup, testing, architecture, proof, and limitations. |
+| Technical complexity                  | Cross-contract atomic publishing, Stellar asset distribution, owner-authorized QR redemption, fee-sponsored authorized reviews, decentralized metadata, event recovery, and historical WASM provenance.     |
+| Product quality                       | A live responsive product supports the full merchant-to-customer lifecycle with clear financial terms, transaction feedback, explorer links, and operational monitoring.                                    |
+| Architecture quality                  | On-chain authority is separated from operational off-chain services; contract responsibilities are focused; server actions use verified wallet sessions; failures are recoverable and idempotent.           |
+| Real-world usefulness                 | Service businesses receive working capital without debt or equity. Customers receive useful bonus service value instead of a speculative token.                                                             |
+| Production deployment                 | [wrenpass.vercel.app](https://wrenpass.vercel.app) with [recorded production release evidence](docs/PRODUCTION.md).                                                                                         |
+| Monitoring and analytics              | Sentry, PostHog, Vercel Analytics, and Speed Insights are integrated. See [monitoring screenshots](#monitoring-and-analytics).                                                                              |
+| Optimized UX                          | Persisted wallet connection, responsive product pages, immediate event reconciliation, paginated campaign transactions, virtualized review browsing, clear loading/errors, and sponsored reviews.           |
+| Stellar Testnet contracts             | Five deployed contracts with explorer links and verifiable WASM hashes.                                                                                                                                     |
+| Minimum 15 meaningful commits         | 65 commits at the recorded snapshot, covering product, contract, operations, CI, performance, security, and fixes.                                                                                          |
+| Complete README                       | Product, architecture, contracts, setup, testing, CI/CD, monitoring, wallet evidence, feedback, screenshots, and limitations are documented here.                                                           |
+| Demo video                            | [WrenPass demo](https://x.com/wrenpasscorp/status/2087435276172120326?s=20)                                                                                                                                 |
+| Product and mobile screenshots        | [Product UI](#product-ui) and [mobile responsive UI](#mobile-responsive-ui).                                                                                                                                |
+| Analytics or monitoring screenshot    | [Sentry and PostHog evidence](#monitoring-and-analytics).                                                                                                                                                   |
+| Basic user feedback summary           | 11 on-chain reviews, 4.64/5 snapshot average, themes, raw screenshot, public page, and transaction-backed records.                                                                                          |
+| Proof of 10+ user wallet interactions | 11 wallet addresses, 40 unique transaction hashes, 40 unique events, 45 wallet-role attributions, roles, ledger ranges, timestamps, and explorer links in [wallet proof](#proof-of-10-user-wallets).        |
 
 ## Current limits and roadmap
 
