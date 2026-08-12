@@ -401,13 +401,17 @@ The captured local test run shows **59 passing test files and 165 passing tests*
 
 Sentry captures production errors, transactions, releases, and health signals.
 
+![WrenPass Sentry project overview](public/sentry1.png)
+
 ![WrenPass Sentry monitoring dashboard](public/sentry2.png)
+
+![WrenPass Sentry issue capture](public/sentry3.png)
 
 PostHog receives privacy-safe product and web analytics.
 
-![WrenPass PostHog analytics dashboard](public/posthog2.png)
+![WrenPass PostHog integration](public/posthog1.png)
 
-Additional captured evidence: [Sentry project overview](public/sentry1.png), [Sentry issue capture](public/sentry3.png), and [PostHog integration](public/posthog1.png).
+![WrenPass PostHog analytics dashboard](public/posthog2.png)
 
 ## Run locally
 
