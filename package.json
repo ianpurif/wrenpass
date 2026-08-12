@@ -13,6 +13,7 @@
     "offchain:audit": "node --conditions=react-server --env-file=.env.local --import tsx scripts/audit-offchain-boundary.ts",
     "offchain:migrate-campaign-transactions": "node --conditions=react-server --env-file=.env.local --import tsx scripts/migrate-campaign-transaction-index.ts",
     "offchain:cleanup-auth": "node --conditions=react-server --env-file=.env.local --import tsx scripts/cleanup-expired-wallet-auth.ts",
+    "users:wallet-report": "node --conditions=react-server --env-file=.env.local --import tsx scripts/export-user-wallet-interactions.ts",
     "operations:run": "node --conditions=react-server --env-file=.env.local --import tsx scripts/run-scheduled-operations.ts",
     "stellar:smoke": "node --conditions=react-server --env-file=.env.local --import tsx scripts/smoke-stellar.ts",
     "stellar:ttl:plan": "node --conditions=react-server --env-file=.env.local --import tsx scripts/plan-stellar-ttl.ts",
