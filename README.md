@@ -4,7 +4,7 @@
 
 <h1 align="center">WrenPass</h1>
 
-<p align="center"><strong>Fund a business you trust. Get more value back.</strong></p>
+<p align="center"><strong>Invest in a business you trust. Get more value back.</strong></p>
 
 <p align="center">
   WrenPass lets small businesses raise working capital by pre-selling limited future-service passes.<br />
