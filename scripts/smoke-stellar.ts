@@ -4,11 +4,13 @@ import { getStellarConfig } from "@/lib/stellar/config";
 import { StellarMetadataContractReader } from "@/lib/stellar/metadata-client";
 import { readContractReviewCount } from "@/lib/stellar/reviews-client";
 import { Client as RedemptionsClient } from "@/generated/redemptions-contract/src";
+import { Client as PublisherClient } from "@/generated/publisher-contract/src";
 import { getServerEnv } from "@/server/env";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
 import { MerchantProfileEventIndex } from "@/server/merchant/profile-event-index";
 import {
   readContractCampaignCount,
+  readContractCampaign,
   readContractConfig,
   readContractPassCount,
 } from "@/lib/stellar/wrenpass-client";
@@ -16,6 +18,7 @@ import { assertPurchaseDistributionReady } from "@/server/stellar/purchase-readi
 import { StellarRpcGateway } from "@/server/stellar/rpc-gateway";
 import {
   assertMetadataTtlReady,
+  assertCampaignPublisherTtlReady,
   assertRedemptionRegistryTtlReady,
   assertReviewTtlReady,
   assertWrenPassTtlReady,
@@ -41,9 +44,18 @@ async function verifyMetadataRegistry(
   const campaignIds: bigint[] = [];
   const campaignCounts = new Map<string, bigint>();
   for (let campaignId = BigInt(1); campaignId <= campaignCount; campaignId += BigInt(1)) {
-    const metadata = await reader.getCampaignMetadata(campaignId);
+    const [campaign, metadata] = await Promise.all([
+      readContractCampaign(config, campaignId),
+      reader.getCampaignMetadata(campaignId),
+    ]);
+    if (!campaign) {
+      throw new Error(`Campaign #${campaignId} is missing from the campaign contract.`);
+    }
     if (!metadata) {
-      throw new Error(`Campaign #${campaignId} has not been migrated to the metadata registry.`);
+      if (campaign.status.tag !== "Draft") {
+        throw new Error(`Published campaign #${campaignId} has no on-chain metadata.`);
+      }
+      continue;
     }
     campaignIds.push(campaignId);
     campaignCounts.set(
@@ -75,6 +87,25 @@ async function verifyMetadataRegistry(
   }
 
   return assertMetadataTtlReady(config, merchants, campaignIds);
+}
+
+async function verifyCampaignPublisher(
+  config: ReturnType<typeof getStellarConfig>,
+): Promise<boolean> {
+  if (!config.publisherContractId) return false;
+  const transaction = await new PublisherClient({
+    contractId: config.publisherContractId,
+    networkPassphrase: config.networkPassphrase,
+    rpcUrl: config.rpcUrl,
+  }).get_config();
+  const publisherConfig = transaction.result.unwrap();
+  if (
+    publisherConfig.campaign_contract !== config.wrenPassContractId
+    || publisherConfig.metadata_contract !== config.metadataContractId
+  ) {
+    throw new Error("The campaign publisher targets unexpected contracts.");
+  }
+  return true;
 }
 
 async function verifyRedemptionRegistry(
@@ -137,11 +168,20 @@ async function main() {
   }
 
   await assertPurchaseDistributionReady(config, contractConfig, gateway);
-  const [ttl, reviewTtl, metadataTtl, redemptionTtl] = await Promise.all([
+  const [
+    ttl,
+    reviewTtl,
+    metadataTtl,
+    redemptionTtl,
+    publisherTtl,
+    publisherReady,
+  ] = await Promise.all([
     assertWrenPassTtlReady(config, campaignCount, passCount),
     assertReviewTtlReady(config, reviewCount),
     verifyMetadataRegistry(config, campaignCount),
     verifyRedemptionRegistry(config),
+    assertCampaignPublisherTtlReady(config),
+    verifyCampaignPublisher(config),
   ]);
 
   console.log(`Stellar RPC network verified: ${config.network}`);
@@ -162,6 +202,11 @@ async function main() {
   );
   console.log(
     `Redemption registry verified: campaign target and storage v1, ${redemptionTtl.minimumRemainingLedgers} minimum ledgers remaining`,
+  );
+  console.log(
+    publisherReady
+      ? `Atomic campaign publisher verified: targets match, ${publisherTtl.minimumRemainingLedgers} minimum ledgers remaining`
+      : "Atomic campaign publisher: not configured; legacy publishing remains available",
   );
 }
 

@@ -17,6 +17,7 @@ import { createOffchainRepositories } from "@/server/firestore/repositories";
 import { MerchantProfileEventIndex } from "@/server/merchant/profile-event-index";
 import {
   createMetadataLedgerKeys,
+  createCampaignPublisherLedgerKeys,
   createRedemptionRegistryLedgerKeys,
   createReviewLedgerKeys,
   createWrenPassLedgerKeys,
@@ -80,6 +81,11 @@ export function createCoreMaintenanceBatches(
     batches.push({ campaignIds, passIds });
   }
   return batches;
+}
+
+export function isMissingMaintenanceFunctionError(error: unknown): boolean {
+  return error instanceof Error
+    && /non-existent contract function[\s\S]*maintain_storage/i.test(error.message);
 }
 
 function createMetadataMaintenanceBatches(
@@ -253,6 +259,12 @@ export class TtlMaintenanceService {
         label: "WrenPass redemption registry",
         keys: createRedemptionRegistryLedgerKeys(this.config.redemptionContractId),
       },
+      ...(this.config.publisherContractId
+        ? [{
+            label: "WrenPass campaign publisher",
+            keys: createCampaignPublisherLedgerKeys(this.config.publisherContractId),
+          }]
+        : []),
     ];
     const codeKeys = await Promise.all(
       [
@@ -260,6 +272,7 @@ export class TtlMaintenanceService {
         this.config.metadataContractId,
         this.config.reviewContractId,
         this.config.redemptionContractId,
+        ...(this.config.publisherContractId ? [this.config.publisherContractId] : []),
       ].map((contractId) => readContractCodeLedgerKey(this.config.rpcUrl, contractId)),
     );
     let inspections = await Promise.all([
@@ -273,7 +286,16 @@ export class TtlMaintenanceService {
     let entriesExtended = 0;
     if (inspections[0]!.keysBelowThreshold.length > 0) {
       if (campaignCount + passCount > BigInt(0)) {
-        transactionHashes.push(...await writer.maintainCore(campaignCount, passCount));
+        try {
+          transactionHashes.push(...await writer.maintainCore(campaignCount, passCount));
+        } catch (error) {
+          if (!isMissingMaintenanceFunctionError(error)) throw error;
+          transactionHashes.push(...await extendLedgerKeysTtl({
+            config: this.config,
+            sponsorSecret: this.sponsorSecret,
+            keys: inspections[0]!.keysBelowThreshold,
+          }));
+        }
       } else {
         transactionHashes.push(...await extendLedgerKeysTtl({
           config: this.config,
@@ -285,9 +307,18 @@ export class TtlMaintenanceService {
     }
     if (inspections[1]!.keysBelowThreshold.length > 0) {
       if (merchants.length + metadataCampaignIds.length > 0) {
-        transactionHashes.push(
-          ...await writer.maintainMetadata(merchants, metadataCampaignIds),
-        );
+        try {
+          transactionHashes.push(
+            ...await writer.maintainMetadata(merchants, metadataCampaignIds),
+          );
+        } catch (error) {
+          if (!isMissingMaintenanceFunctionError(error)) throw error;
+          transactionHashes.push(...await extendLedgerKeysTtl({
+            config: this.config,
+            sponsorSecret: this.sponsorSecret,
+            keys: inspections[1]!.keysBelowThreshold,
+          }));
+        }
       } else {
         transactionHashes.push(...await extendLedgerKeysTtl({
           config: this.config,

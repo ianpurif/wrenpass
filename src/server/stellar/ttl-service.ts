@@ -18,6 +18,7 @@ const LEDGER_ENTRY_BATCH_SIZE = 200;
 const TTL_EXTENSION_BATCH_SIZE = 50;
 const MAX_TESTNET_TTL_FEE_STROOPS = BigInt(100_000_000);
 const MAX_MAINNET_TTL_FEE_STROOPS = BigInt(10_000_000);
+const TESTNET_TTL_INCLUSION_FEE_STROOPS = "100000";
 export const MIN_SAFE_TTL_LEDGERS = 250_000;
 export const TARGET_TTL_LEDGERS = 500_000;
 
@@ -155,7 +156,7 @@ export async function extendLedgerKeysTtl(input: {
     const batch = input.keys.slice(cursor, cursor + TTL_EXTENSION_BATCH_SIZE);
     const account = await server.getAccount(sponsor.publicKey());
     const transaction = new TransactionBuilder(account, {
-      fee: BASE_FEE,
+      fee: input.config.network === "testnet" ? TESTNET_TTL_INCLUSION_FEE_STROOPS : BASE_FEE,
       networkPassphrase: input.config.networkPassphrase,
     })
       .setSorobanData(new SorobanDataBuilder().setReadOnly(batch).build())
@@ -173,9 +174,11 @@ export async function extendLedgerKeysTtl(input: {
     if (sent.status !== "PENDING" && sent.status !== "DUPLICATE") {
       throw new Error(`Stellar rejected TTL maintenance: ${transactionResultCode(sent)}.`);
     }
-    const result = await server.pollTransaction(sent.hash, { attempts: 20 });
+    const result = await server.pollTransaction(sent.hash, { attempts: 40 });
     if (result.status !== rpc.Api.GetTransactionStatus.SUCCESS) {
-      throw new Error("Stellar did not confirm TTL maintenance.");
+      throw new Error(
+        `Stellar TTL maintenance ended with ${result.status} for transaction ${sent.hash}.`,
+      );
     }
     transactionHashes.push(sent.hash);
   }
@@ -298,6 +301,10 @@ export function createRedemptionRegistryLedgerKeys(contractId: string): xdr.Ledg
   ];
 }
 
+export function createCampaignPublisherLedgerKeys(contractId: string): xdr.LedgerKey[] {
+  return createRedemptionRegistryLedgerKeys(contractId);
+}
+
 export async function assertWrenPassTtlReady(
   config: StellarConfig,
   campaignCount: bigint,
@@ -337,5 +344,18 @@ export async function assertRedemptionRegistryTtlReady(
     config.rpcUrl,
     createRedemptionRegistryLedgerKeys(config.redemptionContractId),
     "WrenPass redemption registry",
+  );
+}
+
+export async function assertCampaignPublisherTtlReady(
+  config: StellarConfig,
+): Promise<{ entryCount: number; minimumRemainingLedgers: number }> {
+  if (!config.publisherContractId) {
+    return { entryCount: 0, minimumRemainingLedgers: Number.POSITIVE_INFINITY };
+  }
+  return assertLedgerKeysTtlReady(
+    config.rpcUrl,
+    createCampaignPublisherLedgerKeys(config.publisherContractId),
+    "WrenPass campaign publisher",
   );
 }

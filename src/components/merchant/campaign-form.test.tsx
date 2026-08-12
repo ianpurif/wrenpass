@@ -8,6 +8,7 @@ import type { StellarConfig } from "@/lib/stellar/config";
 const mocks = vi.hoisted(() => ({
   createDraft: vi.fn(),
   publish: vi.fn(),
+  createAndPublish: vi.fn(),
   requestReview: vi.fn(),
   registerCampaignMetadata: vi.fn(),
   saveCampaignMetadata: vi.fn(),
@@ -40,6 +41,11 @@ vi.mock("@/lib/stellar/metadata-client", () => ({
     registerCampaignMetadata = mocks.registerCampaignMetadata;
   },
 }));
+vi.mock("@/lib/stellar/publisher-client", () => ({
+  StellarCampaignPublisher: class {
+    createAndPublish = mocks.createAndPublish;
+  },
+}));
 vi.mock("@/features/notifications/api", () => ({
   syncEventsAfterMutation: mocks.syncEventsAfterMutation,
 }));
@@ -63,6 +69,7 @@ const config: StellarConfig = {
 describe("CampaignForm", () => {
   beforeEach(() => {
     mocks.createDraft.mockReset().mockResolvedValue(BigInt(12));
+    mocks.createAndPublish.mockReset().mockResolvedValue(BigInt(12));
     mocks.publish.mockReset().mockResolvedValue(undefined);
     mocks.requestReview.mockReset();
     mocks.registerCampaignMetadata.mockReset().mockResolvedValue({});
@@ -104,6 +111,29 @@ describe("CampaignForm", () => {
     expect(mocks.syncEventsAfterMutation).toHaveBeenCalledOnce();
     expect(screen.getByText("Campaign #12 is live on Stellar Testnet.")).toBeInTheDocument();
     expect(mocks.requestReview).toHaveBeenCalledWith({ transactionLabel: "campaign publishing" });
+  });
+
+  it("uses one wallet transaction when the atomic publisher is configured", async () => {
+    const user = userEvent.setup();
+    const atomicConfig = {
+      ...config,
+      publisherContractId: config.metadataContractId,
+    };
+    render(<CampaignForm config={atomicConfig} onPublished={vi.fn().mockResolvedValue(undefined)} />);
+
+    await user.type(screen.getByLabelText("Campaign name"), "Five haircuts forward");
+    await user.type(
+      screen.getByLabelText("Service description"),
+      "One complete haircut service delivered at the merchant studio.",
+    );
+    await user.click(screen.getByRole("button", { name: "Create and publish campaign" }));
+
+    expect(await screen.findByText("Campaign #12 is live on Stellar Testnet.")).toBeInTheDocument();
+    expect(mocks.createAndPublish).toHaveBeenCalledOnce();
+    expect(mocks.createDraft).not.toHaveBeenCalled();
+    expect(mocks.registerCampaignMetadata).not.toHaveBeenCalled();
+    expect(mocks.publish).not.toHaveBeenCalled();
+    expect(mocks.saveCampaignMetadata).not.toHaveBeenCalled();
   });
 
   it("ignores a duplicate submission while the first one is active", async () => {

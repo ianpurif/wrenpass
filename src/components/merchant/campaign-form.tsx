@@ -26,6 +26,7 @@ import {
 import { syncEventsAfterMutation } from "@/features/notifications/api";
 import type { StellarConfig } from "@/lib/stellar/config";
 import { StellarMetadataContractWriter } from "@/lib/stellar/metadata-client";
+import { StellarCampaignPublisher } from "@/lib/stellar/publisher-client";
 import { StellarCampaignContractWriter } from "@/lib/stellar/wrenpass-client";
 
 function defaultExpiration(): string {
@@ -47,6 +48,10 @@ export function CampaignForm({
   const writer = useMemo(() => new StellarCampaignContractWriter(config), [config]);
   const metadataWriter = useMemo(
     () => new StellarMetadataContractWriter(config),
+    [config],
+  );
+  const atomicPublisher = useMemo(
+    () => config.publisherContractId ? new StellarCampaignPublisher(config) : undefined,
     [config],
   );
   const [image, setImage] = useState<File | null>(null);
@@ -87,6 +92,18 @@ export function CampaignForm({
 
   const dependencies = {
     writer,
+    atomicPublisher,
+    saveMetadataReference: async (
+      metadata: Parameters<typeof merchantApi.saveCampaignMetadata>[0],
+    ) => {
+      if (!metadata.imagePublicId) return;
+      setStage("Finalizing campaign…");
+      try {
+        return await merchantApi.saveCampaignMetadata(metadata);
+      } catch (metadataError) {
+        console.warn("The campaign is live, but its image reference was not saved.", metadataError);
+      }
+    },
     saveMetadata: async (metadata: Parameters<typeof merchantApi.saveCampaignMetadata>[0]) => {
       if (walletContext) {
         setStage("Approve public campaign details in Freighter…");
@@ -109,7 +126,11 @@ export function CampaignForm({
     try {
       setStage(image ? "Uploading campaign image…" : "Preparing on-chain campaign…");
       const uploaded = image ? await merchantApi.uploadImage("campaign-image", image) : null;
-      setStage("Approve the campaign draft in Freighter…");
+      setStage(
+        atomicPublisher
+          ? "Approve campaign creation in Freighter…"
+          : "Approve the campaign draft in Freighter…",
+      );
       const campaignId = await createAndPublishCampaign(
         {
           ...walletContext,

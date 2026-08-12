@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "wrenpass-campaign",
   "wrenpass-metadata",
+  "wrenpass-publisher",
   "wrenpass-redemptions",
   "wrenpass-reviews",
 ]

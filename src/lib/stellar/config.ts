@@ -36,6 +36,11 @@ const stellarConfigSchema = z.object({
     .string()
     .trim()
     .refine(StrKey.isValidContract, "metadata contract ID must be a valid Stellar C-address"),
+  NEXT_PUBLIC_WRENPASS_PUBLISHER_CONTRACT_ID: z
+    .string()
+    .trim()
+    .refine(StrKey.isValidContract, "publisher contract ID must be a valid Stellar C-address")
+    .optional(),
   NEXT_PUBLIC_WRENPASS_REDEMPTION_CONTRACT_ID: z
     .string()
     .trim()
@@ -54,6 +59,7 @@ export interface StellarConfig {
   wrenPassContractId: string;
   reviewContractId: string;
   metadataContractId: string;
+  publisherContractId?: string;
   redemptionContractId: string;
 }
 
@@ -95,6 +101,7 @@ export function parseStellarConfig(input: StellarConfigInput): StellarConfig {
     wrenPassContractId: values.NEXT_PUBLIC_WRENPASS_CONTRACT_ID,
     reviewContractId: values.NEXT_PUBLIC_WRENPASS_REVIEW_CONTRACT_ID,
     metadataContractId: values.NEXT_PUBLIC_WRENPASS_METADATA_CONTRACT_ID,
+    publisherContractId: values.NEXT_PUBLIC_WRENPASS_PUBLISHER_CONTRACT_ID,
     redemptionContractId: values.NEXT_PUBLIC_WRENPASS_REDEMPTION_CONTRACT_ID,
   };
 }
@@ -114,6 +121,8 @@ export function getStellarConfig(): StellarConfig {
       process.env.NEXT_PUBLIC_WRENPASS_REVIEW_CONTRACT_ID,
     NEXT_PUBLIC_WRENPASS_METADATA_CONTRACT_ID:
       process.env.NEXT_PUBLIC_WRENPASS_METADATA_CONTRACT_ID,
+    NEXT_PUBLIC_WRENPASS_PUBLISHER_CONTRACT_ID:
+      process.env.NEXT_PUBLIC_WRENPASS_PUBLISHER_CONTRACT_ID,
     NEXT_PUBLIC_WRENPASS_REDEMPTION_CONTRACT_ID:
       process.env.NEXT_PUBLIC_WRENPASS_REDEMPTION_CONTRACT_ID,
   });

@@ -1957,6 +1957,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "wrenpass-publisher"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+ "wrenpass-campaign",
+ "wrenpass-metadata",
+]
+
+[[package]]
 name = "wrenpass-redemptions"
 version = "0.1.0"
 dependencies = [

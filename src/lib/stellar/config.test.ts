@@ -46,6 +46,21 @@ describe("parseStellarConfig", () => {
     })).toThrow(/WRENPASS_METADATA_CONTRACT_ID/);
   });
 
+  it("accepts an optional atomic campaign publisher", () => {
+    const input = {
+      ...validConfig(),
+      NEXT_PUBLIC_WRENPASS_PUBLISHER_CONTRACT_ID:
+        "CCPREVJISOBTO25UJSS53YIA7UMRXCYLUTJBA5K4CSGLTRI4P4IOVFDR",
+    };
+    expect(parseStellarConfig(input).publisherContractId).toBe(
+      input.NEXT_PUBLIC_WRENPASS_PUBLISHER_CONTRACT_ID,
+    );
+    expect(() => parseStellarConfig({
+      ...input,
+      NEXT_PUBLIC_WRENPASS_PUBLISHER_CONTRACT_ID: "invalid",
+    })).toThrow(/publisher/i);
+  });
+
   it("requires the on-chain redemption registry", () => {
     const input = validConfig();
     expect(parseStellarConfig(input).redemptionContractId).toBe(

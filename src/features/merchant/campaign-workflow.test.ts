@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createAndPublishCampaign } from "@/features/merchant/campaign-workflow";
 import type { CampaignContractWriter } from "@/lib/stellar/wrenpass-client";
+import type { AtomicCampaignPublisher } from "@/lib/stellar/publisher-client";
 
 const merchant = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 const signTransaction = vi.fn();
@@ -18,6 +19,36 @@ const terms = {
 };
 
 describe("campaign publishing workflow", () => {
+  it("uses one atomic contract call when the publisher is configured", async () => {
+    const writer: CampaignContractWriter = {
+      createDraft: vi.fn(),
+      publish: vi.fn(),
+    };
+    const atomicPublisher: AtomicCampaignPublisher = {
+      createAndPublish: vi.fn().mockResolvedValue(BigInt(7)),
+    };
+    const saveMetadata = vi.fn();
+    const saveMetadataReference = vi.fn();
+
+    await expect(
+      createAndPublishCampaign(
+        { merchant, signTransaction, metadata, terms },
+        { writer, atomicPublisher, saveMetadata, saveMetadataReference },
+      ),
+    ).resolves.toBe("7");
+
+    expect(atomicPublisher.createAndPublish).toHaveBeenCalledWith({
+      merchant,
+      signTransaction,
+      metadata,
+      terms,
+    });
+    expect(saveMetadataReference).toHaveBeenCalledWith({ ...metadata, campaignId: "7" });
+    expect(writer.createDraft).not.toHaveBeenCalled();
+    expect(writer.publish).not.toHaveBeenCalled();
+    expect(saveMetadata).not.toHaveBeenCalled();
+  });
+
   it("does not publish when metadata registration fails", async () => {
     const writer: CampaignContractWriter = {
       createDraft: vi.fn().mockResolvedValue(BigInt(7)),
