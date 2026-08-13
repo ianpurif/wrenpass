@@ -185,6 +185,451 @@ flowchart LR
     APP --> OBS["Sentry, PostHog, Vercel telemetry"]
 ```
 
+## Project folder structure
+
+The application is organized by responsibility: Next.js presentation and routing live in `src/app` and `src/components`, domain behavior lives in `src/features`, blockchain access is isolated in `src/lib` and `src/server`, and Soroban source remains independently testable under `contracts`.
+
+### Folder purpose guide
+
+| Path | Purpose |
+| --- | --- |
+| `.github/` | Dependabot configuration, CI quality gates, and protected Vercel deployment automation |
+| `contracts/` | Rust/Soroban contract source, tests, workspace configuration, and locked dependencies |
+| `deployments/` | Immutable Testnet contract addresses, source commits, WASM hashes, and transaction evidence |
+| `docs/` | Deployment, production-release, and operations runbooks |
+| `e2e/` | Playwright critical user journeys |
+| `patches/` | pnpm dependency patches required for reproducible installation |
+| `public/` | App branding, background media, product screenshots, mobile screenshots, and judge evidence |
+| `scripts/` | Deployment, migration, audit, smoke-test, reporting, TTL, and scheduled-operations tools |
+| `src/app/` | Next.js pages, layouts, global styles, error boundary, and server API route handlers |
+| `src/components/` | Reusable product, dashboard, wallet, form, dialog, review, and layout components with tests |
+| `src/features/` | Feature DTOs, validation, browser-side APIs, authorization helpers, and workflows with tests |
+| `src/generated/` | TypeScript clients and types generated from the five deployed Soroban contracts |
+| `src/lib/` | Shared analytics, styling, Stellar configuration, wallet adapters, and contract clients |
+| `src/server/` | Server-only Stellar, Firestore, Cloudinary, email, event, wallet-auth, review, and operations logic |
+| `src/test/` | Shared Vitest setup, server-only shim, and test fixtures |
+| Root configuration | Environment template, package manifests, tool configuration, security policy, and project documentation |
+
+### Complete file inventory
+
+This inventory contains all **313 project files currently present and not ignored**. Local secrets and generated runtime/build directories such as `.env.local`, `.git/`, `node_modules/`, `.next/`, `contracts/target/`, `playwright-report/`, and `test-results/` are intentionally excluded.
+
+```text
+wrenpass/
+├── .env.example
+├── .github/
+│   ├── dependabot.yml
+│   └── workflows/
+│       ├── ci.yml
+│       └── deploy.yml
+├── .gitignore
+├── .vercelignore
+├── AGENTS.md
+├── contracts/
+│   ├── Cargo.lock
+│   ├── Cargo.toml
+│   ├── wrenpass-campaign/
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       └── test.rs
+│   ├── wrenpass-metadata/
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       └── test.rs
+│   ├── wrenpass-publisher/
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       └── test.rs
+│   ├── wrenpass-redemptions/
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       └── test.rs
+│   └── wrenpass-reviews/
+│       ├── Cargo.toml
+│       └── src/
+│           ├── lib.rs
+│           └── test.rs
+├── deployments/
+│   └── testnet.json
+├── docs/
+│   ├── DEPLOYMENT.md
+│   ├── OPERATIONS.md
+│   └── PRODUCTION.md
+├── e2e/
+│   └── critical-journeys.spec.ts
+├── eslint.config.mjs
+├── next.config.ts
+├── package.json
+├── patches/
+│   └── base32.js@0.1.0.patch
+├── playwright.config.ts
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml
+├── postcss.config.mjs
+├── public/
+│   ├── bg.mp4
+│   ├── ci-cd1.png
+│   ├── ci-cd2.png
+│   ├── ci-cd3.png
+│   ├── ci-cd-code.png
+│   ├── logo.png
+│   ├── logo-qr.png
+│   ├── mobile-view1.png
+│   ├── mobile-view2.png
+│   ├── mobile-view3.png
+│   ├── mobile-view4.png
+│   ├── posthog1.png
+│   ├── posthog2.png
+│   ├── productui1.png
+│   ├── productui2.png
+│   ├── productui3.png
+│   ├── productui4.png
+│   ├── sentry1.png
+│   ├── sentry2.png
+│   ├── sentry3.png
+│   ├── Test-output.png
+│   └── usersreview.png
+├── README.md
+├── scripts/
+│   ├── audit-offchain-boundary.ts
+│   ├── cleanup-expired-wallet-auth.ts
+│   ├── deploy-campaign-publisher.ts
+│   ├── deploy-contract-suite.ts
+│   ├── export-user-wallet-interactions.ts
+│   ├── maintain-stellar-ttl.ts
+│   ├── migrate-campaign-transaction-index.ts
+│   ├── migrate-metadata-profile-index.ts
+│   ├── migrate-review-event-index.ts
+│   ├── minimize-offchain-pii.ts
+│   ├── plan-stellar-ttl.ts
+│   ├── run-scheduled-operations.ts
+│   ├── smoke-services.ts
+│   ├── smoke-stellar.ts
+│   └── verify-contract-deployments.ts
+├── SECURITY.md
+├── src/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── campaigns/
+│   │   │   │   └── [campaignId]/
+│   │   │   │       └── transactions/
+│   │   │   │           └── route.ts
+│   │   │   ├── cron/
+│   │   │   │   └── operations/
+│   │   │   │       └── route.ts
+│   │   │   ├── customer/
+│   │   │   │   └── passes/
+│   │   │   │       └── route.ts
+│   │   │   ├── events/
+│   │   │   │   └── sync/
+│   │   │   │       └── route.ts
+│   │   │   ├── merchant/
+│   │   │   │   ├── campaigns/
+│   │   │   │   │   └── route.ts
+│   │   │   │   ├── images/
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── profile/
+│   │   │   │       └── route.ts
+│   │   │   ├── notifications/
+│   │   │   │   └── profile/
+│   │   │   │       └── route.ts
+│   │   │   ├── redemptions/
+│   │   │   │   ├── route.ts
+│   │   │   │   └── validate/
+│   │   │   │       └── route.ts
+│   │   │   ├── reviews/
+│   │   │   │   ├── route.ts
+│   │   │   │   └── sponsor/
+│   │   │   │       └── route.ts
+│   │   │   ├── stellar/
+│   │   │   │   └── balances/
+│   │   │   │       └── route.ts
+│   │   │   └── wallet/
+│   │   │       ├── challenge/
+│   │   │       │   └── route.ts
+│   │   │       └── session/
+│   │   │           └── route.ts
+│   │   ├── campaigns/
+│   │   │   └── [campaignId]/
+│   │   │       └── page.tsx
+│   │   ├── global-error.tsx
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   ├── merchant/
+│   │   │   ├── business-identity/
+│   │   │   │   └── page.tsx
+│   │   │   ├── create-campaign/
+│   │   │   │   └── page.tsx
+│   │   │   ├── page.tsx
+│   │   │   └── redeem-pass/
+│   │   │       └── page.tsx
+│   │   ├── page.tsx
+│   │   ├── passes/
+│   │   │   └── page.tsx
+│   │   └── reviews/
+│   │       └── page.tsx
+│   ├── components/
+│   │   ├── campaigns/
+│   │   │   ├── campaign-offer.test.tsx
+│   │   │   ├── campaign-offer.tsx
+│   │   │   ├── campaign-transactions.test.tsx
+│   │   │   └── campaign-transactions.tsx
+│   │   ├── customer/
+│   │   │   ├── customer-pass-card.tsx
+│   │   │   ├── customer-workspace.test.tsx
+│   │   │   ├── customer-workspace.tsx
+│   │   │   ├── gift-pass-dialog.test.tsx
+│   │   │   ├── gift-pass-dialog.tsx
+│   │   │   ├── pass-qr-dialog.test.tsx
+│   │   │   ├── pass-qr-dialog.tsx
+│   │   │   ├── purchase-panel.test.tsx
+│   │   │   ├── purchase-panel.tsx
+│   │   │   ├── redemption-requests.test.tsx
+│   │   │   └── redemption-requests.tsx
+│   │   ├── home/
+│   │   │   ├── cinematic-landing.test.tsx
+│   │   │   ├── cinematic-landing.tsx
+│   │   │   └── pass-preview.tsx
+│   │   ├── layout/
+│   │   │   ├── footer.tsx
+│   │   │   ├── logo.test.tsx
+│   │   │   ├── logo.tsx
+│   │   │   ├── navigation.test.tsx
+│   │   │   └── navigation.tsx
+│   │   ├── merchant/
+│   │   │   ├── campaign-card.tsx
+│   │   │   ├── campaign-form.test.tsx
+│   │   │   ├── campaign-form.tsx
+│   │   │   ├── campaign-table-layout.ts
+│   │   │   ├── merchant-page-shell.tsx
+│   │   │   ├── merchant-workspace.test.tsx
+│   │   │   ├── merchant-workspace.tsx
+│   │   │   ├── profile-form.test.tsx
+│   │   │   ├── profile-form.tsx
+│   │   │   ├── redemption-scanner.test.tsx
+│   │   │   └── redemption-scanner.tsx
+│   │   ├── notifications/
+│   │   │   └── notification-email-form.tsx
+│   │   ├── reviews/
+│   │   │   ├── recent-reviews.test.tsx
+│   │   │   ├── recent-reviews.tsx
+│   │   │   ├── review-card.tsx
+│   │   │   ├── review-prompt-provider.test.tsx
+│   │   │   ├── review-prompt-provider.tsx
+│   │   │   ├── reviews-feed.test.tsx
+│   │   │   └── reviews-feed.tsx
+│   │   ├── ui/
+│   │   │   ├── button.test.tsx
+│   │   │   ├── button.tsx
+│   │   │   ├── card.tsx
+│   │   │   ├── container.tsx
+│   │   │   ├── dialog.test.tsx
+│   │   │   ├── dialog.tsx
+│   │   │   ├── feedback-state.tsx
+│   │   │   ├── image-upload-field.test.tsx
+│   │   │   ├── image-upload-field.tsx
+│   │   │   ├── input.test.tsx
+│   │   │   ├── input.tsx
+│   │   │   └── motion-reveal.tsx
+│   │   └── wallet/
+│   │       ├── connected-wallet-link.tsx
+│   │       ├── wallet-button.tsx
+│   │       ├── wallet-provider.test.tsx
+│   │       ├── wallet-provider.tsx
+│   │       ├── wallet-route-guard.test.tsx
+│   │       └── wallet-route-guard.tsx
+│   ├── features/
+│   │   ├── campaign-transactions/
+│   │   │   ├── api.ts
+│   │   │   ├── dto.ts
+│   │   │   └── updates.ts
+│   │   ├── customer/
+│   │   │   ├── api.test.ts
+│   │   │   ├── api.ts
+│   │   │   ├── dto.ts
+│   │   │   └── validation.ts
+│   │   ├── merchant/
+│   │   │   ├── api.ts
+│   │   │   ├── campaign-terms.test.ts
+│   │   │   ├── campaign-terms.ts
+│   │   │   ├── campaign-workflow.test.ts
+│   │   │   ├── campaign-workflow.ts
+│   │   │   ├── display.ts
+│   │   │   └── dto.ts
+│   │   ├── notifications/
+│   │   │   ├── api.test.ts
+│   │   │   └── api.ts
+│   │   ├── redemption/
+│   │   │   ├── api.ts
+│   │   │   ├── dto.ts
+│   │   │   ├── qr.test.ts
+│   │   │   ├── qr.ts
+│   │   │   └── request-authorization.ts
+│   │   └── reviews/
+│   │       ├── api.ts
+│   │       ├── authorization.ts
+│   │       ├── dto.ts
+│   │       ├── validation.test.ts
+│   │       └── validation.ts
+│   ├── generated/
+│   │   ├── metadata-contract/
+│   │   │   ├── .gitignore
+│   │   │   ├── package.json
+│   │   │   ├── README.md
+│   │   │   ├── src/
+│   │   │   │   └── index.ts
+│   │   │   └── tsconfig.json
+│   │   ├── publisher-contract/
+│   │   │   ├── .gitignore
+│   │   │   ├── package.json
+│   │   │   ├── README.md
+│   │   │   ├── src/
+│   │   │   │   └── index.ts
+│   │   │   └── tsconfig.json
+│   │   ├── redemptions-contract/
+│   │   │   ├── .gitignore
+│   │   │   ├── package.json
+│   │   │   ├── README.md
+│   │   │   ├── src/
+│   │   │   │   └── index.ts
+│   │   │   └── tsconfig.json
+│   │   ├── reviews-contract/
+│   │   │   ├── .gitignore
+│   │   │   ├── package.json
+│   │   │   ├── README.md
+│   │   │   ├── src/
+│   │   │   │   └── index.ts
+│   │   │   └── tsconfig.json
+│   │   └── wrenpass-contract/
+│   │       ├── .gitignore
+│   │       ├── package.json
+│   │       ├── README.md
+│   │       ├── src/
+│   │       │   └── index.ts
+│   │       └── tsconfig.json
+│   ├── instrumentation.ts
+│   ├── instrumentation-client.ts
+│   ├── lib/
+│   │   ├── analytics.test.ts
+│   │   ├── analytics.ts
+│   │   ├── cn.ts
+│   │   └── stellar/
+│   │       ├── config.test.ts
+│   │       ├── config.ts
+│   │       ├── explorer.ts
+│   │       ├── freighter-adapter.ts
+│   │       ├── metadata-client.test.ts
+│   │       ├── metadata-client.ts
+│   │       ├── publisher-client.ts
+│   │       ├── redemption-request-client.test.ts
+│   │       ├── redemption-request-client.ts
+│   │       ├── reviews-client.test.ts
+│   │       ├── reviews-client.ts
+│   │       ├── transaction-submission.test.ts
+│   │       ├── transaction-submission.ts
+│   │       └── wrenpass-client.ts
+│   ├── sentry.edge.config.ts
+│   ├── sentry.server.config.ts
+│   ├── server/
+│   │   ├── campaign-transactions/
+│   │   │   ├── campaign-event-key.ts
+│   │   │   ├── campaign-transaction-index.test.ts
+│   │   │   ├── campaign-transaction-index.ts
+│   │   │   └── service.ts
+│   │   ├── cloudinary/
+│   │   │   ├── image-service.test.ts
+│   │   │   └── image-service.ts
+│   │   ├── customer/
+│   │   │   ├── customer-service.test.ts
+│   │   │   ├── customer-service.ts
+│   │   │   └── service.ts
+│   │   ├── email/
+│   │   │   ├── email-service.test.ts
+│   │   │   └── email-service.ts
+│   │   ├── env.test.ts
+│   │   ├── env.ts
+│   │   ├── events/
+│   │   │   ├── event-source.ts
+│   │   │   ├── event-sync-service.test.ts
+│   │   │   ├── event-sync-service.ts
+│   │   │   ├── firestore-notification-claim-store.ts
+│   │   │   └── service.ts
+│   │   ├── firestore/
+│   │   │   ├── document-store.ts
+│   │   │   ├── firebase-admin.ts
+│   │   │   ├── repositories.test.ts
+│   │   │   └── repositories.ts
+│   │   ├── merchant/
+│   │   │   ├── merchant-service.test.ts
+│   │   │   ├── merchant-service.ts
+│   │   │   ├── metadata-registry-reader.ts
+│   │   │   ├── profile-event-index.test.ts
+│   │   │   ├── profile-event-index.ts
+│   │   │   ├── profile-event-source.ts
+│   │   │   └── service.ts
+│   │   ├── models.ts
+│   │   ├── operations/
+│   │   │   ├── cron-auth.test.ts
+│   │   │   ├── cron-auth.ts
+│   │   │   ├── operational-state-store.test.ts
+│   │   │   ├── operational-state-store.ts
+│   │   │   ├── operations-service.test.ts
+│   │   │   ├── operations-service.ts
+│   │   │   ├── ttl-maintenance-service.test.ts
+│   │   │   └── ttl-maintenance-service.ts
+│   │   ├── redemption/
+│   │   │   ├── redemption-registry.test.ts
+│   │   │   ├── redemption-registry.ts
+│   │   │   ├── redemption-service.test.ts
+│   │   │   ├── redemption-service.ts
+│   │   │   └── service.ts
+│   │   ├── reviews/
+│   │   │   ├── reader-service.ts
+│   │   │   ├── review-event-index.test.ts
+│   │   │   ├── review-event-index.ts
+│   │   │   ├── review-event-source.ts
+│   │   │   ├── review-reader.test.ts
+│   │   │   ├── review-reader.ts
+│   │   │   ├── review-sponsor-guard.test.ts
+│   │   │   ├── review-sponsor-guard.ts
+│   │   │   ├── review-sponsorship-service.test.ts
+│   │   │   ├── review-sponsorship-service.ts
+│   │   │   └── service.ts
+│   │   ├── stellar/
+│   │   │   ├── balance-service.test.ts
+│   │   │   ├── balance-service.ts
+│   │   │   ├── campaign-reader.ts
+│   │   │   ├── customer-chain-reader.test.ts
+│   │   │   ├── customer-chain-reader.ts
+│   │   │   ├── event-retention.test.ts
+│   │   │   ├── event-retention.ts
+│   │   │   ├── purchase-readiness.test.ts
+│   │   │   ├── purchase-readiness.ts
+│   │   │   ├── rpc-gateway.ts
+│   │   │   ├── services.ts
+│   │   │   ├── ttl-service.test.ts
+│   │   │   └── ttl-service.ts
+│   │   └── wallet-auth/
+│   │       ├── auth-service.test.ts
+│   │       ├── auth-service.ts
+│   │       ├── firestore-auth-store.test.ts
+│   │       ├── firestore-auth-store.ts
+│   │       ├── request-session.ts
+│   │       └── service.ts
+│   └── test/
+│       ├── fixtures/
+│       │   └── customer.ts
+│       ├── server-only.ts
+│       └── setup.ts
+├── tsconfig.json
+├── vercel.json
+└── vitest.config.ts
+```
+
 ### Source of truth
 
 | On-chain and authoritative                        | Off-chain and operational                        |
