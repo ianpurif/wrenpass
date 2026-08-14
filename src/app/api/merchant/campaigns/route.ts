@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 
 import { MerchantServiceError } from "@/server/merchant/merchant-service";
-import { getMerchantService } from "@/server/merchant/service";
+import { getMerchantDashboard, getMerchantService } from "@/server/merchant/service";
 import { getRequestWalletAddress } from "@/server/wallet-auth/request-session";
 
 export const runtime = "nodejs";
@@ -12,10 +12,11 @@ export async function GET(request: NextRequest) {
   if (!walletAddress) return Response.json({ error: "Connect your wallet first." }, { status: 401 });
 
   try {
-    return Response.json(await getMerchantService().getDashboard(walletAddress), {
+    return Response.json(await getMerchantDashboard(walletAddress), {
       headers: { "Cache-Control": "no-store" },
     });
-  } catch {
+  } catch (error) {
+    console.error("Merchant dashboard request failed.", error);
     return Response.json({ error: "Unable to load merchant campaigns." }, { status: 503 });
   }
 }

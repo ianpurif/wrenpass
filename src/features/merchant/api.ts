@@ -45,6 +45,19 @@ const uploadResponseSchema = z.object({
   sha256: z.string().regex(/^[a-f\d]{64}$/i),
 });
 export const publicCampaignSchema = merchantCampaignSchema.extend({ merchant: merchantSchema });
+type MerchantDashboard = z.infer<typeof merchantDashboardSchema>;
+
+const DASHBOARD_TIMEOUT_MS = 20_000;
+const DASHBOARD_ATTEMPTS = 2;
+const DASHBOARD_RETRY_DELAY_MS = 250;
+const dashboardRequests = new Map<string, Promise<MerchantDashboard>>();
+
+class MerchantDashboardRequestError extends Error {
+  constructor(message: string, readonly retryable: boolean) {
+    super(message);
+    this.name = "MerchantDashboardRequestError";
+  }
+}
 
 async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
   const response = await fetch(url, { ...init, credentials: "same-origin" });
@@ -57,6 +70,101 @@ async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
     );
   }
   return payload;
+}
+
+async function requestDashboard(): Promise<MerchantDashboard> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DASHBOARD_TIMEOUT_MS);
+  try {
+    const response = await fetch("/api/merchant/campaigns", {
+      credentials: "same-origin",
+      signal: controller.signal,
+    });
+    const responseBody = await response.text();
+    let payload: unknown = null;
+    if (responseBody) {
+      try {
+        payload = JSON.parse(responseBody);
+      } catch {
+        throw new MerchantDashboardRequestError(
+          "The merchant service returned an invalid response.",
+          false,
+        );
+      }
+    }
+    if (!response.ok) {
+      const errorPayload = payload as { error?: unknown } | null;
+      throw new MerchantDashboardRequestError(
+        errorPayload && typeof errorPayload.error === "string"
+          ? errorPayload.error
+          : "The merchant dashboard could not be loaded.",
+        [502, 503, 504].includes(response.status),
+      );
+    }
+    return merchantDashboardSchema.parse(payload);
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new MerchantDashboardRequestError(
+        "Loading the merchant workspace timed out. Please try again.",
+        true,
+      );
+    }
+    if (error instanceof MerchantDashboardRequestError) throw error;
+    if (error instanceof z.ZodError) {
+      throw new MerchantDashboardRequestError(
+        "The merchant service returned an invalid dashboard.",
+        false,
+      );
+    }
+    throw new MerchantDashboardRequestError(
+      error instanceof Error ? error.message : "Unable to reach the merchant service.",
+      true,
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function loadDashboard(): Promise<MerchantDashboard> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= DASHBOARD_ATTEMPTS; attempt += 1) {
+    try {
+      return await requestDashboard();
+    } catch (error) {
+      lastError = error;
+      if (
+        !(error instanceof MerchantDashboardRequestError) ||
+        !error.retryable ||
+        attempt === DASHBOARD_ATTEMPTS
+      ) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, DASHBOARD_RETRY_DELAY_MS));
+    }
+  }
+  throw lastError;
+}
+
+function waitForConsumer<T>(request: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return request;
+  if (signal.aborted) {
+    return Promise.reject(new DOMException("The request was cancelled.", "AbortError"));
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(new DOMException("The request was cancelled.", "AbortError"));
+    signal.addEventListener("abort", abort, { once: true });
+    request.then(
+      (value) => {
+        signal.removeEventListener("abort", abort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", abort);
+        reject(error);
+      },
+    );
+  });
 }
 
 export const merchantApi = {
@@ -72,8 +180,17 @@ export const merchantApi = {
       }),
     ).merchant;
   },
-  async getDashboard() {
-    return merchantDashboardSchema.parse(await requestJson("/api/merchant/campaigns"));
+  getDashboard(walletAddress: string, options: { signal?: AbortSignal } = {}) {
+    let request = dashboardRequests.get(walletAddress);
+    if (!request) {
+      request = loadDashboard().finally(() => {
+        if (dashboardRequests.get(walletAddress) === request) {
+          dashboardRequests.delete(walletAddress);
+        }
+      });
+      dashboardRequests.set(walletAddress, request);
+    }
+    return waitForConsumer(request, options.signal);
   },
   async saveCampaignMetadata(input: CampaignMetadataInput) {
     return savedMetadataResponseSchema.parse(

@@ -9,7 +9,7 @@ import {
   Store,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CampaignCard } from "@/components/merchant/campaign-card";
 import { campaignTableGridClass } from "@/components/merchant/campaign-table-layout";
@@ -85,43 +85,61 @@ export function MerchantWorkspace({
   const { address, connect, error: walletError, status } = useWallet();
   const [dashboard, setDashboard] = useState<MerchantDashboardDto | null>(null);
   const [loadedAddress, setLoadedAddress] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<{ address: string; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const requestId = useRef(0);
+  const error = loadError?.address === address ? loadError.message : null;
 
-  const loadDashboard = useCallback(async () => {
+  const loadDashboard = useCallback(async (options: { signal?: AbortSignal } = {}) => {
     if (!address) {
       setDashboard(null);
       return;
     }
+    const currentRequestId = requestId.current + 1;
+    requestId.current = currentRequestId;
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     try {
-      setDashboard(await merchantApi.getDashboard());
+      const nextDashboard = await merchantApi.getDashboard(address, options);
+      if (options.signal?.aborted || requestId.current !== currentRequestId) return;
+      setDashboard(nextDashboard);
       setLoadedAddress(address);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load the dashboard.");
+      if (options.signal?.aborted || requestId.current !== currentRequestId) return;
+      setLoadError({
+        address,
+        message: loadError instanceof Error ? loadError.message : "Unable to load the dashboard.",
+      });
     } finally {
-      setLoading(false);
+      if (requestId.current === currentRequestId) setLoading(false);
     }
   }, [address]);
 
   useEffect(() => {
     if (!address) return;
-    let active = true;
-    merchantApi.getDashboard().then(
+    const controller = new AbortController();
+    const currentRequestId = requestId.current + 1;
+    requestId.current = currentRequestId;
+    merchantApi.getDashboard(address, { signal: controller.signal }).then(
       (nextDashboard) => {
-        if (!active) return;
+        if (controller.signal.aborted || requestId.current !== currentRequestId) return;
         setDashboard(nextDashboard);
         setLoadedAddress(address);
-        setError(null);
+        setLoadError(null);
       },
-      (loadError: unknown) => {
-        if (!active) return;
-        setError(loadError instanceof Error ? loadError.message : "Unable to load the dashboard.");
+      (initialLoadError: unknown) => {
+        if (controller.signal.aborted || requestId.current !== currentRequestId) return;
+        setLoadError({
+          address,
+          message: initialLoadError instanceof Error
+            ? initialLoadError.message
+            : "Unable to load the dashboard.",
+        });
       },
     );
     return () => {
-      active = false;
+      controller.abort();
+      requestId.current += 1;
     };
   }, [address]);
 
