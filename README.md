@@ -357,6 +357,8 @@ wrenpass/
 │   │   │           └── route.ts
 │   │   ├── campaigns/
 │   │   │   └── [campaignId]/
+│   │   │       ├── loading.test.tsx
+│   │   │       ├── loading.tsx
 │   │   │       └── page.tsx
 │   │   ├── global-error.tsx
 │   │   ├── globals.css
@@ -455,6 +457,7 @@ wrenpass/
 │   │   │   ├── dto.ts
 │   │   │   └── validation.ts
 │   │   ├── merchant/
+│   │   │   ├── api.test.ts
 │   │   │   ├── api.ts
 │   │   │   ├── campaign-terms.test.ts
 │   │   │   ├── campaign-terms.ts

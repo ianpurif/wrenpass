@@ -37,10 +37,12 @@ export default async function PublicCampaignPage({
   params: Promise<{ campaignId: string }>;
 }) {
   const { campaignId } = await params;
-  const campaign = await getMerchantService().getPublicCampaign(campaignId);
+  const [campaign, initialTransactions] = await Promise.all([
+    getMerchantService().getPublicCampaign(campaignId),
+    loadInitialTransactions(campaignId),
+  ]);
   if (!campaign) notFound();
   const config = getStellarConfig();
-  const initialTransactions = await loadInitialTransactions(campaignId);
 
   return (
     <main id="main-content" className="py-10 sm:py-14">
