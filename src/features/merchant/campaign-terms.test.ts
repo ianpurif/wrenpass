@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  FINANCIAL_RULES,
   formatUsdcAmount,
   parseUsdcAmount,
   parseUsdcBalance,
@@ -16,9 +17,23 @@ describe("campaign terms", () => {
     expect(formatUsdcAmount(BigInt(52_500_000))).toBe("5.25");
     expect(quoteCampaignInput({ passPrice: "5", serviceValue: "6" })).toEqual({
       bonus: BigInt(10_000_000),
-      merchantRelease: BigInt(37_500_000),
+      merchantRelease: BigInt(39_500_000),
       protectedReserve: BigInt(10_000_000),
-      platformFee: BigInt(2_500_000),
+      platformFee: BigInt(500_000),
+    });
+  });
+
+  it("charges a 1% platform fee while preserving the 20% protection reserve", () => {
+    expect(FINANCIAL_RULES).toEqual({
+      merchant_bps: 7_900,
+      reserve_bps: 2_000,
+      platform_fee_bps: 100,
+    });
+    expect(quoteCampaignInput({ passPrice: "500", serviceValue: "550" })).toEqual({
+      bonus: BigInt(500_000_000),
+      merchantRelease: BigInt(3_950_000_000),
+      protectedReserve: BigInt(1_000_000_000),
+      platformFee: BigInt(50_000_000),
     });
   });
 
@@ -26,15 +41,15 @@ describe("campaign terms", () => {
     expect(quoteCampaignFunding({ passPrice: "5", serviceValue: "6", maxSupply: 100 })).toEqual({
       perPass: {
         bonus: BigInt(10_000_000),
-        merchantRelease: BigInt(37_500_000),
+        merchantRelease: BigInt(39_500_000),
         protectedReserve: BigInt(10_000_000),
-        platformFee: BigInt(2_500_000),
+        platformFee: BigInt(500_000),
       },
       totals: {
         customerPayments: BigInt(5_000_000_000),
-        merchantRelease: BigInt(3_750_000_000),
+        merchantRelease: BigInt(3_950_000_000),
         protectedReserve: BigInt(1_000_000_000),
-        platformFee: BigInt(250_000_000),
+        platformFee: BigInt(50_000_000),
       },
     });
   });

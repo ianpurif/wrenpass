@@ -4,9 +4,9 @@ import type { CampaignTerms } from "@/generated/wrenpass-contract/src";
 
 export const USDC_SCALE = BigInt(10_000_000);
 export const FINANCIAL_RULES = {
-  merchant_bps: 7_500,
+  merchant_bps: 7_900,
   reserve_bps: 2_000,
-  platform_fee_bps: 500,
+  platform_fee_bps: 100,
 } as const;
 
 const MAX_U32 = 4_294_967_295;

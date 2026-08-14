@@ -89,7 +89,7 @@ describe("CampaignForm", () => {
       "One complete haircut service delivered at the merchant studio.",
     );
     expect(screen.getByText("500 USDC")).toBeInTheDocument();
-    expect(screen.getByText("375 USDC")).toBeInTheDocument();
+    expect(screen.getByText("395 USDC")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Create and publish campaign" }));
 
     await waitFor(() => expect(mocks.publish).toHaveBeenCalledOnce());

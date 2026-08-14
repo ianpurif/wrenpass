@@ -255,6 +255,21 @@ fn rejects_invalid_amount_supply_expiration_and_financial_rules() {
 }
 
 #[test]
+fn calculates_the_lower_one_percent_platform_fee() {
+    let rules = FinancialRules {
+        merchant_bps: 7_900,
+        reserve_bps: 2_000,
+        platform_fee_bps: 100,
+    };
+
+    let amounts = WrenPassContract::calculate_distribution(5_000_000_000, &rules).unwrap();
+
+    assert_eq!(amounts.merchant_release, 3_950_000_000);
+    assert_eq!(amounts.protected_reserve, 1_000_000_000);
+    assert_eq!(amounts.platform_fee, 50_000_000);
+}
+
+#[test]
 fn supports_the_full_u32_supply_boundary_without_overflow() {
     let (env, _contract_id, client, _platform, _payment_asset) = setup();
     let merchant = Address::generate(&env);
