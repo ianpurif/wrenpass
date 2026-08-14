@@ -4,6 +4,7 @@ import {
   formatUsdcAmount,
   parseUsdcAmount,
   parseUsdcBalance,
+  quoteCampaignFunding,
   quoteCampaignInput,
   toCampaignTerms,
 } from "@/features/merchant/campaign-terms";
@@ -18,6 +19,23 @@ describe("campaign terms", () => {
       merchantRelease: BigInt(37_500_000),
       protectedReserve: BigInt(10_000_000),
       platformFee: BigInt(2_500_000),
+    });
+  });
+
+  it("projects full campaign funding with integer-safe math", () => {
+    expect(quoteCampaignFunding({ passPrice: "5", serviceValue: "6", maxSupply: 100 })).toEqual({
+      perPass: {
+        bonus: BigInt(10_000_000),
+        merchantRelease: BigInt(37_500_000),
+        protectedReserve: BigInt(10_000_000),
+        platformFee: BigInt(2_500_000),
+      },
+      totals: {
+        customerPayments: BigInt(5_000_000_000),
+        merchantRelease: BigInt(3_750_000_000),
+        protectedReserve: BigInt(1_000_000_000),
+        platformFee: BigInt(250_000_000),
+      },
     });
   });
 

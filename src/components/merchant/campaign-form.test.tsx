@@ -88,6 +88,8 @@ describe("CampaignForm", () => {
       screen.getByLabelText("Service description"),
       "One complete haircut service delivered at the merchant studio.",
     );
+    expect(screen.getByText("500 USDC")).toBeInTheDocument();
+    expect(screen.getByText("375 USDC")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Create and publish campaign" }));
 
     await waitFor(() => expect(mocks.publish).toHaveBeenCalledOnce());
@@ -110,6 +112,13 @@ describe("CampaignForm", () => {
     expect(onPublished).toHaveBeenCalledOnce();
     expect(mocks.syncEventsAfterMutation).toHaveBeenCalledOnce();
     expect(screen.getByText("Campaign #12 is live on Stellar Testnet.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /View campaign/ })).toHaveAttribute(
+      "href",
+      "/campaigns/12",
+    );
+    await user.click(screen.getByRole("button", { name: "Copy link" }));
+    expect(await navigator.clipboard.readText()).toBe("http://localhost:3000/campaigns/12");
+    expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
     expect(mocks.requestReview).toHaveBeenCalledWith({ transactionLabel: "campaign publishing" });
   });
 

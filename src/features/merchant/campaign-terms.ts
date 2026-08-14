@@ -153,3 +153,23 @@ export function quoteCampaignInput(input: Pick<CampaignInput, "passPrice" | "ser
     platformFee,
   };
 }
+
+export function quoteCampaignFunding(
+  input: Pick<CampaignInput, "passPrice" | "serviceValue" | "maxSupply">,
+) {
+  const perPass = quoteCampaignInput(input);
+  if (!Number.isSafeInteger(input.maxSupply) || input.maxSupply <= 0) {
+    throw new Error("Maximum passes must be a positive whole number.");
+  }
+  const supply = BigInt(input.maxSupply);
+  const price = parseUsdcAmount(input.passPrice);
+  return {
+    perPass,
+    totals: {
+      customerPayments: price * supply,
+      merchantRelease: perPass.merchantRelease * supply,
+      protectedReserve: perPass.protectedReserve * supply,
+      platformFee: perPass.platformFee * supply,
+    },
+  };
+}
