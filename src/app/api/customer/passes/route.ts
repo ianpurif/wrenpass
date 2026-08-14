@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { CustomerServiceError } from "@/server/customer/customer-service";
-import { getCustomerDashboard } from "@/server/customer/service";
+import { getCustomerPasses } from "@/server/customer/service";
 import { getRequestWalletAddress } from "@/server/wallet-auth/request-session";
 
 export const runtime = "nodejs";
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    return Response.json(await getCustomerDashboard(walletAddress), {
+    return Response.json({ passes: await getCustomerPasses(walletAddress) }, {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {

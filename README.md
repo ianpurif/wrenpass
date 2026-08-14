@@ -322,6 +322,8 @@ wrenpass/
 │   │   │   │   └── operations/
 │   │   │   │       └── route.ts
 │   │   │   ├── customer/
+│   │   │   │   ├── activity/
+│   │   │   │   │   └── route.ts
 │   │   │   │   └── passes/
 │   │   │   │       └── route.ts
 │   │   │   ├── events/

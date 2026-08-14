@@ -3,13 +3,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { customerApi } from "@/features/customer/api";
 import { testCustomerAddress } from "@/test/fixtures/customer";
 
-function dashboardResponse(status = 200) {
+function passResponse(status = 200) {
   return new Response(
-    JSON.stringify({
-      passes: [],
-      activity: [],
-      activityWindowStartsAt: "2026-08-01T00:00:00.000Z",
-    }),
+    JSON.stringify({ passes: [] }),
+    { status, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+function activityResponse(status = 200) {
+  return new Response(
+    JSON.stringify({ activity: [], activityWindowStartsAt: "2026-08-01T00:00:00.000Z" }),
     { status, headers: { "Content-Type": "application/json" } },
   );
 }
@@ -28,7 +31,6 @@ describe("customerApi", () => {
         vi.fn().mockResolvedValue(
           new Response(
             JSON.stringify({
-              passes: [],
               activity: [
                 {
                   id: kind.toLowerCase(),
@@ -46,7 +48,7 @@ describe("customerApi", () => {
         ),
       );
 
-      await expect(customerApi.getDashboard(testCustomerAddress)).resolves.toMatchObject({
+      await expect(customerApi.getActivity(testCustomerAddress)).resolves.toMatchObject({
         activity: [{ kind }],
       });
     },
@@ -57,13 +59,13 @@ describe("customerApi", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: "Temporary RPC failure." }), { status: 503 }))
-      .mockResolvedValueOnce(dashboardResponse());
+      .mockResolvedValueOnce(passResponse());
     vi.stubGlobal("fetch", fetchMock);
 
-    const request = customerApi.getDashboard(testCustomerAddress);
+    const request = customerApi.getPasses(testCustomerAddress);
     await vi.runAllTimersAsync();
 
-    await expect(request).resolves.toMatchObject({ passes: [], activity: [] });
+    await expect(request).resolves.toMatchObject({ passes: [] });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -75,10 +77,10 @@ describe("customerApi", () => {
     const fetchMock = vi.fn().mockReturnValue(response);
     vi.stubGlobal("fetch", fetchMock);
 
-    const first = customerApi.getDashboard(testCustomerAddress);
-    const second = customerApi.getDashboard(testCustomerAddress);
+    const first = customerApi.getPasses(testCustomerAddress);
+    const second = customerApi.getPasses(testCustomerAddress);
     expect(fetchMock).toHaveBeenCalledOnce();
-    resolveResponse(dashboardResponse());
+    resolveResponse(passResponse());
 
     await expect(Promise.all([first, second])).resolves.toHaveLength(2);
   });
@@ -93,13 +95,26 @@ describe("customerApi", () => {
       }));
     vi.stubGlobal("fetch", fetchMock);
 
-    const request = customerApi.getDashboard(testCustomerAddress);
+    const request = customerApi.getPasses(testCustomerAddress);
     const expectation = expect(request).rejects.toThrow(
       "Reading passes from Stellar timed out. Please try again.",
     );
     await vi.runAllTimersAsync();
 
     await expectation;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("combines independently loaded passes and activity for legacy consumers", async () => {
+    const fetchMock = vi.fn((url: string) =>
+      Promise.resolve(url.endsWith("/activity") ? activityResponse() : passResponse()));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(customerApi.getDashboard(testCustomerAddress)).resolves.toEqual({
+      passes: [],
+      activity: [],
+      activityWindowStartsAt: "2026-08-01T00:00:00.000Z",
+    });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

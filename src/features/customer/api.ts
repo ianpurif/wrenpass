@@ -28,17 +28,21 @@ const activitySchema = z.object({
   amount: integerStringSchema.optional(),
   counterparty: z.string().optional(),
 });
-const dashboardSchema = z.object({
+const passCollectionSchema = z.object({
   passes: z.array(customerPassSchema),
+});
+const activityWindowSchema = z.object({
   activity: z.array(activitySchema),
   activityWindowStartsAt: z.string().datetime(),
 });
-
-type CustomerDashboard = z.infer<typeof dashboardSchema>;
+type CustomerPassCollection = z.infer<typeof passCollectionSchema>;
+type CustomerActivityWindow = z.infer<typeof activityWindowSchema>;
+type CustomerDashboard = CustomerPassCollection & CustomerActivityWindow;
 const CUSTOMER_REQUEST_TIMEOUT_MS = 20_000;
 const CUSTOMER_REQUEST_ATTEMPTS = 2;
 const CUSTOMER_RETRY_DELAY_MS = 250;
-const dashboardRequests = new Map<string, Promise<CustomerDashboard>>();
+const passRequests = new Map<string, Promise<CustomerPassCollection>>();
+const activityRequests = new Map<string, Promise<CustomerActivityWindow>>();
 
 class CustomerRequestError extends Error {
   constructor(message: string, readonly retryable: boolean) {
@@ -47,7 +51,7 @@ class CustomerRequestError extends Error {
   }
 }
 
-async function requestJson(url: string): Promise<unknown> {
+async function requestJson(url: string, timeoutMessage: string): Promise<unknown> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CUSTOMER_REQUEST_TIMEOUT_MS);
   let response: Response;
@@ -58,10 +62,7 @@ async function requestJson(url: string): Promise<unknown> {
     });
   } catch (error) {
     if (controller.signal.aborted) {
-      throw new CustomerRequestError(
-        "Reading passes from Stellar timed out. Please try again.",
-        true,
-      );
+      throw new CustomerRequestError(timeoutMessage, true);
     }
     throw new CustomerRequestError(
       error instanceof Error ? error.message : "Unable to reach the customer service.",
@@ -91,11 +92,15 @@ async function requestJson(url: string): Promise<unknown> {
   return payload;
 }
 
-async function loadDashboard(): Promise<CustomerDashboard> {
+async function loadResource<T>(
+  url: string,
+  schema: z.ZodType<T>,
+  timeoutMessage: string,
+): Promise<T> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= CUSTOMER_REQUEST_ATTEMPTS; attempt += 1) {
     try {
-      return dashboardSchema.parse(await requestJson("/api/customer/passes"));
+      return schema.parse(await requestJson(url, timeoutMessage));
     } catch (error) {
       lastError = error;
       if (
@@ -132,16 +137,45 @@ function waitForConsumer<T>(request: Promise<T>, signal?: AbortSignal): Promise<
 }
 
 export const customerApi = {
-  getDashboard(walletAddress: string, options: { signal?: AbortSignal } = {}) {
-    let request = dashboardRequests.get(walletAddress);
+  getPasses(walletAddress: string, options: { signal?: AbortSignal } = {}) {
+    let request = passRequests.get(walletAddress);
     if (!request) {
-      request = loadDashboard().finally(() => {
-        if (dashboardRequests.get(walletAddress) === request) {
-          dashboardRequests.delete(walletAddress);
+      request = loadResource(
+        "/api/customer/passes",
+        passCollectionSchema,
+        "Reading passes from Stellar timed out. Please try again.",
+      ).finally(() => {
+        if (passRequests.get(walletAddress) === request) {
+          passRequests.delete(walletAddress);
         }
       });
-      dashboardRequests.set(walletAddress, request);
+      passRequests.set(walletAddress, request);
     }
     return waitForConsumer(request, options.signal);
+  },
+
+  getActivity(walletAddress: string, options: { signal?: AbortSignal } = {}) {
+    let request = activityRequests.get(walletAddress);
+    if (!request) {
+      request = loadResource(
+        "/api/customer/activity",
+        activityWindowSchema,
+        "Reading recent activity from Stellar timed out. Please try again.",
+      ).finally(() => {
+        if (activityRequests.get(walletAddress) === request) {
+          activityRequests.delete(walletAddress);
+        }
+      });
+      activityRequests.set(walletAddress, request);
+    }
+    return waitForConsumer(request, options.signal);
+  },
+
+  async getDashboard(walletAddress: string, options: { signal?: AbortSignal } = {}): Promise<CustomerDashboard> {
+    const [passCollection, activityWindow] = await Promise.all([
+      this.getPasses(walletAddress, options),
+      this.getActivity(walletAddress, options),
+    ]);
+    return { ...passCollection, ...activityWindow };
   },
 };

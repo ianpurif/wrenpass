@@ -45,11 +45,8 @@ export class CustomerService {
     private readonly campaigns: CampaignCatalog,
   ) {}
 
-  async getDashboard(walletAddress: string): Promise<CustomerDashboardDto> {
-    const [passCount, activityWindow] = await Promise.all([
-      this.chainReader.getPassCount(),
-      this.chainReader.readRecentActivity(walletAddress),
-    ]);
+  async getPasses(walletAddress: string): Promise<CustomerDashboardDto["passes"]> {
+    const passCount = await this.chainReader.getPassCount();
     if (passCount > MAX_DIRECT_PASS_READS) {
       throw new CustomerServiceError(
         "The direct pass reader reached its safe limit. Event indexing is required before loading this account.",
@@ -86,10 +83,22 @@ export class CustomerService {
         return leftTime === rightTime ? 0 : leftTime < rightTime ? 1 : -1;
       });
 
+    return passes;
+  }
+
+  async getActivity(walletAddress: string): Promise<Pick<CustomerDashboardDto, "activity" | "activityWindowStartsAt">> {
+    const activityWindow = await this.chainReader.readRecentActivity(walletAddress);
     return {
-      passes,
       activity: activityWindow.activity,
       activityWindowStartsAt: activityWindow.startsAt,
     };
+  }
+
+  async getDashboard(walletAddress: string): Promise<CustomerDashboardDto> {
+    const [passes, activityWindow] = await Promise.all([
+      this.getPasses(walletAddress),
+      this.getActivity(walletAddress),
+    ]);
+    return { passes, ...activityWindow };
   }
 }

@@ -26,7 +26,7 @@ function pass(id: number, owner: string): Pass {
 }
 
 describe("CustomerService", () => {
-  it("returns only passes currently owned by the authenticated wallet", async () => {
+  it("returns only current ownership without waiting for an activity scan", async () => {
     const passes = [pass(1, testCustomerAddress), pass(2, testRecipientAddress)];
     const reader: CustomerChainReader = {
       getPassCount: vi.fn().mockResolvedValue(BigInt(2)),
@@ -38,12 +38,34 @@ describe("CustomerService", () => {
     };
     const campaigns = { getPublicCampaign: vi.fn().mockResolvedValue(testPublicCampaign) };
 
-    const dashboard = await new CustomerService(reader, campaigns).getDashboard(testCustomerAddress);
+    const ownedPasses = await new CustomerService(reader, campaigns).getPasses(testCustomerAddress);
 
-    expect(dashboard.passes).toHaveLength(1);
-    expect(dashboard.passes[0]).toEqual(
+    expect(ownedPasses).toHaveLength(1);
+    expect(ownedPasses[0]).toEqual(
       expect.objectContaining({ id: "1", owner: testCustomerAddress, campaign: testPublicCampaign }),
     );
     expect(reader.findPass).toHaveBeenCalledTimes(2);
+    expect(reader.readRecentActivity).not.toHaveBeenCalled();
+  });
+
+  it("loads activity without scanning the pass collection", async () => {
+    const reader: CustomerChainReader = {
+      getPassCount: vi.fn(),
+      findPass: vi.fn(),
+      readRecentActivity: vi.fn().mockResolvedValue({
+        activity: [],
+        startsAt: "2026-08-02T00:00:00.000Z",
+      }),
+    };
+    const campaigns = { getPublicCampaign: vi.fn() };
+
+    const activity = await new CustomerService(reader, campaigns).getActivity(testCustomerAddress);
+
+    expect(activity).toEqual({
+      activity: [],
+      activityWindowStartsAt: "2026-08-02T00:00:00.000Z",
+    });
+    expect(reader.getPassCount).not.toHaveBeenCalled();
+    expect(reader.findPass).not.toHaveBeenCalled();
   });
 });
