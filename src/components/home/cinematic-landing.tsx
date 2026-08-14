@@ -8,11 +8,12 @@ import {
   useSpring,
   useTransform,
 } from "framer-motion";
-import { ArrowDown, ArrowRight, Check, QrCode, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check, QrCode, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { PassPreview, type PassPreviewContent } from "@/components/home/pass-preview";
+import { LandingStartActions } from "@/components/home/landing-start-actions";
 import { RecentReviews } from "@/components/reviews/recent-reviews";
 import { Container } from "@/components/ui/container";
 import { ConnectedWalletLink } from "@/components/wallet/connected-wallet-link";
@@ -271,22 +272,7 @@ export function CinematicLanding({
             <p className="mt-8 max-w-xl text-pretty text-base leading-7 text-white/75 sm:text-lg sm:leading-8">
               WrenPass helps small businesses pre-sell limited future service value to the customers who already believe in them.
             </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Link
-                className="inline-flex h-12 items-center justify-center gap-3 rounded-[2px] bg-white px-6 text-sm font-bold text-ink transition-colors hover:bg-mint focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
-                href="#campaign-example"
-              >
-                Explore the model
-                <ArrowDown aria-hidden="true" className="size-4" />
-              </Link>
-              <ConnectedWalletLink
-                className="inline-flex h-12 items-center justify-center gap-3 rounded-[2px] border border-white/45 px-6 text-sm font-bold text-white transition-colors hover:border-white hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
-                href="/merchant"
-              >
-                Create a campaign
-                <ArrowRight aria-hidden="true" className="size-4" />
-              </ConnectedWalletLink>
-            </div>
+            <LandingStartActions />
           </motion.div>
 
           <div className="mt-14 grid gap-5 border-t border-white/30 pt-5 text-xs font-semibold text-white/72 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:gap-10">

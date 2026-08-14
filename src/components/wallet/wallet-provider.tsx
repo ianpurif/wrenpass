@@ -111,7 +111,7 @@ interface WalletContextValue {
   balances: WalletBalances | null;
   error: string | null;
   networkLabel: string;
-  connect(): Promise<void>;
+  connect(): Promise<boolean>;
   disconnect(): Promise<void>;
   refreshBalances(): Promise<void>;
   signTransaction(
@@ -327,11 +327,13 @@ export function WalletProvider({
         expiresAt: session.expiresAt,
       };
       captureWalletConnected(config.network);
+      return true;
     } catch (connectError) {
       await api.revokeSession().catch(() => undefined);
       await adapter.disconnect().catch(() => undefined);
       clearWallet();
       setError(readableError(connectError));
+      return false;
     }
   }, [
     adapter,

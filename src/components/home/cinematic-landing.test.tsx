@@ -16,6 +16,10 @@ vi.mock("@/components/wallet/connected-wallet-link", () => ({
   ),
 }));
 
+vi.mock("@/components/home/landing-start-actions", () => ({
+  LandingStartActions: () => <a href="#campaign-example">See a sample campaign</a>,
+}));
+
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
