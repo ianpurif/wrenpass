@@ -8,9 +8,6 @@ import type {
 import type { PublicCampaignDto } from "@/features/merchant/dto";
 import type { CustomerChainReader } from "@/server/stellar/customer-chain-reader";
 
-const MAX_DIRECT_PASS_READS = BigInt(2_000);
-const PASS_READ_BATCH_SIZE = 20;
-
 interface CampaignCatalog {
   getPublicCampaign(campaignId: string): Promise<PublicCampaignDto | null>;
 }
@@ -46,26 +43,7 @@ export class CustomerService {
   ) {}
 
   async getPasses(walletAddress: string): Promise<CustomerDashboardDto["passes"]> {
-    const passCount = await this.chainReader.getPassCount();
-    if (passCount > MAX_DIRECT_PASS_READS) {
-      throw new CustomerServiceError(
-        "The direct pass reader reached its safe limit. Event indexing is required before loading this account.",
-      );
-    }
-
-    const ownedPasses: Pass[] = [];
-    const count = Number(passCount);
-    for (let start = 1; start <= count; start += PASS_READ_BATCH_SIZE) {
-      const end = Math.min(count, start + PASS_READ_BATCH_SIZE - 1);
-      const batch = await Promise.all(
-        Array.from({ length: end - start + 1 }, (_, index) =>
-          this.chainReader.findPass(BigInt(start + index)),
-        ),
-      );
-      ownedPasses.push(
-        ...batch.filter((pass): pass is Pass => pass !== null && pass.owner === walletAddress),
-      );
-    }
+    const ownedPasses = await this.chainReader.getOwnedPasses(walletAddress);
 
     const campaignIds = [...new Set(ownedPasses.map((pass) => pass.campaign_id.toString()))];
     const campaignEntries = await Promise.all(

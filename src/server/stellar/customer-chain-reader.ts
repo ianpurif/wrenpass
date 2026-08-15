@@ -9,6 +9,9 @@ import {
   retryStartLedgerFromRangeError,
 } from "@/server/stellar/event-retention";
 import {
+  readContractIndexMigrationStatus,
+  readContractOwnerPassCount,
+  readContractOwnerPasses,
   readContractPass,
   readContractPassCount,
 } from "@/lib/stellar/wrenpass-client";
@@ -30,11 +33,56 @@ interface EventPageReader {
 const EVENT_LEDGER_BATCH_SIZE = 10_000;
 const MAX_EVENT_PAGES = 25;
 const MAX_EVENT_RANGE_RETRIES = 2;
+const OWNER_PASS_PAGE_SIZE = 50;
+const MAX_DIRECT_PASS_READS = BigInt(2_000);
 
 export interface CustomerChainReader {
+  getOwnedPasses(walletAddress: string): Promise<Pass[]>;
   getPassCount(): Promise<bigint>;
   findPass(passId: bigint): Promise<Pass | null>;
   readRecentActivity(walletAddress: string): Promise<ActivityWindow>;
+}
+
+interface OwnerPassIndexReader {
+  getMigrationStatus(): Promise<{ passes_complete: boolean }>;
+  getOwnerPassCount(owner: string): Promise<bigint>;
+  getOwnerPasses(owner: string, cursor: bigint, limit: number): Promise<Pass[]>;
+  getPassCount(): Promise<bigint>;
+  findPass(passId: bigint): Promise<Pass | null>;
+}
+
+export async function readOwnedPasses(
+  reader: OwnerPassIndexReader,
+  walletAddress: string,
+): Promise<Pass[]> {
+  const migrationStatus = await reader.getMigrationStatus();
+  if (migrationStatus.passes_complete) {
+    const count = await reader.getOwnerPassCount(walletAddress);
+    const pageCount = Math.ceil(Number(count) / OWNER_PASS_PAGE_SIZE);
+    const pages = await Promise.all(
+      Array.from({ length: pageCount }, (_, page) =>
+        reader.getOwnerPasses(
+          walletAddress,
+          BigInt(page * OWNER_PASS_PAGE_SIZE),
+          OWNER_PASS_PAGE_SIZE,
+        ),
+      ),
+    );
+    return pages.flat();
+  }
+
+  const passCount = await reader.getPassCount();
+  if (passCount > MAX_DIRECT_PASS_READS) {
+    throw new Error(
+      "The pass ownership index is still migrating and the legacy reader reached its safe limit.",
+    );
+  }
+  const passes = await Promise.all(
+    Array.from({ length: Number(passCount) }, (_, index) => reader.findPass(BigInt(index + 1))),
+  );
+  return passes.filter(
+    (pass): pass is Pass => pass !== null && pass.owner === walletAddress,
+  );
 }
 
 function eventTopic(name: string): string {
@@ -209,6 +257,20 @@ export class StellarCustomerChainReader implements CustomerChainReader {
 
   findPass(passId: bigint): Promise<Pass | null> {
     return readContractPass(this.config, passId);
+  }
+
+  getOwnedPasses(walletAddress: string): Promise<Pass[]> {
+    return readOwnedPasses(
+      {
+        getMigrationStatus: () => readContractIndexMigrationStatus(this.config),
+        getOwnerPassCount: (owner) => readContractOwnerPassCount(this.config, owner),
+        getOwnerPasses: (owner, cursor, limit) =>
+          readContractOwnerPasses(this.config, owner, cursor, limit),
+        getPassCount: () => this.getPassCount(),
+        findPass: (passId) => this.findPass(passId),
+      },
+      walletAddress,
+    );
   }
 
   async readRecentActivity(walletAddress: string): Promise<ActivityWindow> {

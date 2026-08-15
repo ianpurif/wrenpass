@@ -29,6 +29,7 @@ describe("CustomerService", () => {
   it("returns only current ownership without waiting for an activity scan", async () => {
     const passes = [pass(1, testCustomerAddress), pass(2, testRecipientAddress)];
     const reader: CustomerChainReader = {
+      getOwnedPasses: vi.fn().mockResolvedValue([passes[0]]),
       getPassCount: vi.fn().mockResolvedValue(BigInt(2)),
       findPass: vi.fn(async (id: bigint) => passes[Number(id) - 1] ?? null),
       readRecentActivity: vi.fn().mockResolvedValue({
@@ -44,12 +45,14 @@ describe("CustomerService", () => {
     expect(ownedPasses[0]).toEqual(
       expect.objectContaining({ id: "1", owner: testCustomerAddress, campaign: testPublicCampaign }),
     );
-    expect(reader.findPass).toHaveBeenCalledTimes(2);
+    expect(reader.getOwnedPasses).toHaveBeenCalledWith(testCustomerAddress);
+    expect(reader.findPass).not.toHaveBeenCalled();
     expect(reader.readRecentActivity).not.toHaveBeenCalled();
   });
 
   it("loads activity without scanning the pass collection", async () => {
     const reader: CustomerChainReader = {
+      getOwnedPasses: vi.fn(),
       getPassCount: vi.fn(),
       findPass: vi.fn(),
       readRecentActivity: vi.fn().mockResolvedValue({

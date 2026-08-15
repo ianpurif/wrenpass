@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   decodeCustomerActivity,
   readEventPages,
+  readOwnedPasses,
 } from "@/server/stellar/customer-chain-reader";
 import { testCustomerAddress, testRecipientAddress } from "@/test/fixtures/customer";
 
@@ -184,5 +185,46 @@ describe("readEventPages", () => {
       filters: [],
       limit: 10_000,
     });
+  });
+});
+
+describe("readOwnedPasses", () => {
+  const ownedPass = { id: BigInt(1), owner: testCustomerAddress } as never;
+
+  it("reads only the wallet's paginated owner index when migration is complete", async () => {
+    const reader = {
+      getMigrationStatus: vi.fn().mockResolvedValue({ passes_complete: true }),
+      getOwnerPassCount: vi.fn().mockResolvedValue(BigInt(51)),
+      getOwnerPasses: vi
+        .fn()
+        .mockResolvedValueOnce([ownedPass])
+        .mockResolvedValueOnce([]),
+      getPassCount: vi.fn(),
+      findPass: vi.fn(),
+    };
+
+    await expect(readOwnedPasses(reader, testCustomerAddress)).resolves.toEqual([ownedPass]);
+
+    expect(reader.getOwnerPasses).toHaveBeenNthCalledWith(1, testCustomerAddress, BigInt(0), 50);
+    expect(reader.getOwnerPasses).toHaveBeenNthCalledWith(2, testCustomerAddress, BigInt(50), 50);
+    expect(reader.getPassCount).not.toHaveBeenCalled();
+    expect(reader.findPass).not.toHaveBeenCalled();
+  });
+
+  it("falls back to authoritative pass reads while the index is migrating", async () => {
+    const otherPass = { id: BigInt(2), owner: testRecipientAddress } as never;
+    const reader = {
+      getMigrationStatus: vi.fn().mockResolvedValue({ passes_complete: false }),
+      getOwnerPassCount: vi.fn(),
+      getOwnerPasses: vi.fn(),
+      getPassCount: vi.fn().mockResolvedValue(BigInt(2)),
+      findPass: vi.fn()
+        .mockResolvedValueOnce(ownedPass)
+        .mockResolvedValueOnce(otherPass),
+    };
+
+    await expect(readOwnedPasses(reader, testCustomerAddress)).resolves.toEqual([ownedPass]);
+    expect(reader.getOwnerPasses).not.toHaveBeenCalled();
+    expect(reader.findPass).toHaveBeenCalledTimes(2);
   });
 });
