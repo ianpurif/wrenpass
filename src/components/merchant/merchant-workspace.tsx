@@ -102,7 +102,9 @@ export function MerchantWorkspace({
   const requestId = useRef(0);
   const error = loadError?.address === address ? loadError.message : null;
 
-  const loadDashboard = useCallback(async (options: { signal?: AbortSignal } = {}) => {
+  const loadDashboard = useCallback(async (
+    options: { signal?: AbortSignal; refresh?: boolean } = {},
+  ) => {
     if (!address) {
       setDashboard(null);
       return;
@@ -238,7 +240,7 @@ export function MerchantWorkspace({
                 </Link>
               </>
             )}
-            <Button disabled={loading} size="sm" variant="ghost" onClick={() => void loadDashboard()}>
+            <Button disabled={loading} size="sm" variant="ghost" onClick={() => void loadDashboard({ refresh: true })}>
               {loading ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <RefreshCcw aria-hidden="true" className="size-4" />}
               Refresh
             </Button>
@@ -334,7 +336,7 @@ export function MerchantWorkspace({
                     Public details and financial terms are anchored to Stellar. Images remain hosted by Cloudinary.
                   </p>
                 </div>
-                <div className="p-6 sm:p-7"><CampaignForm config={config} onPublished={loadDashboard} /></div>
+                <div className="p-6 sm:p-7"><CampaignForm config={config} onPublished={() => loadDashboard({ refresh: true })} /></div>
               </section>
             ) : <MerchantSetupRequired />
           )}

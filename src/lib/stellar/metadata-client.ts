@@ -184,17 +184,18 @@ export class StellarMetadataContractReader {
     const client = createClient(this.config);
     const countTransaction = await client.merchant_campaign_count({ merchant });
     const count = countTransaction.result;
-    const campaigns: CampaignMetadata[] = [];
     const pageSize = 50;
-
-    for (let cursor = BigInt(0); cursor < count; cursor += BigInt(pageSize)) {
-      const transaction = await client.get_merchant_campaigns({
-        merchant,
-        cursor,
-        limit: pageSize,
-      });
-      campaigns.push(...unwrapContractResult(transaction.result));
-    }
-    return campaigns;
+    const pageCount = Math.ceil(Number(count) / pageSize);
+    const pages = await Promise.all(
+      Array.from({ length: pageCount }, async (_, page) => {
+        const transaction = await client.get_merchant_campaigns({
+          merchant,
+          cursor: BigInt(page * pageSize),
+          limit: pageSize,
+        });
+        return unwrapContractResult(transaction.result);
+      }),
+    );
+    return pages.flat();
   }
 }

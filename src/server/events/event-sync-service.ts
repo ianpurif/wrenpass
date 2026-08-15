@@ -51,6 +51,10 @@ export interface ExpectedTransaction {
   ledger: number;
 }
 
+export interface EventSyncOptions {
+  includeExpirationNotices?: boolean;
+}
+
 export class EventNotAvailableYetError extends Error {
   constructor(transactionHash: string) {
     super(`Stellar RPC has not exposed transaction ${transactionHash} to the event index yet.`);
@@ -200,7 +204,10 @@ export class EventSyncService {
     }
   }
 
-  async sync(expectedTransaction?: ExpectedTransaction): Promise<EventSyncResult> {
+  async sync(
+    expectedTransaction?: ExpectedTransaction,
+    options: EventSyncOptions = {},
+  ): Promise<EventSyncResult> {
     const cursorId = `events-${this.contractId}`;
     const cursor = await this.checkpoints.readEventCursor(cursorId);
     const startLedger = expectedTransaction
@@ -288,7 +295,9 @@ export class EventSyncService {
         }
       }
     }
-    await this.deliverExpirationNotices(result);
+    if (options.includeExpirationNotices !== false) {
+      await this.deliverExpirationNotices(result);
+    }
     if (result.notificationFailures === 0) {
       await this.checkpoints.advanceEventCursor(cursorId, batch.nextLedger, this.now());
       result.checkpointAdvanced = true;

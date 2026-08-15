@@ -9,6 +9,7 @@ import {
 import { createEmailService } from "@/server/email/email-service";
 import { EventSyncService } from "@/server/events/event-sync-service";
 import type { ExpectedTransaction } from "@/server/events/event-sync-service";
+import type { EventSyncOptions } from "@/server/events/event-sync-service";
 import { StellarWrenPassEventSource } from "@/server/events/event-source";
 import { FirestoreNotificationClaimStore } from "@/server/events/firestore-notification-claim-store";
 import { createOffchainRepositories } from "@/server/firestore/repositories";
@@ -38,14 +39,18 @@ export function getEventSyncService(): EventSyncService {
   return eventSyncService;
 }
 
-export function syncEvents(expectedTransaction?: ExpectedTransaction) {
-  const key = expectedTransaction?.transactionHash.toLowerCase() ?? "latest";
+export function syncEvents(
+  expectedTransaction?: ExpectedTransaction,
+  options: EventSyncOptions = {},
+) {
+  const mode = options.includeExpirationNotices === false ? "events" : "full";
+  const key = `${expectedTransaction?.transactionHash.toLowerCase() ?? "latest"}:${mode}`;
   const current = eventSyncRequests.get(key);
   if (current) return current;
 
   const request = eventSyncTail
     .catch(() => undefined)
-    .then(() => getEventSyncService().sync(expectedTransaction))
+    .then(() => getEventSyncService().sync(expectedTransaction, options))
     .finally(() => {
       if (eventSyncRequests.get(key) === request) eventSyncRequests.delete(key);
     });

@@ -121,14 +121,15 @@ describe("EventSyncService", () => {
     const source = {
       readRetainedEvents: vi.fn().mockResolvedValue(eventBatch([purchasedEvent])),
     };
+    const lifecycle = {
+      findCampaign: vi.fn().mockResolvedValue(null),
+      getPassCount: vi.fn().mockResolvedValue(BigInt(0)),
+      findPass: vi.fn().mockResolvedValue(null),
+    };
     const service = new EventSyncService(
       source,
       repositories,
-      {
-        findCampaign: vi.fn().mockResolvedValue(null),
-        getPassCount: vi.fn().mockResolvedValue(BigInt(0)),
-        findPass: vi.fn().mockResolvedValue(null),
-      },
+      lifecycle,
       createClaimStore(repositories),
       { send: vi.fn() },
       testStellarConfig.wrenPassContractId,
@@ -136,11 +137,15 @@ describe("EventSyncService", () => {
       () => new Date("2026-08-11T00:00:00.000Z"),
     );
 
-    await expect(service.sync({
-      transactionHash: purchasedEvent.transactionHash,
-      ledger: purchasedEvent.ledger,
-    })).resolves.toMatchObject({ indexed: 1 });
+    await expect(service.sync(
+      {
+        transactionHash: purchasedEvent.transactionHash,
+        ledger: purchasedEvent.ledger,
+      },
+      { includeExpirationNotices: false },
+    )).resolves.toMatchObject({ indexed: 1 });
     expect(source.readRetainedEvents).toHaveBeenCalledWith(purchasedEvent.ledger);
+    expect(lifecycle.getPassCount).not.toHaveBeenCalled();
     await expect(
       repositories.indexedBlockchainEvents.findById(purchasedEvent.id),
     ).resolves.toMatchObject({

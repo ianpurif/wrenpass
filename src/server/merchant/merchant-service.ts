@@ -315,11 +315,9 @@ export class MerchantService {
   }
 
   async getPublicCampaign(campaignId: string): Promise<PublicCampaignDto | null> {
-    const onchainMetadata = await this.metadataRegistry.getCampaignMetadata(campaignId);
-    if (!onchainMetadata) return null;
-    const [campaign, merchant, reference] = await Promise.all([
+    const [onchainMetadata, campaign, reference] = await Promise.all([
+      this.metadataRegistry.getCampaignMetadata(campaignId),
       this.campaignReader.findById(campaignId),
-      this.getProfile(onchainMetadata.merchantId),
       this.repositories.cloudinaryAssetReferences
         .findById(campaignImageReferenceId(campaignId))
         .catch((error) => {
@@ -327,7 +325,9 @@ export class MerchantService {
           return null;
         }),
     ]);
-    if (!campaign || !merchant) return null;
+    if (!onchainMetadata || !campaign) return null;
+    const merchant = await this.getProfile(onchainMetadata.merchantId);
+    if (!merchant) return null;
     return {
       metadata: mergeCampaignMetadata(onchainMetadata, reference),
       merchant,

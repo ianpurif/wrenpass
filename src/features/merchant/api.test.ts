@@ -15,6 +15,7 @@ function dashboardResponse(status = 200) {
 
 describe("merchantApi dashboard", () => {
   afterEach(() => {
+    merchantApi.invalidateDashboard(walletAddress);
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -47,6 +48,26 @@ describe("merchantApi dashboard", () => {
     resolveResponse(dashboardResponse());
 
     await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+  });
+
+  it("reuses a recent dashboard across merchant page navigation", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => dashboardResponse());
+    vi.stubGlobal("fetch", fetchMock);
+
+    await merchantApi.getDashboard(walletAddress);
+    await merchantApi.getDashboard(walletAddress);
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("bypasses the short cache for an explicit refresh", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => dashboardResponse());
+    vi.stubGlobal("fetch", fetchMock);
+
+    await merchantApi.getDashboard(walletAddress);
+    await merchantApi.getDashboard(walletAddress, { refresh: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("does not retry an invalid dashboard payload", async () => {

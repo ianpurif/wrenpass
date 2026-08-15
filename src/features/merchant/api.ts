@@ -50,7 +50,9 @@ type MerchantDashboard = z.infer<typeof merchantDashboardSchema>;
 const DASHBOARD_TIMEOUT_MS = 20_000;
 const DASHBOARD_ATTEMPTS = 2;
 const DASHBOARD_RETRY_DELAY_MS = 250;
+const DASHBOARD_CACHE_MS = 30_000;
 const dashboardRequests = new Map<string, Promise<MerchantDashboard>>();
+const dashboardCache = new Map<string, { value: MerchantDashboard; expiresAt: number }>();
 
 class MerchantDashboardRequestError extends Error {
   constructor(message: string, readonly retryable: boolean) {
@@ -172,34 +174,58 @@ export const merchantApi = {
     return profileResponseSchema.parse(await requestJson("/api/merchant/profile")).merchant;
   },
   async saveProfile(input: MerchantProfileUpdate) {
-    return savedProfileResponseSchema.parse(
+    const merchant = savedProfileResponseSchema.parse(
       await requestJson("/api/merchant/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       }),
     ).merchant;
+    dashboardCache.delete(merchant.id);
+    return merchant;
   },
-  getDashboard(walletAddress: string, options: { signal?: AbortSignal } = {}) {
+  getDashboard(
+    walletAddress: string,
+    options: { signal?: AbortSignal; refresh?: boolean } = {},
+  ) {
+    const cached = dashboardCache.get(walletAddress);
+    if (!options.refresh && cached && cached.expiresAt > Date.now()) {
+      return waitForConsumer(Promise.resolve(cached.value), options.signal);
+    }
+    if (cached) dashboardCache.delete(walletAddress);
+
     let request = dashboardRequests.get(walletAddress);
     if (!request) {
-      request = loadDashboard().finally(() => {
-        if (dashboardRequests.get(walletAddress) === request) {
-          dashboardRequests.delete(walletAddress);
-        }
-      });
+      request = loadDashboard()
+        .then((value) => {
+          dashboardCache.set(walletAddress, {
+            value,
+            expiresAt: Date.now() + DASHBOARD_CACHE_MS,
+          });
+          return value;
+        })
+        .finally(() => {
+          if (dashboardRequests.get(walletAddress) === request) {
+            dashboardRequests.delete(walletAddress);
+          }
+        });
       dashboardRequests.set(walletAddress, request);
     }
     return waitForConsumer(request, options.signal);
   },
+  invalidateDashboard(walletAddress: string) {
+    dashboardCache.delete(walletAddress);
+  },
   async saveCampaignMetadata(input: CampaignMetadataInput) {
-    return savedMetadataResponseSchema.parse(
+    const metadata = savedMetadataResponseSchema.parse(
       await requestJson("/api/merchant/campaigns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       }),
     ).metadata;
+    dashboardCache.delete(metadata.merchantId);
+    return metadata;
   },
   async uploadImage(kind: "merchant-logo" | "campaign-image", file: File) {
     const body = new FormData();

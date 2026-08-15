@@ -2,15 +2,24 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StellarMetadataContractWriter } from "@/lib/stellar/metadata-client";
+import {
+  StellarMetadataContractReader,
+  StellarMetadataContractWriter,
+} from "@/lib/stellar/metadata-client";
 import { testCustomerAddress, testStellarConfig } from "@/test/fixtures/customer";
 
 const contractMocks = vi.hoisted(() => {
   const registerCampaignMetadata = vi.fn();
+  const merchantCampaignCount = vi.fn();
+  const getMerchantCampaigns = vi.fn();
   const Client = vi.fn(function MockClient() {
-    return { register_campaign_metadata: registerCampaignMetadata };
+    return {
+      get_merchant_campaigns: getMerchantCampaigns,
+      merchant_campaign_count: merchantCampaignCount,
+      register_campaign_metadata: registerCampaignMetadata,
+    };
   });
-  return { Client, registerCampaignMetadata };
+  return { Client, getMerchantCampaigns, merchantCampaignCount, registerCampaignMetadata };
 });
 
 vi.mock("@/generated/metadata-contract/src", () => ({
@@ -74,5 +83,43 @@ describe("StellarMetadataContractWriter", () => {
         .registerCampaignMetadata(input),
     ).rejects.toThrow("RPC unavailable");
     expect(contractMocks.registerCampaignMetadata).toHaveBeenCalledOnce();
+  });
+});
+
+describe("StellarMetadataContractReader", () => {
+  it("loads independent campaign index pages concurrently and preserves page order", async () => {
+    contractMocks.merchantCampaignCount.mockResolvedValue({ result: BigInt(51) });
+    let releaseFirstPage: ((value: unknown) => void) | undefined;
+    const firstPage = new Promise((resolve) => {
+      releaseFirstPage = resolve;
+    });
+    const firstCampaign = { campaign_id: BigInt(1) };
+    const lastCampaign = { campaign_id: BigInt(51) };
+    const ok = (value: unknown[]) => ({
+      result: {
+        isErr: () => false,
+        unwrap: () => value,
+      },
+    });
+    contractMocks.getMerchantCampaigns
+      .mockReturnValueOnce(firstPage)
+      .mockResolvedValueOnce(ok([lastCampaign]));
+
+    const pending = new StellarMetadataContractReader(testStellarConfig)
+      .getMerchantCampaigns(testCustomerAddress);
+    await vi.waitFor(() => expect(contractMocks.getMerchantCampaigns).toHaveBeenCalledTimes(2));
+    releaseFirstPage?.(ok([firstCampaign]));
+
+    await expect(pending).resolves.toEqual([firstCampaign, lastCampaign]);
+    expect(contractMocks.getMerchantCampaigns).toHaveBeenNthCalledWith(1, {
+      merchant: testCustomerAddress,
+      cursor: BigInt(0),
+      limit: 50,
+    });
+    expect(contractMocks.getMerchantCampaigns).toHaveBeenNthCalledWith(2, {
+      merchant: testCustomerAddress,
+      cursor: BigInt(50),
+      limit: 50,
+    });
   });
 });

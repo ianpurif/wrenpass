@@ -27,7 +27,7 @@ async function syncExpectedTransaction(input?: {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
     try {
-      return await syncEvents(input);
+      return await syncEvents(input, { includeExpirationNotices: false });
     } catch (error) {
       if (
         !(error instanceof EventNotAvailableYetError) ||
