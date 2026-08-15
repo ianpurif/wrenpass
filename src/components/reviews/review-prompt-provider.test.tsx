@@ -63,7 +63,7 @@ describe("ReviewPromptProvider", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Complete transaction" }));
-    expect(screen.getByRole("dialog", { name: "Buy with USDC successful" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Buy with USDC successful" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "5 stars" }));
     await user.type(screen.getByLabelText("Review message"), "Fast, clear, and easy to trust.");
@@ -94,7 +94,7 @@ describe("ReviewPromptProvider", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Complete transaction" }));
-    await user.type(screen.getByLabelText("Review message"), "Helpful experience");
+    await user.type(await screen.findByLabelText("Review message"), "Helpful experience");
     await user.click(screen.getByRole("button", { name: "Publish review" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Choose a star rating.");

@@ -113,14 +113,14 @@ describe("MerchantWorkspace", () => {
     expect(screen.getByRole("link", { name: "View" }).parentElement).toHaveClass("gap-2", "lg:flex-nowrap");
 
     workspace.rerender(<MerchantWorkspace config={config} page="business-identity" />);
-    expect(screen.getByText("Profile form")).toBeInTheDocument();
+    expect(await screen.findByText("Profile form")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Merchant overview" })).toHaveAttribute("href", "/merchant");
 
     workspace.rerender(<MerchantWorkspace config={config} page="redeem-pass" />);
-    expect(screen.getByText("Redemption scanner")).toBeInTheDocument();
+    expect(await screen.findByText("Redemption scanner")).toBeInTheDocument();
 
     workspace.rerender(<MerchantWorkspace config={config} page="create-campaign" />);
-    expect(screen.getByText("Campaign form")).toBeInTheDocument();
+    expect(await screen.findByText("Campaign form")).toBeInTheDocument();
     expect(mocks.syncEvents).not.toHaveBeenCalled();
   });
 });

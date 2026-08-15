@@ -19,17 +19,19 @@ describe("product analytics", () => {
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://us.i.posthog.com");
   });
 
-  it("captures only allowlisted, non-identifying transaction properties", () => {
+  it("captures only allowlisted, non-identifying transaction properties", async () => {
     captureTransactionSucceeded("pass purchase");
     captureTransactionSucceeded("user supplied private text");
     captureWalletConnected("testnet");
     captureReviewSubmitted(5);
 
-    expect(mocks.capture.mock.calls).toEqual([
-      ["transaction_succeeded", { transaction_kind: "pass_purchase" }],
-      ["wallet_connected", { network: "testnet" }],
-      ["review_submitted", { rating: 5 }],
-    ]);
+    await vi.waitFor(() => {
+      expect(mocks.capture.mock.calls).toEqual([
+        ["transaction_succeeded", { transaction_kind: "pass_purchase" }],
+        ["wallet_connected", { network: "testnet" }],
+        ["review_submitted", { rating: 5 }],
+      ]);
+    });
     expect(JSON.stringify(mocks.capture.mock.calls)).not.toContain("private text");
   });
 

@@ -1,7 +1,5 @@
 "use client";
 
-import posthog from "posthog-js";
-
 type Network = "testnet" | "mainnet";
 type TransactionKind = "campaign_publish" | "pass_purchase" | "pass_gift" | "pass_redemption";
 
@@ -12,33 +10,43 @@ const transactionKinds: Record<string, TransactionKind | undefined> = {
   "pass redemption": "pass_redemption",
 };
 
+let posthogClient: Promise<typeof import("posthog-js")> | null = null;
+
 function enabled(): boolean {
   return process.env.NODE_ENV === "production"
     && Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY)
     && Boolean(process.env.NEXT_PUBLIC_POSTHOG_HOST);
 }
 
+function capture(event: string, properties: Record<string, unknown>): void {
+  if (!enabled()) return;
+  posthogClient ??= import("posthog-js");
+  void posthogClient
+    .then(({ default: posthog }) => posthog.capture(event, properties))
+    .catch((error: unknown) => {
+      console.warn("Analytics could not record an event.", error);
+    });
+}
+
 export function captureWalletConnected(network: Network): void {
-  if (enabled()) posthog.capture("wallet_connected", { network });
+  capture("wallet_connected", { network });
 }
 
 export function captureWalletDisconnected(network: Network): void {
-  if (enabled()) posthog.capture("wallet_disconnected", { network });
+  capture("wallet_disconnected", { network });
 }
 
 export function captureTransactionSucceeded(transactionLabel: string): void {
   const transactionKind = transactionKinds[transactionLabel];
-  if (enabled() && transactionKind) {
-    posthog.capture("transaction_succeeded", { transaction_kind: transactionKind });
-  }
+  if (transactionKind) capture("transaction_succeeded", { transaction_kind: transactionKind });
 }
 
 export function captureReviewSubmitted(rating: number): void {
-  if (enabled() && Number.isInteger(rating) && rating >= 1 && rating <= 5) {
-    posthog.capture("review_submitted", { rating });
+  if (Number.isInteger(rating) && rating >= 1 && rating <= 5) {
+    capture("review_submitted", { rating });
   }
 }
 
 export function captureRedemptionQrDisplayed(network: Network): void {
-  if (enabled()) posthog.capture("redemption_qr_displayed", { network });
+  capture("redemption_qr_displayed", { network });
 }

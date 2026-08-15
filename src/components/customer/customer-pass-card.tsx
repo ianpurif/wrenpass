@@ -1,15 +1,21 @@
 "use client";
 
 import { ExternalLink, Gift, QrCode } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useState } from "react";
 
-import { GiftPassDialog } from "@/components/customer/gift-pass-dialog";
-import { PassQrDialog } from "@/components/customer/pass-qr-dialog";
 import { Button, buttonStyles } from "@/components/ui/button";
 import type { CustomerPassDto } from "@/features/customer/dto";
 import { displayExpiration, displayUsdc } from "@/features/merchant/display";
 import type { StellarConfig } from "@/lib/stellar/config";
+
+const GiftPassDialog = dynamic(() =>
+  import("@/components/customer/gift-pass-dialog").then((module) => module.GiftPassDialog),
+);
+const PassQrDialog = dynamic(() =>
+  import("@/components/customer/pass-qr-dialog").then((module) => module.PassQrDialog),
+);
 
 const statusStyles = {
   Active: { dot: "bg-forest", text: "text-forest", badge: "border-mint/70 bg-mint-soft" },
@@ -107,14 +113,18 @@ export function CustomerPassCard({
           </div>
         </div>
       </article>
-      <GiftPassDialog
-        config={config}
-        open={giftOpen}
-        pass={pass}
-        onGifted={onGifted}
-        onOpenChange={setGiftOpen}
-      />
-      <PassQrDialog config={config} open={qrOpen} passId={pass.id} onOpenChange={setQrOpen} />
+      {giftOpen && (
+        <GiftPassDialog
+          config={config}
+          open
+          pass={pass}
+          onGifted={onGifted}
+          onOpenChange={setGiftOpen}
+        />
+      )}
+      {qrOpen && (
+        <PassQrDialog config={config} open passId={pass.id} onOpenChange={setQrOpen} />
+      )}
     </>
   );
 }

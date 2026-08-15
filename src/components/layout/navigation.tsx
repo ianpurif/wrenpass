@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -71,16 +70,11 @@ export function Navigation() {
       </button>
       </Container>
 
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.nav
+      {menuOpen && (
+          <nav
             id="mobile-navigation"
             aria-label="Mobile navigation"
             className="border-t border-line bg-canvas px-5 pb-5 pt-3 md:hidden"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2 }}
           >
             <div className="mx-auto grid max-w-7xl gap-1">
               {walletConnected && navItems.map((item) => (
@@ -95,9 +89,8 @@ export function Navigation() {
               ))}
               <WalletButton className="mt-2" />
             </div>
-          </motion.nav>
-        )}
-      </AnimatePresence>
+          </nav>
+      )}
     </header>
   );
 }

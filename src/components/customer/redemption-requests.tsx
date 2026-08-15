@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircle, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useReviewPrompt } from "@/components/reviews/review-prompt-provider";
@@ -11,7 +11,6 @@ import { redemptionApi } from "@/features/redemption/api";
 import type { RedemptionRequestDto } from "@/features/redemption/dto";
 import { shortenStellarAddress } from "@/features/merchant/display";
 import type { StellarConfig } from "@/lib/stellar/config";
-import { StellarRedemptionContractWriter } from "@/lib/stellar/wrenpass-client";
 
 export function RedemptionRequests({
   config,
@@ -22,7 +21,6 @@ export function RedemptionRequests({
 }) {
   const { address, signTransaction } = useWallet();
   const { requestReview } = useReviewPrompt();
-  const writer = useMemo(() => new StellarRedemptionContractWriter(config), [config]);
   const [requests, setRequests] = useState<RedemptionRequestDto[]>([]);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +59,8 @@ export function RedemptionRequests({
     setWorkingId(request.id);
     setError(null);
     try {
+      const { StellarRedemptionContractWriter } = await import("@/lib/stellar/wrenpass-client");
+      const writer = new StellarRedemptionContractWriter(config);
       const sent = await writer.approveAndSubmit({
         serializedTransaction: request.serializedTransaction,
         owner: address,

@@ -9,14 +9,11 @@ import {
   Store,
 } from "lucide-react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CampaignCard } from "@/components/merchant/campaign-card";
 import { campaignTableGridClass } from "@/components/merchant/campaign-table-layout";
-import { CampaignForm } from "@/components/merchant/campaign-form";
-import { MerchantProfileForm } from "@/components/merchant/profile-form";
-import { RedemptionScanner } from "@/components/merchant/redemption-scanner";
-import { NotificationEmailForm } from "@/components/notifications/notification-email-form";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { ErrorState, LoadingState } from "@/components/ui/feedback-state";
 import { useWallet } from "@/components/wallet/wallet-provider";
@@ -24,6 +21,21 @@ import { merchantApi } from "@/features/merchant/api";
 import { displayUsdc, shortenStellarAddress } from "@/features/merchant/display";
 import type { MerchantDashboardDto } from "@/features/merchant/dto";
 import type { StellarConfig } from "@/lib/stellar/config";
+
+const CampaignForm = dynamic(() =>
+  import("@/components/merchant/campaign-form").then((module) => module.CampaignForm),
+);
+const MerchantProfileForm = dynamic(() =>
+  import("@/components/merchant/profile-form").then((module) => module.MerchantProfileForm),
+);
+const RedemptionScanner = dynamic(() =>
+  import("@/components/merchant/redemption-scanner").then((module) => module.RedemptionScanner),
+);
+const NotificationEmailForm = dynamic(() =>
+  import("@/components/notifications/notification-email-form").then(
+    (module) => module.NotificationEmailForm,
+  ),
+);
 
 export type MerchantWorkspacePage =
   | "overview"

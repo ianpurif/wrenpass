@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, CheckCircle2, Copy, ExternalLink, LoaderCircle, Rocket, ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -26,9 +26,6 @@ import {
 } from "@/features/merchant/campaign-workflow";
 import { syncEventsAfterMutation } from "@/features/notifications/api";
 import type { StellarConfig } from "@/lib/stellar/config";
-import { StellarMetadataContractWriter } from "@/lib/stellar/metadata-client";
-import { StellarCampaignPublisher } from "@/lib/stellar/publisher-client";
-import { StellarCampaignContractWriter } from "@/lib/stellar/wrenpass-client";
 
 function defaultExpiration(): string {
   const date = new Date(Date.now() + 90 * 86_400_000);
@@ -46,15 +43,6 @@ export function CampaignForm({
 }) {
   const { address, signTransaction } = useWallet();
   const { requestReview } = useReviewPrompt();
-  const writer = useMemo(() => new StellarCampaignContractWriter(config), [config]);
-  const metadataWriter = useMemo(
-    () => new StellarMetadataContractWriter(config),
-    [config],
-  );
-  const atomicPublisher = useMemo(
-    () => config.publisherContractId ? new StellarCampaignPublisher(config) : undefined,
-    [config],
-  );
   const [image, setImage] = useState<File | null>(null);
   const submissionActiveRef = useRef(false);
   const [stage, setStage] = useState<string | null>(null);
@@ -99,34 +87,51 @@ export function CampaignForm({
     ? { merchant: address, signTransaction: (transactionXdr: string) => signTransaction(transactionXdr) }
     : null;
 
-  const dependencies = {
-    writer,
-    atomicPublisher,
-    saveMetadataReference: async (
-      metadata: Parameters<typeof merchantApi.saveCampaignMetadata>[0],
-    ) => {
-      if (!metadata.imagePublicId) return;
-      setStage("Finalizing campaign…");
-      try {
-        return await merchantApi.saveCampaignMetadata(metadata);
-      } catch (metadataError) {
-        console.warn("The campaign is live, but its image reference was not saved.", metadataError);
-      }
-    },
-    saveMetadata: async (metadata: Parameters<typeof merchantApi.saveCampaignMetadata>[0]) => {
-      if (walletContext) {
-        setStage("Approve public campaign details in Freighter…");
-        await metadataWriter.registerCampaignMetadata({
-          campaignId: BigInt(metadata.campaignId),
-          merchant: walletContext.merchant,
-          metadata,
-          signTransaction: walletContext.signTransaction,
-        });
-      }
-      setStage("Verifying campaign metadata…");
-      return merchantApi.saveCampaignMetadata(metadata);
-    },
-  };
+  async function createDependencies() {
+    const [campaignModule, metadataModule, publisherModule] = await Promise.all([
+      import("@/lib/stellar/wrenpass-client"),
+      import("@/lib/stellar/metadata-client"),
+      config.publisherContractId
+        ? import("@/lib/stellar/publisher-client")
+        : Promise.resolve(null),
+    ]);
+    const writer = new campaignModule.StellarCampaignContractWriter(config);
+    const metadataWriter = new metadataModule.StellarMetadataContractWriter(config);
+    const atomicPublisher = publisherModule
+      ? new publisherModule.StellarCampaignPublisher(config)
+      : undefined;
+
+    return {
+      writer,
+      atomicPublisher,
+      saveMetadataReference: async (
+        metadata: Parameters<typeof merchantApi.saveCampaignMetadata>[0],
+      ) => {
+        if (!metadata.imagePublicId) return;
+        setStage("Finalizing campaign…");
+        try {
+          return await merchantApi.saveCampaignMetadata(metadata);
+        } catch (metadataError) {
+          console.warn("The campaign is live, but its image reference was not saved.", metadataError);
+        }
+      },
+      saveMetadata: async (
+        metadata: Parameters<typeof merchantApi.saveCampaignMetadata>[0],
+      ) => {
+        if (walletContext) {
+          setStage("Approve public campaign details in Freighter…");
+          await metadataWriter.registerCampaignMetadata({
+            campaignId: BigInt(metadata.campaignId),
+            merchant: walletContext.merchant,
+            metadata,
+            signTransaction: walletContext.signTransaction,
+          });
+        }
+        setStage("Verifying campaign metadata…");
+        return merchantApi.saveCampaignMetadata(metadata);
+      },
+    };
+  }
 
   const submitCampaign = handleSubmit(async (values) => {
     if (!walletContext) return;
@@ -136,8 +141,9 @@ export function CampaignForm({
     try {
       setStage(image ? "Uploading campaign image…" : "Preparing on-chain campaign…");
       const uploaded = image ? await merchantApi.uploadImage("campaign-image", image) : null;
+      const dependencies = await createDependencies();
       setStage(
-        atomicPublisher
+        dependencies.atomicPublisher
           ? "Approve campaign creation in Freighter…"
           : "Approve the campaign draft in Freighter…",
       );

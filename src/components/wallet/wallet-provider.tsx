@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { z } from "zod";
 
 import type { StellarConfig } from "@/lib/stellar/config";
 import { createFreighterAdapter } from "@/lib/stellar/freighter-adapter";
@@ -10,29 +9,69 @@ import {
   captureWalletDisconnected,
 } from "@/lib/analytics";
 
-const balanceSchema = z.object({
-  address: z.string(),
-  xlm: z.string(),
-  asset: z.object({
-    code: z.string(),
-    balance: z.string().nullable(),
-    hasTrustline: z.boolean(),
-  }),
-});
+export interface WalletBalances {
+  address: string;
+  xlm: string;
+  asset: {
+    code: string;
+    balance: string | null;
+    hasTrustline: boolean;
+  };
+}
 
-const sessionSchema = z.discriminatedUnion("authenticated", [
-  z.object({ authenticated: z.literal(false) }),
-  z.object({
-    authenticated: z.literal(true),
-    address: z.string(),
-    expiresAt: z.string(),
-  }),
-]);
+export type WalletSession =
+  | { authenticated: false }
+  | { authenticated: true; address: string; expiresAt: string };
 
-const challengeSchema = z.object({ id: z.string(), message: z.string() });
+function record(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null
+    ? value as Record<string, unknown>
+    : null;
+}
 
-export type WalletBalances = z.infer<typeof balanceSchema>;
-export type WalletSession = z.infer<typeof sessionSchema>;
+function parseSession(value: unknown): WalletSession {
+  const input = record(value);
+  if (input?.authenticated === false) return { authenticated: false };
+  if (
+    input?.authenticated === true
+    && typeof input.address === "string"
+    && typeof input.expiresAt === "string"
+  ) {
+    return { authenticated: true, address: input.address, expiresAt: input.expiresAt };
+  }
+  throw new Error("The wallet service returned an invalid session.");
+}
+
+function parseChallenge(value: unknown): { id: string; message: string } {
+  const input = record(value);
+  if (typeof input?.id === "string" && typeof input.message === "string") {
+    return { id: input.id, message: input.message };
+  }
+  throw new Error("The wallet service returned an invalid challenge.");
+}
+
+function parseBalances(value: unknown): WalletBalances {
+  const input = record(value);
+  const asset = record(input?.asset);
+  if (
+    typeof input?.address === "string"
+    && typeof input.xlm === "string"
+    && typeof asset?.code === "string"
+    && (typeof asset.balance === "string" || asset.balance === null)
+    && typeof asset.hasTrustline === "boolean"
+  ) {
+    return {
+      address: input.address,
+      xlm: input.xlm,
+      asset: {
+        code: asset.code,
+        balance: asset.balance,
+        hasTrustline: asset.hasTrustline,
+      },
+    };
+  }
+  throw new Error("The wallet service returned invalid balances.");
+}
 
 interface CachedWalletState {
   address: string;
@@ -142,29 +181,25 @@ async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
 function createWalletApi(): WalletApi {
   return {
     async readSession() {
-      return sessionSchema.parse(await requestJson("/api/wallet/session"));
+      return parseSession(await requestJson("/api/wallet/session"));
     },
     async createChallenge(address) {
-      return challengeSchema.parse(
-        await requestJson("/api/wallet/challenge", {
+      return parseChallenge(await requestJson("/api/wallet/challenge", {
           method: "POST",
           body: JSON.stringify({ address }),
-        }),
-      );
+        }));
     },
     async createSession(challengeId, signature) {
-      return sessionSchema.parse(
-        await requestJson("/api/wallet/session", {
+      return parseSession(await requestJson("/api/wallet/session", {
           method: "POST",
           body: JSON.stringify({ challengeId, signature }),
-        }),
-      );
+        }));
     },
     async revokeSession() {
       await requestJson("/api/wallet/session", { method: "DELETE" });
     },
     async readBalances(address) {
-      return balanceSchema.parse(
+      return parseBalances(
         await requestJson(`/api/stellar/balances?address=${encodeURIComponent(address)}`),
       );
     },

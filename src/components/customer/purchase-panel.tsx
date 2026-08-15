@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarClock, CheckCircle2, ExternalLink, LoaderCircle, ShieldCheck, WalletCards } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,6 @@ import type { PublicCampaignDto } from "@/features/merchant/dto";
 import { syncEventsAfterMutation } from "@/features/notifications/api";
 import type { StellarConfig } from "@/lib/stellar/config";
 import { stellarTransactionUrl } from "@/lib/stellar/explorer";
-import { StellarCustomerContractWriter } from "@/lib/stellar/wrenpass-client";
 
 function readableError(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
@@ -40,7 +39,6 @@ export function PurchasePanel({
     signTransaction,
     status,
   } = useWallet();
-  const writer = useMemo(() => new StellarCustomerContractWriter(config), [config]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -81,6 +79,8 @@ export function PurchasePanel({
     setPending(true);
     setError(null);
     try {
+      const { StellarCustomerContractWriter } = await import("@/lib/stellar/wrenpass-client");
+      const writer = new StellarCustomerContractWriter(config);
       const receipt = await writer.purchase({
         campaignId: BigInt(campaign.onchain.id),
         customer: address,
