@@ -243,6 +243,7 @@ export function CinematicLanding({
           loop
           muted
           playsInline
+          poster="/bg-poster.jpg"
           preload="metadata"
         >
           <source src="/bg.mp4" type="video/mp4" />

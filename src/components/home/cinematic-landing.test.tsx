@@ -61,6 +61,7 @@ describe("CinematicLanding", () => {
     expect(video).toHaveAttribute("loop");
     expect(video).toHaveProperty("muted", true);
     expect(video).toHaveAttribute("playsinline");
+    expect(video).toHaveAttribute("poster", "/bg-poster.jpg");
     expect(video?.querySelector("source")).toHaveAttribute("src", "/bg.mp4");
     expect(video?.closest("section")).toHaveAccessibleName("Working capital, backed by real service.");
   });
