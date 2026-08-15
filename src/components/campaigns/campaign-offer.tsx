@@ -1,4 +1,5 @@
 import { Store } from "lucide-react";
+import Image from "next/image";
 
 import { PurchasePanel } from "@/components/customer/purchase-panel";
 import { CampaignStatus } from "@/components/merchant/campaign-card";
@@ -24,11 +25,16 @@ export function CampaignOffer({
         <div className="flex min-w-0 items-center gap-3">
           {merchant.logoUrl ? (
             <span
-              role="img"
-              aria-label={`${merchant.businessName} logo`}
-              className="size-8 shrink-0 bg-sage-soft bg-cover bg-center"
-              style={{ backgroundImage: `url(${merchant.logoUrl})` }}
-            />
+              className="relative size-8 shrink-0 overflow-hidden bg-sage-soft"
+            >
+              <Image
+                alt={`${merchant.businessName} logo`}
+                className="object-cover"
+                fill
+                sizes="32px"
+                src={merchant.logoUrl}
+              />
+            </span>
           ) : (
             <span className="grid size-8 shrink-0 place-items-center bg-mint-soft text-forest">
               <Store aria-hidden="true" className="size-4" strokeWidth={1.7} />
@@ -50,11 +56,17 @@ export function CampaignOffer({
         <div className="min-w-0">
           {metadata.imageUrl && (
             <div
-              role="img"
-              aria-label={`${metadata.name} campaign`}
-              className="aspect-[16/7] border-b border-ink/15 bg-sage-soft bg-cover bg-center"
-              style={{ backgroundImage: `url(${metadata.imageUrl})` }}
-            />
+              className="relative aspect-[16/7] overflow-hidden border-b border-ink/15 bg-sage-soft"
+            >
+              <Image
+                alt={`${metadata.name} campaign`}
+                className="object-cover"
+                fetchPriority="high"
+                fill
+                sizes="(max-width: 1023px) 100vw, 60vw"
+                src={metadata.imageUrl}
+              />
+            </div>
           )}
 
           <div className="p-6 sm:p-8 lg:p-10">

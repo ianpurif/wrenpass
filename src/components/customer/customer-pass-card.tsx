@@ -3,6 +3,7 @@
 import { ExternalLink, Gift, QrCode } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 
 import { Button, buttonStyles } from "@/components/ui/button";
@@ -55,11 +56,16 @@ export function CustomerPassCard({
             <div className="flex min-w-0 items-start gap-3">
               {campaign?.metadata.imageUrl ? (
                 <div
-                  role="img"
-                  aria-label="Campaign"
-                  className="size-12 shrink-0 rounded-lg bg-sage-soft bg-cover bg-center"
-                  style={{ backgroundImage: `url(${campaign.metadata.imageUrl})` }}
-                />
+                  className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-sage-soft"
+                >
+                  <Image
+                    alt="Campaign"
+                    className="object-cover"
+                    fill
+                    sizes="48px"
+                    src={campaign.metadata.imageUrl}
+                  />
+                </div>
               ) : (
                 <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-sage-soft font-mono text-xs font-bold text-forest">
                   #{pass.id}

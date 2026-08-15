@@ -2,6 +2,7 @@
 
 import { Check, Copy, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 
 import { buttonStyles } from "@/components/ui/button";
@@ -45,11 +46,16 @@ export function CampaignCard({ campaign }: { campaign: MerchantCampaignDto }) {
         <div className="flex min-w-0 items-start gap-3">
           {metadata.imageUrl ? (
             <div
-              role="img"
-              aria-label="Campaign"
-              className="size-11 shrink-0 rounded-lg bg-sage-soft bg-cover bg-center"
-              style={{ backgroundImage: `url(${metadata.imageUrl})` }}
-            />
+              className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-sage-soft"
+            >
+              <Image
+                alt="Campaign"
+                className="object-cover"
+                fill
+                sizes="44px"
+                src={metadata.imageUrl}
+              />
+            </div>
           ) : (
             <div className="grid size-11 shrink-0 place-items-center rounded-lg bg-sage-soft text-xs font-bold text-forest">
               #{onchain.id}
