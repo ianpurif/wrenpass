@@ -1,0 +1,166 @@
+import "server-only";
+
+import { randomInt } from "node:crypto";
+
+import type { Campaign } from "@/generated/wrenpass-contract/src";
+import { getStellarConfig } from "@/lib/stellar/config";
+import { readContractCampaign } from "@/lib/stellar/wrenpass-client";
+import { syncEvents } from "@/server/events/service";
+import {
+  FirestoreOperationalStateStore,
+  type OperationalStateStore,
+} from "@/server/operations/operational-state-store";
+import {
+  getTestnetSimulatorConfig,
+  type TestnetSimulatorConfig,
+} from "@/server/simulator/config";
+import {
+  StellarTestnetSimulationExecutor,
+  type TestnetSimulationExecutionResult,
+  type TestnetSimulationExecutor,
+} from "@/server/simulator/stellar-testnet-simulation-executor";
+
+const RUN_WINDOW_MS = 110 * 60 * 1_000;
+const FUNDING_INCREMENT = 100_000n;
+
+interface EligibleCampaign {
+  id: bigint;
+  passPrice: bigint;
+  remaining: number;
+}
+
+type RandomInteger = (minimum: number, maximumExclusive: number) => number;
+
+export type TestnetSimulationReservation =
+  | { accepted: true }
+  | { accepted: false; reason: "recently_started"; retryAfterSeconds: number };
+
+function randomBigIntInclusive(
+  minimum: bigint,
+  maximum: bigint,
+  randomInteger: RandomInteger,
+): bigint {
+  const alignedMinimum = (
+    (minimum + FUNDING_INCREMENT - 1n) / FUNDING_INCREMENT
+  ) * FUNDING_INCREMENT;
+  const alignedMaximum = (maximum / FUNDING_INCREMENT) * FUNDING_INCREMENT;
+  const choices = (alignedMaximum - alignedMinimum) / FUNDING_INCREMENT + 1n;
+  if (choices <= 0n || choices > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error("The simulator funding range is unsupported.");
+  }
+  return alignedMinimum
+    + BigInt(randomInteger(0, Number(choices))) * FUNDING_INCREMENT;
+}
+
+function eligibleCampaign(
+  campaign: Campaign | null,
+  config: TestnetSimulatorConfig,
+  now: Date,
+): EligibleCampaign | null {
+  if (
+    !campaign
+    || campaign.status.tag !== "Active"
+    || campaign.expires_at <= BigInt(Math.floor(now.getTime() / 1_000))
+  ) {
+    return null;
+  }
+  const remaining = campaign.max_supply - campaign.sold;
+  if (
+    remaining < config.minimumPurchases
+    || campaign.pass_price * BigInt(config.minimumPurchases) > config.maximumFunding
+  ) {
+    return null;
+  }
+  return { id: campaign.id, passPrice: campaign.pass_price, remaining };
+}
+
+export class TestnetSimulationService {
+  constructor(
+    private readonly config: TestnetSimulatorConfig,
+    private readonly store: OperationalStateStore,
+    private readonly readCampaign: (campaignId: bigint) => Promise<Campaign | null>,
+    private readonly executor: TestnetSimulationExecutor,
+    private readonly synchronizeEvents: () => Promise<unknown>,
+    private readonly now: () => Date = () => new Date(),
+    private readonly randomInteger: RandomInteger = randomInt,
+  ) {}
+
+  async reserveRun(): Promise<TestnetSimulationReservation> {
+    const decision = await this.store.consumeRateLimits([
+      {
+        id: "testnet-purchase-simulator",
+        limit: 1,
+        windowMs: RUN_WINDOW_MS,
+      },
+    ], this.now());
+    return decision.allowed
+      ? { accepted: true }
+      : {
+          accepted: false,
+          reason: "recently_started",
+          retryAfterSeconds: decision.retryAfterSeconds,
+        };
+  }
+
+  async run(): Promise<TestnetSimulationExecutionResult> {
+    const now = this.now();
+    const campaigns = await Promise.all(
+      this.config.campaignIds.map((campaignId) => this.readCampaign(campaignId)),
+    );
+    const eligible = campaigns
+      .map((campaign) => eligibleCampaign(campaign, this.config, now))
+      .filter((campaign): campaign is EligibleCampaign => campaign !== null);
+    if (eligible.length === 0) {
+      throw new Error("No configured Testnet campaign is active, available, and affordable.");
+    }
+
+    const campaign = eligible[this.randomInteger(0, eligible.length)];
+    const affordablePurchases = Number(this.config.maximumFunding / campaign.passPrice);
+    const maximumPurchases = Math.min(
+      this.config.maximumPurchases,
+      campaign.remaining,
+      affordablePurchases,
+    );
+    const purchaseCount = this.randomInteger(
+      this.config.minimumPurchases,
+      maximumPurchases + 1,
+    );
+    const purchaseCost = campaign.passPrice * BigInt(purchaseCount);
+    const minimumFunding = purchaseCost > this.config.minimumFunding
+      ? purchaseCost
+      : this.config.minimumFunding;
+    const fundingAmount = randomBigIntInclusive(
+      minimumFunding,
+      this.config.maximumFunding,
+      this.randomInteger,
+    );
+
+    const result = await this.executor.execute({
+      campaignId: campaign.id,
+      fundingAmount,
+      purchaseCount,
+    });
+    try {
+      await this.synchronizeEvents();
+    } catch (error) {
+      console.error("Testnet simulation purchases succeeded but event synchronization failed.", error);
+    }
+    return result;
+  }
+}
+
+let service: TestnetSimulationService | undefined;
+
+export function getTestnetSimulationService(): TestnetSimulationService {
+  if (!service) {
+    const stellarConfig = getStellarConfig();
+    service = new TestnetSimulationService(
+      getTestnetSimulatorConfig(),
+      new FirestoreOperationalStateStore(),
+      (campaignId) => readContractCampaign(stellarConfig, campaignId),
+      new StellarTestnetSimulationExecutor(stellarConfig),
+      syncEvents,
+    );
+  }
+  return service;
+}
