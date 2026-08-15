@@ -67,6 +67,30 @@ const executionResult = {
 };
 
 describe("TestnetSimulationService", () => {
+  it("reports safe configuration adjustments when reserving a run", async () => {
+    const service = new TestnetSimulationService(
+      {
+        ...config,
+        maximumPurchases: 5,
+        configurationWarnings: [
+          "TESTNET_SIMULATOR_MAX_PURCHASES=7 exceeds the safety cap of 5; using 5.",
+        ],
+      },
+      store(),
+      vi.fn(),
+      { execute: vi.fn() },
+      vi.fn(),
+      () => NOW,
+    );
+
+    await expect(service.reserveRun()).resolves.toEqual({
+      accepted: true,
+      configurationWarnings: [
+        "TESTNET_SIMULATOR_MAX_PURCHASES=7 exceeds the safety cap of 5; using 5.",
+      ],
+    });
+  });
+
   it("reserves one execution window to prevent overlap and duplicate runs", async () => {
     const operationalStore = store({ allowed: false, retryAfterSeconds: 900 });
     const service = new TestnetSimulationService(

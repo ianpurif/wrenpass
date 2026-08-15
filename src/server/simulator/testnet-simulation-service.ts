@@ -32,8 +32,13 @@ interface EligibleCampaign {
 type RandomInteger = (minimum: number, maximumExclusive: number) => number;
 
 export type TestnetSimulationReservation =
-  | { accepted: true }
-  | { accepted: false; reason: "recently_started"; retryAfterSeconds: number };
+  | { accepted: true; configurationWarnings?: readonly string[] }
+  | {
+      accepted: false;
+      reason: "recently_started";
+      retryAfterSeconds: number;
+      configurationWarnings?: readonly string[];
+    };
 
 function randomBigIntInclusive(
   minimum: bigint,
@@ -93,12 +98,17 @@ export class TestnetSimulationService {
         windowMs: RUN_WINDOW_MS,
       },
     ], this.now());
+    const configurationWarnings = this.config.configurationWarnings;
     return decision.allowed
-      ? { accepted: true }
+      ? {
+          accepted: true,
+          ...(configurationWarnings?.length ? { configurationWarnings } : {}),
+        }
       : {
           accepted: false,
           reason: "recently_started",
           retryAfterSeconds: decision.retryAfterSeconds,
+          ...(configurationWarnings?.length ? { configurationWarnings } : {}),
         };
   }
 

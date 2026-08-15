@@ -29,6 +29,27 @@ describe("parseTestnetSimulatorConfig", () => {
     });
   });
 
+  it("caps an oversized maximum without disabling the scheduled run", () => {
+    expect(parseTestnetSimulatorConfig({
+      TESTNET_SIMULATOR_MIN_PURCHASES: "1",
+      TESTNET_SIMULATOR_MAX_PURCHASES: "7",
+    })).toMatchObject({
+      minimumPurchases: 1,
+      maximumPurchases: 5,
+      configurationWarnings: [
+        "TESTNET_SIMULATOR_MAX_PURCHASES=7 exceeds the safety cap of 5; using 5.",
+      ],
+    });
+  });
+
+  it("reports invalid values as a clear simulator configuration error", () => {
+    expect(() => parseTestnetSimulatorConfig({
+      TESTNET_SIMULATOR_MAX_PURCHASES: "many",
+    })).toThrow(
+      "Invalid Testnet simulator configuration: TESTNET_SIMULATOR_MAX_PURCHASES",
+    );
+  });
+
   it("rejects reversed ranges", () => {
     expect(() => parseTestnetSimulatorConfig({
       TESTNET_SIMULATOR_MIN_USDC: "31",
