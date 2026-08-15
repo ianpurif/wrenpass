@@ -35,6 +35,7 @@ const MAX_EVENT_PAGES = 25;
 const MAX_EVENT_RANGE_RETRIES = 2;
 const OWNER_PASS_PAGE_SIZE = 50;
 const MAX_DIRECT_PASS_READS = BigInt(2_000);
+const LEGACY_PASS_READ_BATCH_SIZE = 20;
 
 export interface CustomerChainReader {
   getOwnedPasses(walletAddress: string): Promise<Pass[]>;
@@ -58,12 +59,15 @@ export async function readOwnedPasses(
   const migrationStatus = await reader.getMigrationStatus();
   if (migrationStatus.passes_complete) {
     const count = await reader.getOwnerPassCount(walletAddress);
-    const pageCount = Math.ceil(Number(count) / OWNER_PASS_PAGE_SIZE);
+    const cursors: bigint[] = [];
+    for (let cursor = BigInt(0); cursor < count; cursor += BigInt(OWNER_PASS_PAGE_SIZE)) {
+      cursors.push(cursor);
+    }
     const pages = await Promise.all(
-      Array.from({ length: pageCount }, (_, page) =>
+      cursors.map((cursor) =>
         reader.getOwnerPasses(
           walletAddress,
-          BigInt(page * OWNER_PASS_PAGE_SIZE),
+          cursor,
           OWNER_PASS_PAGE_SIZE,
         ),
       ),
@@ -77,12 +81,19 @@ export async function readOwnedPasses(
       "The pass ownership index is still migrating and the legacy reader reached its safe limit.",
     );
   }
-  const passes = await Promise.all(
-    Array.from({ length: Number(passCount) }, (_, index) => reader.findPass(BigInt(index + 1))),
-  );
-  return passes.filter(
-    (pass): pass is Pass => pass !== null && pass.owner === walletAddress,
-  );
+  const ownedPasses: Pass[] = [];
+  for (let start = 1; start <= Number(passCount); start += LEGACY_PASS_READ_BATCH_SIZE) {
+    const end = Math.min(Number(passCount), start + LEGACY_PASS_READ_BATCH_SIZE - 1);
+    const passes = await Promise.all(
+      Array.from({ length: end - start + 1 }, (_, index) =>
+        reader.findPass(BigInt(start + index)),
+      ),
+    );
+    ownedPasses.push(...passes.filter(
+      (pass): pass is Pass => pass !== null && pass.owner === walletAddress,
+    ));
+  }
+  return ownedPasses;
 }
 
 function eventTopic(name: string): string {
