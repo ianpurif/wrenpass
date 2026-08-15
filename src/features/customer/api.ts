@@ -41,8 +41,11 @@ type CustomerDashboard = CustomerPassCollection & CustomerActivityWindow;
 const CUSTOMER_REQUEST_TIMEOUT_MS = 20_000;
 const CUSTOMER_REQUEST_ATTEMPTS = 2;
 const CUSTOMER_RETRY_DELAY_MS = 250;
+const CUSTOMER_CACHE_MS = 30_000;
 const passRequests = new Map<string, Promise<CustomerPassCollection>>();
 const activityRequests = new Map<string, Promise<CustomerActivityWindow>>();
+const passCache = new Map<string, { value: CustomerPassCollection; expiresAt: number }>();
+const activityCache = new Map<string, { value: CustomerActivityWindow; expiresAt: number }>();
 
 class CustomerRequestError extends Error {
   constructor(message: string, readonly retryable: boolean) {
@@ -137,38 +140,77 @@ function waitForConsumer<T>(request: Promise<T>, signal?: AbortSignal): Promise<
 }
 
 export const customerApi = {
-  getPasses(walletAddress: string, options: { signal?: AbortSignal } = {}) {
+  getPasses(
+    walletAddress: string,
+    options: { signal?: AbortSignal; refresh?: boolean } = {},
+  ) {
+    const cached = passCache.get(walletAddress);
+    if (!options.refresh && cached && cached.expiresAt > Date.now()) {
+      return waitForConsumer(Promise.resolve(cached.value), options.signal);
+    }
+    if (cached) passCache.delete(walletAddress);
+
     let request = passRequests.get(walletAddress);
     if (!request) {
       request = loadResource(
         "/api/customer/passes",
         passCollectionSchema,
         "Reading passes from Stellar timed out. Please try again.",
-      ).finally(() => {
-        if (passRequests.get(walletAddress) === request) {
-          passRequests.delete(walletAddress);
-        }
-      });
+      )
+        .then((value) => {
+          passCache.set(walletAddress, {
+            value,
+            expiresAt: Date.now() + CUSTOMER_CACHE_MS,
+          });
+          return value;
+        })
+        .finally(() => {
+          if (passRequests.get(walletAddress) === request) {
+            passRequests.delete(walletAddress);
+          }
+        });
       passRequests.set(walletAddress, request);
     }
     return waitForConsumer(request, options.signal);
   },
 
-  getActivity(walletAddress: string, options: { signal?: AbortSignal } = {}) {
+  getActivity(
+    walletAddress: string,
+    options: { signal?: AbortSignal; refresh?: boolean } = {},
+  ) {
+    const cached = activityCache.get(walletAddress);
+    if (!options.refresh && cached && cached.expiresAt > Date.now()) {
+      return waitForConsumer(Promise.resolve(cached.value), options.signal);
+    }
+    if (cached) activityCache.delete(walletAddress);
+
     let request = activityRequests.get(walletAddress);
     if (!request) {
       request = loadResource(
         "/api/customer/activity",
         activityWindowSchema,
         "Reading recent activity from Stellar timed out. Please try again.",
-      ).finally(() => {
-        if (activityRequests.get(walletAddress) === request) {
-          activityRequests.delete(walletAddress);
-        }
-      });
+      )
+        .then((value) => {
+          activityCache.set(walletAddress, {
+            value,
+            expiresAt: Date.now() + CUSTOMER_CACHE_MS,
+          });
+          return value;
+        })
+        .finally(() => {
+          if (activityRequests.get(walletAddress) === request) {
+            activityRequests.delete(walletAddress);
+          }
+        });
       activityRequests.set(walletAddress, request);
     }
     return waitForConsumer(request, options.signal);
+  },
+
+  invalidate(walletAddress: string) {
+    passCache.delete(walletAddress);
+    activityCache.delete(walletAddress);
   },
 
   async getDashboard(walletAddress: string, options: { signal?: AbortSignal } = {}): Promise<CustomerDashboard> {

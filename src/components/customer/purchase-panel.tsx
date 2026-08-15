@@ -103,6 +103,9 @@ export function PurchasePanel({
           ledger: receipt.ledger,
         },
       });
+      void import("@/features/customer/api").then(({ customerApi }) => {
+        customerApi.invalidate(address);
+      });
       await Promise.allSettled([
         syncEventsAfterMutation(receipt.transactionHash, receipt.ledger),
         refreshBalances(),

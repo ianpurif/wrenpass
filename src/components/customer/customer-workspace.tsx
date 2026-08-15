@@ -128,7 +128,9 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
   const error = loadError?.address === address ? loadError.message : null;
   const currentActivityError = activityError?.address === address ? activityError.message : null;
 
-  const loadPasses = useCallback(async (options: { signal?: AbortSignal } = {}) => {
+  const loadPasses = useCallback(async (
+    options: { signal?: AbortSignal; refresh?: boolean } = {},
+  ) => {
     if (status !== "connected" || !address) return;
     const currentRequestId = passRequestId.current + 1;
     passRequestId.current = currentRequestId;
@@ -150,7 +152,9 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
     }
   }, [address, status]);
 
-  const loadActivity = useCallback(async (options: { signal?: AbortSignal } = {}) => {
+  const loadActivity = useCallback(async (
+    options: { signal?: AbortSignal; refresh?: boolean } = {},
+  ) => {
     if (status !== "connected" || !address) return;
     const currentRequestId = activityRequestId.current + 1;
     activityRequestId.current = currentRequestId;
@@ -290,7 +294,11 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
           disabled={refreshing}
           size="sm"
           variant="secondary"
-          onClick={() => void (selectedSection === "activity" ? loadActivity() : loadPasses())}
+          onClick={() => void (
+            selectedSection === "activity"
+              ? loadActivity({ refresh: true })
+              : loadPasses({ refresh: true })
+          )}
         >
           {refreshing ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <RefreshCcw aria-hidden="true" className="size-4" />}
           Refresh
@@ -344,7 +352,7 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
               </div>
             </section>
 
-            <RedemptionRequests config={config} onRedeemed={loadPasses} />
+            <RedemptionRequests config={config} onRedeemed={() => loadPasses({ refresh: true })} />
 
             <section id="owned-passes" aria-labelledby="owned-passes-heading" className="min-w-0">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -380,7 +388,7 @@ export function CustomerWorkspace({ config }: { config: StellarConfig }) {
 
               {visiblePasses.length ? (
                 <div className="mt-4 grid gap-3">
-                  {visiblePasses.map((pass) => <CustomerPassCard config={config} key={pass.id} pass={pass} onGifted={loadPasses} />)}
+                  {visiblePasses.map((pass) => <CustomerPassCard config={config} key={pass.id} pass={pass} onGifted={() => loadPasses({ refresh: true })} />)}
                 </div>
               ) : (
                 <div className="mt-4 rounded-card border border-dashed border-line bg-white px-6 py-10 text-center">

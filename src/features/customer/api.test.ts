@@ -19,6 +19,7 @@ function activityResponse(status = 200) {
 
 describe("customerApi", () => {
   afterEach(() => {
+    customerApi.invalidate(testCustomerAddress);
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -83,6 +84,17 @@ describe("customerApi", () => {
     resolveResponse(passResponse());
 
     await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+  });
+
+  it("reuses recent pass reads across page navigation and supports refresh", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => passResponse());
+    vi.stubGlobal("fetch", fetchMock);
+
+    await customerApi.getPasses(testCustomerAddress);
+    await customerApi.getPasses(testCustomerAddress);
+    await customerApi.getPasses(testCustomerAddress, { refresh: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("times out bounded retries instead of loading forever", async () => {
