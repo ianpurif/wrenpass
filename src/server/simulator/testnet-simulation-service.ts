@@ -24,7 +24,7 @@ import {
   type TestnetSimulationExecutor,
 } from "@/server/simulator/stellar-testnet-simulation-executor";
 
-const RUN_WINDOW_MS = 110 * 60 * 1_000;
+const RUN_WINDOW_MS = 55 * 60 * 1_000;
 const FUNDING_INCREMENT = 100_000n;
 
 interface EligibleCampaign {

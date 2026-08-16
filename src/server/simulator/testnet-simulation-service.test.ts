@@ -109,7 +109,11 @@ describe("TestnetSimulationService", () => {
       retryAfterSeconds: 900,
     });
     expect(operationalStore.consumeRateLimits).toHaveBeenCalledWith([
-      expect.objectContaining({ id: "testnet-purchase-simulator", limit: 1 }),
+      expect.objectContaining({
+        id: "testnet-purchase-simulator",
+        limit: 1,
+        windowMs: 55 * 60 * 1_000,
+      }),
     ], NOW);
   });
 

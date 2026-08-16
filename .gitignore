@@ -21,6 +21,7 @@ contracts/**/test_snapshots/
 # local environment files
 .env*
 !.env.example
+simulator-private.pem
 
 # debug logs
 npm-debug.log*

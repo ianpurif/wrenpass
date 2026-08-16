@@ -9,6 +9,7 @@ import {
   operationalStateSchema,
   userProfileSchema,
 } from "@/server/models";
+import { testnetSimulatorAccountRecordSchema } from "@/server/simulator/testnet-simulator-account-vault";
 
 const legacyCollections = [
   "campaign_metadata",
@@ -43,6 +44,7 @@ const retainedCollections = {
   operational_state: operationalStateSchema,
   walletAuthChallenges: challengeSchema,
   walletAuthSessions: sessionSchema,
+  testnet_simulator_accounts: testnetSimulatorAccountRecordSchema,
 } satisfies Record<string, ZodType>;
 
 const retainedCollectionFields: Record<string, Set<string>> = {
@@ -96,6 +98,11 @@ const retainedCollectionFields: Record<string, Set<string>> = {
     "createdAt",
     "expiresAt",
   ]),
+  testnet_simulator_accounts: new Set([
+    "public_key",
+    "encrypted_secret",
+    "created_at",
+  ]),
 };
 
 async function validateCollection(
@@ -112,7 +119,10 @@ async function validateCollection(
       throw new Error(`${name}/${document.id} contains unapproved fields.`);
     }
     const parsed = schema.parse(raw) as Record<string, unknown>;
-    const embeddedId = parsed.id ?? parsed.idHash ?? parsed.tokenHash;
+    const embeddedId = parsed.id
+      ?? parsed.idHash
+      ?? parsed.tokenHash
+      ?? parsed.public_key;
     if (embeddedId !== document.id) {
       throw new Error(`${name}/${document.id} has a mismatched document key.`);
     }

@@ -19,6 +19,23 @@ Vercel calls `/api/cron/operations` daily with `CRON_SECRET` as a bearer token. 
 
 Post-transaction sync remains the low-latency path; the cron is the durable recovery path for missed events and temporary provider outages.
 
+## Testnet activity simulator
+
+cron-job.org calls `/api/cron/testnet-simulation` once per hour. A 55-minute Firestore reservation window prevents overlapping or duplicate executions without skipping the next hourly trigger.
+
+Every generated Testnet wallet secret is encrypted with RSA-OAEP and SHA-256 before the server creates a `testnet_simulator_accounts` record. Firestore contains only `public_key`, `encrypted_secret`, and `created_at`. Client access is denied, and neither the ciphertext nor plaintext is included in APIs, logs, monitoring, analytics, or wallet reports. The RSA private key remains offline and is required to decrypt a selected ciphertext manually.
+
+To inspect one account, copy only its `encrypted_secret` value from the Firebase console and decrypt it locally:
+
+```powershell
+$ciphertext = "COPY_ENCRYPTED_SECRET_HERE"
+$encryptedPath = Join-Path $env:TEMP "wrenpass-testnet-secret.bin"
+$privateKeyPath = "C:\path\to\simulator-private.pem"
+[IO.File]::WriteAllBytes($encryptedPath, [Convert]::FromBase64String($ciphertext))
+openssl pkeyutl -decrypt -inkey $privateKeyPath -in $encryptedPath -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256
+Remove-Item -LiteralPath $encryptedPath
+```
+
 ## Runbooks
 
 - Inspect current TTL and generate manual CLI commands: `pnpm stellar:ttl:plan`
