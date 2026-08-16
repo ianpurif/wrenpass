@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     }
     after(async () => {
       try {
-        const result = await service.run();
+        const result = await service.run(new URL(request.url).origin);
         console.info("Testnet purchase simulation completed.", result);
       } catch (error) {
         Sentry.captureException(error, { tags: { operation: "testnet-purchase-simulation" } });

@@ -49,6 +49,12 @@ export function hashOpaqueToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
+export function createSep53MessageDigest(message: string): Buffer {
+  return createHash("sha256")
+    .update(`${SIGNED_MESSAGE_PREFIX}${message}`, "utf8")
+    .digest();
+}
+
 function createOpaqueToken(): string {
   return randomBytes(32).toString("base64url");
 }
@@ -74,11 +80,10 @@ function verifySep53Signature(address: string, message: string, signature: strin
 
   if (signatureBytes.length !== 64) return false;
 
-  const digest = createHash("sha256")
-    .update(`${SIGNED_MESSAGE_PREFIX}${message}`, "utf8")
-    .digest();
-
-  return Keypair.fromPublicKey(address).verify(digest, signatureBytes);
+  return Keypair.fromPublicKey(address).verify(
+    createSep53MessageDigest(message),
+    signatureBytes,
+  );
 }
 
 export class WalletAuthService {

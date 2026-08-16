@@ -17,6 +17,8 @@ import {
   StellarCustomerContractWriter,
   type PurchaseReceipt,
 } from "@/lib/stellar/wrenpass-client";
+import { connectSimulatorWallet } from "@/server/simulator/simulator-wallet-session";
+import { getWalletAuthService } from "@/server/wallet-auth/service";
 
 const HORIZON_TESTNET_URL = "https://horizon-testnet.stellar.org";
 const SLIPPAGE_BPS = 500n;
@@ -40,6 +42,7 @@ export interface TestnetSimulationExecutionResult {
   fundingAmount: string;
   xlmSwapMaximum: string;
   swapTransactionHash: string;
+  walletSessionExpiresAt: string;
   purchases: Array<{
     passId: string;
     transactionHash: string;
@@ -52,6 +55,7 @@ export interface TestnetSimulationExecutor {
     campaignId: bigint;
     fundingAmount: bigint;
     purchaseCount: number;
+    origin: string;
   }): Promise<TestnetSimulationExecutionResult>;
 }
 
@@ -181,10 +185,16 @@ export class StellarTestnetSimulationExecutor implements TestnetSimulationExecut
     campaignId: bigint;
     fundingAmount: bigint;
     purchaseCount: number;
+    origin: string;
   }): Promise<TestnetSimulationExecutionResult> {
     const buyer = Keypair.random();
     await this.fundWithFriendbot(buyer);
     const swap = await this.establishTrustlineAndSwap(buyer, input.fundingAmount);
+    const walletSession = await connectSimulatorWallet(
+      getWalletAuthService(),
+      buyer,
+      input.origin,
+    );
     const receipts: PurchaseReceipt[] = [];
     for (let index = 0; index < input.purchaseCount; index += 1) {
       receipts.push(await this.writer.purchase({
@@ -200,6 +210,7 @@ export class StellarTestnetSimulationExecutor implements TestnetSimulationExecut
       fundingAmount: input.fundingAmount.toString(),
       xlmSwapMaximum: swap.maximumXlm.toString(),
       swapTransactionHash: swap.hash,
+      walletSessionExpiresAt: walletSession.expiresAt,
       purchases: receipts.map((receipt) => ({
         passId: receipt.passId.toString(),
         transactionHash: receipt.transactionHash,

@@ -61,6 +61,7 @@ const executionResult = {
   fundingAmount: "300000000",
   xlmSwapMaximum: "200000000",
   swapTransactionHash: "swap-hash",
+  walletSessionExpiresAt: "2026-08-16T00:00:00.000Z",
   purchases: [
     { passId: "10", transactionHash: "purchase-hash", ledger: 100 },
   ],
@@ -132,13 +133,17 @@ describe("TestnetSimulationService", () => {
       chooseUpperBound,
     );
 
-    await expect(service.run()).resolves.toEqual(executionResult);
+    await expect(service.run("https://wrenpass.vercel.app")).resolves.toEqual(executionResult);
     expect(executor.execute).toHaveBeenCalledWith({
       campaignId: 4n,
       purchaseCount: 3,
       fundingAmount: 300_000_000n,
+      origin: "https://wrenpass.vercel.app",
     });
-    expect(synchronize).toHaveBeenCalledOnce();
+    expect(synchronize).toHaveBeenCalledWith(
+      { transactionHash: "purchase-hash", ledger: 100 },
+      { includeExpirationNotices: false },
+    );
   });
 
   it("fails before creating a wallet when no configured campaign is viable", async () => {
@@ -152,7 +157,9 @@ describe("TestnetSimulationService", () => {
       () => NOW,
     );
 
-    await expect(service.run()).rejects.toThrow(/No configured Testnet campaign/);
+    await expect(service.run("https://wrenpass.vercel.app")).rejects.toThrow(
+      /No configured Testnet campaign/,
+    );
     expect(executor.execute).not.toHaveBeenCalled();
   });
 
@@ -168,7 +175,7 @@ describe("TestnetSimulationService", () => {
       (minimum) => minimum,
     );
 
-    await expect(service.run()).resolves.toEqual(executionResult);
+    await expect(service.run("https://wrenpass.vercel.app")).resolves.toEqual(executionResult);
     expect(consoleError).toHaveBeenCalledWith(
       "Testnet simulation purchases succeeded but event synchronization failed.",
       expect.any(Error),

@@ -60,7 +60,7 @@ describe("Testnet simulation cron route", () => {
     await expect(response.json()).resolves.toEqual({ accepted: true });
     expect(mocks.run).not.toHaveBeenCalled();
     await backgroundWork?.();
-    expect(mocks.run).toHaveBeenCalledOnce();
+    expect(mocks.run).toHaveBeenCalledWith("https://wrenpass.vercel.app");
   });
 
   it("returns a successful no-op for a duplicate execution window", async () => {

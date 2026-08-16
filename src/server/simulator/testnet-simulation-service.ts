@@ -6,6 +6,10 @@ import type { Campaign } from "@/generated/wrenpass-contract/src";
 import { getStellarConfig } from "@/lib/stellar/config";
 import { readContractCampaign } from "@/lib/stellar/wrenpass-client";
 import { syncEvents } from "@/server/events/service";
+import type {
+  EventSyncOptions,
+  ExpectedTransaction,
+} from "@/server/events/event-sync-service";
 import {
   FirestoreOperationalStateStore,
   type OperationalStateStore,
@@ -30,6 +34,10 @@ interface EligibleCampaign {
 }
 
 type RandomInteger = (minimum: number, maximumExclusive: number) => number;
+type SynchronizeEvents = (
+  expectedTransaction?: ExpectedTransaction,
+  options?: EventSyncOptions,
+) => Promise<unknown>;
 
 export type TestnetSimulationReservation =
   | { accepted: true; configurationWarnings?: readonly string[] }
@@ -85,7 +93,7 @@ export class TestnetSimulationService {
     private readonly store: OperationalStateStore,
     private readonly readCampaign: (campaignId: bigint) => Promise<Campaign | null>,
     private readonly executor: TestnetSimulationExecutor,
-    private readonly synchronizeEvents: () => Promise<unknown>,
+    private readonly synchronizeEvents: SynchronizeEvents,
     private readonly now: () => Date = () => new Date(),
     private readonly randomInteger: RandomInteger = randomInt,
   ) {}
@@ -112,7 +120,7 @@ export class TestnetSimulationService {
         };
   }
 
-  async run(): Promise<TestnetSimulationExecutionResult> {
+  async run(origin: string): Promise<TestnetSimulationExecutionResult> {
     const now = this.now();
     const campaigns = await Promise.all(
       this.config.campaignIds.map((campaignId) => this.readCampaign(campaignId)),
@@ -149,9 +157,19 @@ export class TestnetSimulationService {
       campaignId: campaign.id,
       fundingAmount,
       purchaseCount,
+      origin,
     });
     try {
-      await this.synchronizeEvents();
+      const latestPurchase = result.purchases.at(-1);
+      await this.synchronizeEvents(
+        latestPurchase
+          ? {
+              transactionHash: latestPurchase.transactionHash,
+              ledger: latestPurchase.ledger,
+            }
+          : undefined,
+        { includeExpirationNotices: false },
+      );
     } catch (error) {
       console.error("Testnet simulation purchases succeeded but event synchronization failed.", error);
     }

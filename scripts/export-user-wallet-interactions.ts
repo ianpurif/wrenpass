@@ -26,6 +26,10 @@ import {
   type Notification,
   type UserProfile,
 } from "@/server/models";
+import {
+  mergeWalletReportEvents,
+  type WalletReportBlockchainEvent,
+} from "@/server/reports/wallet-report-events";
 
 const PAGE_SIZE = 500;
 const walletAddressSchema = z
@@ -55,7 +59,7 @@ interface CliOptions {
   outputPath?: string;
 }
 
-interface BlockchainInteraction extends IndexedBlockchainEvent {
+interface BlockchainInteraction extends WalletReportBlockchainEvent {
   roles: WalletRole[];
 }
 
@@ -239,6 +243,7 @@ function buildReport(input: {
   retainedEvents: WrenPassEvent[];
   notifications: Notification[];
   managedAssets: CloudinaryAssetReference[];
+  contractId: string;
 }): WalletReport {
   const users = new Map<string, UserWalletReport>();
   const ensureUser = (walletAddress: string): UserWalletReport => {
@@ -289,7 +294,13 @@ function buildReport(input: {
   const retainedEventsById = new Map(
     input.retainedEvents.map((event) => [event.id, event]),
   );
-  for (const event of input.events) {
+  const reportEvents = mergeWalletReportEvents({
+    indexedEvents: input.events,
+    retainedEvents: input.retainedEvents,
+    contractId: input.contractId,
+    observedAt: input.generatedAt,
+  });
+  for (const event of reportEvents) {
     const participants = participantsForEvent(
       event,
       input.notifications,
@@ -334,7 +345,7 @@ function buildReport(input: {
     generatedAt: input.generatedAt,
     scope: {
       blockchain:
-        "All wallet-associated records retained in indexed_blockchain_events, enriched with exact actor topics still retained by Stellar RPC. Event indexedAt is cache time; ledger is the authoritative ordering field.",
+        "All wallet-associated indexed events plus contract events currently retained by Stellar RPC. source identifies indexed cache records and RPC-recovered records; indexedAt is cache time or RPC observation time, while ledger is authoritative ordering.",
       walletSessions:
         "Verified sessions currently retained in Firestore. Session token hashes and unsigned challenges are intentionally excluded.",
     },
@@ -371,6 +382,7 @@ async function createReport(): Promise<WalletReport> {
     retainedEvents: retainedBatch.events,
     notifications,
     managedAssets,
+    contractId: config.wrenPassContractId,
   });
 }
 
