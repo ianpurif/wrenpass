@@ -2,7 +2,7 @@
 
 ## Contract release
 
-Contract releases use pinned source, Rust `1.96.1`, Stellar CLI `27.0.0`, Soroban SDK `27.0.5`, locked Cargo dependencies, and unoptimized WASM. Changing any of those inputs requires a new manifest and a full Testnet validation.
+Contract releases use pinned source, Rust `1.96.1`, Stellar CLI `27.0.0`, Soroban SDK `27.0.5`, locked Cargo dependencies, and Stellar CLI's production WASM optimizer. Changing any of those inputs requires a new manifest and a full Testnet validation. The historical Testnet manifest remains reproducible because its entries explicitly record `optimized: false`; new release artifacts are optimized by `pnpm contract:build` before their hashes and deterministic IDs are calculated.
 
 The current Testnet suite was built and deployed with the `x86_64-pc-windows-msvc` Rust host. Its byte-for-byte provenance job therefore runs on `windows-latest`, and the manifest verifier rejects a different host before building. Rust WASM output from the same source and toolchain is not assumed to be byte-identical across host targets. Contract formatting, linting, tests, builds, on-chain hashes, and interaction evidence remain enforced by CI.
 
@@ -22,6 +22,14 @@ Preview deterministic contract IDs without submitting transactions:
 ```bash
 pnpm contract:deploy:plan:testnet
 ```
+
+Estimate the current Mainnet resource fee for uploading the five local release artifacts without signing or submitting a transaction:
+
+```bash
+pnpm contract:cost:mainnet
+```
+
+The estimate uses Mainnet `simulateTransaction`; resource fees can change with network settings and ledger storage pricing, so run it again immediately before approving a release budget.
 
 Deploy only after reviewing the plan:
 

@@ -93,6 +93,7 @@ async function main(): Promise<void> {
       input.deployerIdentity,
       "--network",
       input.network,
+      // The build step already optimized this artifact; preserve the hash used for the ID.
       "--optimize=false",
     ]);
     if (deployedId !== contractId) {

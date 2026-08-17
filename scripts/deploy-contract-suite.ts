@@ -228,6 +228,7 @@ function main(): void {
           input.deployerIdentity,
           "--network",
           input.network,
+          // contract:build already optimized this exact artifact; preserve its verified hash.
           "--optimize=false",
         ]);
         if (deployedId !== deployment.contractId) {
