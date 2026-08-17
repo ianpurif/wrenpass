@@ -31,13 +31,16 @@ describe("parseTestnetSimulatorConfig", () => {
 
   it("caps an oversized maximum without disabling the scheduled run", () => {
     expect(parseTestnetSimulatorConfig({
+      TESTNET_SIMULATOR_MAX_USDC: "1007",
       TESTNET_SIMULATOR_MIN_PURCHASES: "1",
       TESTNET_SIMULATOR_MAX_PURCHASES: "7",
     })).toMatchObject({
+      maximumFunding: 1_000_000_000n,
       minimumPurchases: 1,
       maximumPurchases: 5,
       configurationWarnings: [
         "TESTNET_SIMULATOR_MAX_PURCHASES=7 exceeds the safety cap of 5; using 5.",
+        "TESTNET_SIMULATOR_MAX_USDC=1007 exceeds the safety cap of 100 USDC; using 100 USDC.",
       ],
     });
   });
@@ -59,5 +62,12 @@ describe("parseTestnetSimulatorConfig", () => {
       TESTNET_SIMULATOR_MIN_PURCHASES: "3",
       TESTNET_SIMULATOR_MAX_PURCHASES: "2",
     })).toThrow(/MIN_PURCHASES/);
+  });
+
+  it("rejects a minimum above the Testnet funding safety cap", () => {
+    expect(() => parseTestnetSimulatorConfig({
+      TESTNET_SIMULATOR_MIN_USDC: "101",
+      TESTNET_SIMULATOR_MAX_USDC: "200",
+    })).toThrow(/100 USDC safety cap/);
   });
 });

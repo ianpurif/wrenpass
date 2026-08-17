@@ -1,5 +1,7 @@
 import "server-only";
 
+import { isDeepStrictEqual } from "node:util";
+
 import type { Campaign, Pass } from "@/generated/wrenpass-contract/src";
 import { campaignEventKey } from "@/server/campaign-transactions/campaign-event-key";
 import { buildNotificationEmail, type EmailService } from "@/server/email/email-service";
@@ -7,6 +9,7 @@ import type { OffchainRepositories } from "@/server/firestore/repositories";
 import {
   indexedBlockchainEventSchema,
   notificationSchema,
+  type IndexedBlockchainEvent,
   type Notification,
   type NotificationType,
 } from "@/server/models";
@@ -77,6 +80,31 @@ const EXPIRATION_NOTICE_WINDOW_SECONDS = BigInt(7 * 24 * 60 * 60);
 const MAX_EXPIRATION_PASS_READS = BigInt(2_000);
 const NOTIFICATION_CLAIM_MS = 5 * 60 * 1_000;
 const EVENT_REPLAY_LEDGERS = 10;
+
+function toIndexedBlockchainEvent(
+  event: WrenPassEvent,
+  contractId: string,
+  indexedAt: string,
+): IndexedBlockchainEvent {
+  return indexedBlockchainEventSchema.parse({
+    id: event.id,
+    contractId,
+    transactionHash: event.transactionHash,
+    ...(event.eventType === "pass_purchased"
+      ? { campaignEventKey: campaignEventKey(event.campaignId, event.id) }
+      : {}),
+    eventIndex: event.eventIndex,
+    ledger: event.ledger,
+    eventType: event.eventType,
+    payload: {
+      campaignId: event.campaignId,
+      ...(event.passId ? { passId: event.passId } : {}),
+      ...(event.customer ? { customer: event.customer } : {}),
+      ...event.payload,
+    },
+    indexedAt,
+  });
+}
 
 function notificationTargets(event: WrenPassEvent): NotificationTarget[] {
   if (event.eventType === "pass_purchased" && event.customer) {
@@ -259,29 +287,15 @@ export class EventSyncService {
 
     for (const event of batch.events) {
       const existing = await this.repositories.indexedBlockchainEvents.findById(event.id);
-      if (existing) {
+      const indexedEvent = toIndexedBlockchainEvent(
+        event,
+        this.contractId,
+        existing?.indexedAt ?? this.now().toISOString(),
+      );
+      if (existing && isDeepStrictEqual(existing, indexedEvent)) {
         result.duplicates += 1;
       } else {
-        await this.repositories.indexedBlockchainEvents.save(
-          indexedBlockchainEventSchema.parse({
-            id: event.id,
-            contractId: this.contractId,
-            transactionHash: event.transactionHash,
-            ...(event.eventType === "pass_purchased"
-              ? { campaignEventKey: campaignEventKey(event.campaignId, event.id) }
-              : {}),
-            eventIndex: event.eventIndex,
-            ledger: event.ledger,
-            eventType: event.eventType,
-            payload: {
-              campaignId: event.campaignId,
-              ...(event.passId ? { passId: event.passId } : {}),
-              ...(event.customer ? { customer: event.customer } : {}),
-              ...event.payload,
-            },
-            indexedAt: this.now().toISOString(),
-          }),
-        );
+        await this.repositories.indexedBlockchainEvents.save(indexedEvent);
         result.indexed += 1;
       }
 

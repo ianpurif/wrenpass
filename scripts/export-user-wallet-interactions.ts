@@ -10,11 +10,6 @@ import {
 } from "firebase-admin/firestore";
 import { z, type ZodType } from "zod";
 
-import { getStellarConfig } from "@/lib/stellar/config";
-import {
-  StellarWrenPassEventSource,
-  type WrenPassEvent,
-} from "@/server/events/event-source";
 import { closeFirebaseApp, getFirestoreDb } from "@/server/firestore/firebase-admin";
 import {
   cloudinaryAssetReferenceSchema,
@@ -26,10 +21,6 @@ import {
   type Notification,
   type UserProfile,
 } from "@/server/models";
-import {
-  mergeWalletReportEvents,
-  type WalletReportBlockchainEvent,
-} from "@/server/reports/wallet-report-events";
 
 const PAGE_SIZE = 500;
 const walletAddressSchema = z
@@ -59,7 +50,7 @@ interface CliOptions {
   outputPath?: string;
 }
 
-interface BlockchainInteraction extends WalletReportBlockchainEvent {
+interface BlockchainInteraction extends IndexedBlockchainEvent {
   roles: WalletRole[];
 }
 
@@ -113,15 +104,6 @@ const walletPayloadRoles: Readonly<Record<string, WalletRole>> = {
   recipientWalletAddress: "recipient",
   reviewer: "reviewer",
   reviewerWalletAddress: "reviewer",
-};
-
-const notificationRoles: Readonly<Partial<Record<Notification["type"], WalletRole>>> = {
-  campaign_sold_out: "merchant",
-  pass_gifted: "previous_owner",
-  pass_purchased: "customer",
-  pass_received: "recipient",
-  pass_redeemed: "owner",
-  refund_processed: "owner",
 };
 
 function parseCliOptions(args: string[]): CliOptions {
@@ -212,25 +194,10 @@ function addRole(
 
 function participantsForEvent(
   event: IndexedBlockchainEvent,
-  notifications: Notification[],
-  retainedEvent?: WrenPassEvent,
 ): Map<string, Set<WalletRole>> {
   const participants = new Map<string, Set<WalletRole>>();
   for (const [field, role] of Object.entries(walletPayloadRoles)) {
     addRole(participants, event.payload[field], role);
-  }
-  if (retainedEvent) {
-    addRole(participants, retainedEvent.customer, "customer");
-    addRole(participants, retainedEvent.merchant, "merchant");
-    addRole(participants, retainedEvent.owner, "owner");
-    addRole(participants, retainedEvent.previousOwner, "previous_owner");
-    addRole(participants, retainedEvent.recipient, "recipient");
-  }
-
-  for (const notification of notifications) {
-    if (!notification.id.startsWith(`${event.id}:`)) continue;
-    const role = notificationRoles[notification.type];
-    if (role) addRole(participants, notification.recipientWalletAddress, role);
   }
   return participants;
 }
@@ -240,10 +207,8 @@ function buildReport(input: {
   profiles: UserProfile[];
   sessions: WalletSession[];
   events: IndexedBlockchainEvent[];
-  retainedEvents: WrenPassEvent[];
   notifications: Notification[];
   managedAssets: CloudinaryAssetReference[];
-  contractId: string;
 }): WalletReport {
   const users = new Map<string, UserWalletReport>();
   const ensureUser = (walletAddress: string): UserWalletReport => {
@@ -269,9 +234,21 @@ function buildReport(input: {
     return created;
   };
 
+  for (const event of input.events) {
+    const participants = participantsForEvent(event);
+    for (const [walletAddress, roles] of participants) {
+      ensureUser(walletAddress).interactions.blockchain.push({
+        ...event,
+        roles: [...roles].sort(),
+      });
+    }
+  }
+
   for (const profile of input.profiles) {
     const walletAddress = walletAddressSchema.parse(profile.id);
-    ensureUser(walletAddress).profile = {
+    const user = users.get(walletAddress);
+    if (!user) continue;
+    user.profile = {
       ...(profile.email ? { email: profile.email } : {}),
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
@@ -279,39 +256,19 @@ function buildReport(input: {
   }
   const reportGeneratedAt = new Date(input.generatedAt).getTime();
   for (const session of input.sessions) {
-    ensureUser(session.address).interactions.walletSessions.push({
+    const user = users.get(session.address);
+    if (!user) continue;
+    user.interactions.walletSessions.push({
       createdAt: session.createdAt,
       expiresAt: session.expiresAt,
       status: new Date(session.expiresAt).getTime() > reportGeneratedAt ? "active" : "expired",
     });
   }
   for (const notification of input.notifications) {
-    ensureUser(notification.recipientWalletAddress).interactions.notifications.push(notification);
+    users.get(notification.recipientWalletAddress)?.interactions.notifications.push(notification);
   }
   for (const asset of input.managedAssets) {
-    ensureUser(asset.ownerWalletAddress).interactions.managedAssets.push(asset);
-  }
-  const retainedEventsById = new Map(
-    input.retainedEvents.map((event) => [event.id, event]),
-  );
-  const reportEvents = mergeWalletReportEvents({
-    indexedEvents: input.events,
-    retainedEvents: input.retainedEvents,
-    contractId: input.contractId,
-    observedAt: input.generatedAt,
-  });
-  for (const event of reportEvents) {
-    const participants = participantsForEvent(
-      event,
-      input.notifications,
-      retainedEventsById.get(event.id),
-    );
-    for (const [walletAddress, roles] of participants) {
-      ensureUser(walletAddress).interactions.blockchain.push({
-        ...event,
-        roles: [...roles].sort(),
-      });
-    }
+    users.get(asset.ownerWalletAddress)?.interactions.managedAssets.push(asset);
   }
 
   const userReports = [...users.values()]
@@ -345,7 +302,7 @@ function buildReport(input: {
     generatedAt: input.generatedAt,
     scope: {
       blockchain:
-        "All wallet-associated indexed events plus contract events currently retained by Stellar RPC. source identifies indexed cache records and RPC-recovered records; indexedAt is cache time or RPC observation time, while ledger is authoritative ordering.",
+        "Wallets are included only when they are participants in indexed_blockchain_events. Firestore profile, session, notification, and asset records may enrich an indexed wallet but never create a report entry.",
       walletSessions:
         "Verified sessions currently retained in Firestore. Session token hashes and unsigned challenges are intentionally excluded.",
     },
@@ -355,9 +312,18 @@ function buildReport(input: {
         (total, user) => total + user.totals.blockchain,
         0,
       ),
-      walletSessions: input.sessions.length,
-      notifications: input.notifications.length,
-      managedAssets: input.managedAssets.length,
+      walletSessions: userReports.reduce(
+        (total, user) => total + user.totals.walletSessions,
+        0,
+      ),
+      notifications: userReports.reduce(
+        (total, user) => total + user.totals.notifications,
+        0,
+      ),
+      managedAssets: userReports.reduce(
+        (total, user) => total + user.totals.managedAssets,
+        0,
+      ),
     },
     users: userReports,
   };
@@ -365,31 +331,20 @@ function buildReport(input: {
 
 async function createReport(): Promise<WalletReport> {
   const db = getFirestoreDb();
-  const config = getStellarConfig();
-  const [
-    profiles,
-    sessions,
-    events,
-    notifications,
-    managedAssets,
-    retainedBatch,
-  ] = await Promise.all([
+  const [profiles, sessions, events, notifications, managedAssets] = await Promise.all([
     readCollection(db, "user_profiles", userProfileSchema),
     readCollection(db, "walletAuthSessions", walletSessionSchema),
     readCollection(db, "indexed_blockchain_events", indexedBlockchainEventSchema),
     readCollection(db, "notifications", notificationSchema),
     readCollection(db, "cloudinary_asset_references", cloudinaryAssetReferenceSchema),
-    new StellarWrenPassEventSource(config).readRetainedEvents(),
   ]);
   return buildReport({
     generatedAt: new Date().toISOString(),
     profiles,
     sessions,
     events,
-    retainedEvents: retainedBatch.events,
     notifications,
     managedAssets,
-    contractId: config.wrenPassContractId,
   });
 }
 

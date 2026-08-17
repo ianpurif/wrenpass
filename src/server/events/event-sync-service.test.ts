@@ -163,6 +163,52 @@ describe("EventSyncService", () => {
     });
   });
 
+  it("enriches an older indexed purchase with its on-chain customer", async () => {
+    const repositories = createOffchainRepositories(createStore());
+    await repositories.indexedBlockchainEvents.save({
+      id: purchasedEvent.id,
+      contractId: testStellarConfig.wrenPassContractId,
+      transactionHash: purchasedEvent.transactionHash,
+      campaignEventKey: campaignEventKey("1", purchasedEvent.id),
+      eventIndex: purchasedEvent.eventIndex,
+      ledger: purchasedEvent.ledger,
+      eventType: "pass_purchased",
+      payload: {
+        campaignId: "1",
+        passId: "2",
+        ...purchasedEvent.payload,
+      },
+      indexedAt: "2026-08-10T00:00:00.000Z",
+    });
+    const service = new EventSyncService(
+      {
+        readRetainedEvents: vi.fn().mockResolvedValue(eventBatch([purchasedEvent])),
+      },
+      repositories,
+      {
+        findCampaign: vi.fn().mockResolvedValue(null),
+        getPassCount: vi.fn().mockResolvedValue(BigInt(0)),
+        findPass: vi.fn().mockResolvedValue(null),
+      },
+      createClaimStore(repositories),
+      { send: vi.fn() },
+      testStellarConfig.wrenPassContractId,
+      createCheckpointStore(),
+      () => new Date("2026-08-11T00:00:00.000Z"),
+    );
+
+    await expect(service.sync(undefined, { includeExpirationNotices: false })).resolves.toMatchObject({
+      indexed: 1,
+      duplicates: 0,
+    });
+    await expect(
+      repositories.indexedBlockchainEvents.findById(purchasedEvent.id),
+    ).resolves.toMatchObject({
+      indexedAt: "2026-08-10T00:00:00.000Z",
+      payload: { customer: owner },
+    });
+  });
+
   it("rejects a confirmed purchase attributed to a different customer", async () => {
     const repositories = createOffchainRepositories(createStore());
     const service = new EventSyncService(

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { parseUsdcAmount } from "@/features/merchant/campaign-terms";
 
 export const MAX_TESTNET_SIMULATOR_PURCHASES = 5;
+export const MAX_TESTNET_SIMULATOR_USDC = parseUsdcAmount("100");
 
 const rawConfigSchema = z.object({
   TESTNET_SIMULATOR_MIN_USDC: z.string().trim().default("10"),
@@ -60,23 +61,37 @@ export function parseTestnetSimulatorConfig(
     "TESTNET_SIMULATOR_MIN_USDC",
     raw.TESTNET_SIMULATOR_MIN_USDC,
   );
-  const maximumFunding = parseFunding(
+  const configuredMaximumFunding = parseFunding(
     "TESTNET_SIMULATOR_MAX_USDC",
     raw.TESTNET_SIMULATOR_MAX_USDC,
   );
+  const maximumFunding = configuredMaximumFunding > MAX_TESTNET_SIMULATOR_USDC
+    ? MAX_TESTNET_SIMULATOR_USDC
+    : configuredMaximumFunding;
   const maximumPurchases = Math.min(
     raw.TESTNET_SIMULATOR_MAX_PURCHASES,
     MAX_TESTNET_SIMULATOR_PURCHASES,
   );
-  const configurationWarnings = raw.TESTNET_SIMULATOR_MAX_PURCHASES > maximumPurchases
-    ? [
-        `TESTNET_SIMULATOR_MAX_PURCHASES=${raw.TESTNET_SIMULATOR_MAX_PURCHASES} exceeds the safety cap of ${MAX_TESTNET_SIMULATOR_PURCHASES}; using ${maximumPurchases}.`,
-      ]
-    : [];
+  const configurationWarnings: string[] = [];
+  if (raw.TESTNET_SIMULATOR_MAX_PURCHASES > maximumPurchases) {
+    configurationWarnings.push(
+      `TESTNET_SIMULATOR_MAX_PURCHASES=${raw.TESTNET_SIMULATOR_MAX_PURCHASES} exceeds the safety cap of ${MAX_TESTNET_SIMULATOR_PURCHASES}; using ${maximumPurchases}.`,
+    );
+  }
+  if (configuredMaximumFunding > maximumFunding) {
+    configurationWarnings.push(
+      `TESTNET_SIMULATOR_MAX_USDC=${raw.TESTNET_SIMULATOR_MAX_USDC} exceeds the safety cap of 100 USDC; using 100 USDC.`,
+    );
+  }
 
-  if (minimumFunding > maximumFunding) {
+  if (minimumFunding > configuredMaximumFunding) {
     throw new TestnetSimulatorConfigurationError(
       "TESTNET_SIMULATOR_MIN_USDC must not exceed TESTNET_SIMULATOR_MAX_USDC.",
+    );
+  }
+  if (minimumFunding > maximumFunding) {
+    throw new TestnetSimulatorConfigurationError(
+      "TESTNET_SIMULATOR_MIN_USDC must not exceed the 100 USDC safety cap.",
     );
   }
   if (raw.TESTNET_SIMULATOR_MIN_PURCHASES > maximumPurchases) {
