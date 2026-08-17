@@ -5,7 +5,7 @@ import { randomInt } from "node:crypto";
 import type { Campaign } from "@/generated/wrenpass-contract/src";
 import { getStellarConfig } from "@/lib/stellar/config";
 import { readContractCampaign } from "@/lib/stellar/wrenpass-client";
-import { syncEvents } from "@/server/events/service";
+import { syncConfirmedTransaction } from "@/server/events/service";
 import type {
   EventSyncOptions,
   ExpectedTransaction,
@@ -35,7 +35,7 @@ interface EligibleCampaign {
 
 type RandomInteger = (minimum: number, maximumExclusive: number) => number;
 type SynchronizeEvents = (
-  expectedTransaction?: ExpectedTransaction,
+  expectedTransaction: ExpectedTransaction,
   options?: EventSyncOptions,
 ) => Promise<unknown>;
 
@@ -159,19 +159,18 @@ export class TestnetSimulationService {
       purchaseCount,
       origin,
     });
-    try {
-      const latestPurchase = result.purchases.at(-1);
+    for (const purchase of result.purchases) {
       await this.synchronizeEvents(
-        latestPurchase
-          ? {
-              transactionHash: latestPurchase.transactionHash,
-              ledger: latestPurchase.ledger,
-            }
-          : undefined,
+        {
+          transactionHash: purchase.transactionHash,
+          ledger: purchase.ledger,
+          expectedEvent: {
+            eventType: "pass_purchased",
+            customer: result.walletAddress,
+          },
+        },
         { includeExpirationNotices: false },
       );
-    } catch (error) {
-      console.error("Testnet simulation purchases succeeded but event synchronization failed.", error);
     }
     return result;
   }
@@ -187,7 +186,7 @@ export function getTestnetSimulationService(): TestnetSimulationService {
       new FirestoreOperationalStateStore(),
       (campaignId) => readContractCampaign(stellarConfig, campaignId),
       new StellarTestnetSimulationExecutor(stellarConfig),
-      syncEvents,
+      syncConfirmedTransaction,
     );
   }
   return service;

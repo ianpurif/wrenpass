@@ -2,8 +2,7 @@ import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 
-import { EventNotAvailableYetError } from "@/server/events/event-sync-service";
-import { syncEvents } from "@/server/events/service";
+import { syncConfirmedTransaction, syncEvents } from "@/server/events/service";
 import { getRequestWalletAddress } from "@/server/wallet-auth/request-session";
 
 export const runtime = "nodejs";
@@ -15,30 +14,6 @@ const requestSchema = z.object({
   (value) => Boolean(value.transactionHash) === Boolean(value.ledger),
   "Transaction hash and ledger must be provided together.",
 );
-
-const retryDelaysMs = [0, 400, 800, 1_200] as const;
-
-async function syncExpectedTransaction(input?: {
-  transactionHash: string;
-  ledger: number;
-}) {
-  for (const [index, delayMs] of retryDelaysMs.entries()) {
-    if (delayMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
-    try {
-      return await syncEvents(input, { includeExpirationNotices: false });
-    } catch (error) {
-      if (
-        !(error instanceof EventNotAvailableYetError) ||
-        index === retryDelaysMs.length - 1
-      ) {
-        throw error;
-      }
-    }
-  }
-  throw new Error("Event synchronization did not complete.");
-}
 
 export async function POST(request: NextRequest) {
   if (!(await getRequestWalletAddress(request))) {
@@ -55,7 +30,13 @@ export async function POST(request: NextRequest) {
           ledger: body.data.ledger,
         }
       : undefined;
-    return Response.json(await syncExpectedTransaction(expectedTransaction));
+    return Response.json(
+      expectedTransaction
+        ? await syncConfirmedTransaction(expectedTransaction, {
+            includeExpirationNotices: false,
+          })
+        : await syncEvents(undefined, { includeExpirationNotices: false }),
+    );
   } catch (error) {
     Sentry.captureException(error, { tags: { operation: "event-sync" } });
     console.error("Event synchronization failed.", error);

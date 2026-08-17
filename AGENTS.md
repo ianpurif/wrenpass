@@ -25,7 +25,7 @@ Your architecture decisions should be senior-level, but your code must remain si
 - Reviews are authoritative in the WrenPass review contract; transaction links belong in the derived `indexed_blockchain_events` cache, never in a separate review source of truth.
 - Merchant-profile discovery for storage maintenance is derived from verified metadata-contract events in `indexed_blockchain_events`; never restore a separate profile-locator collection.
 - Firestore user profiles contain only optional notification email settings and timestamps; notification delivery records reference wallets and must not duplicate recipient email addresses.
-- Testnet simulator secret exports must be encrypted with the configured RSA public key before server-only Firestore persistence; the application must never receive the decryption key or expose ciphertext through APIs, reports, logs, monitoring, or analytics.
+- Testnet customer wallet secret exports must be encrypted with the configured RSA public key before server-only Firestore persistence; the application must never receive the decryption key or expose ciphertext through APIs, reports, logs, monitoring, or analytics.
 
 ---
 

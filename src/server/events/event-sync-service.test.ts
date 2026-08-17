@@ -141,6 +141,10 @@ describe("EventSyncService", () => {
       {
         transactionHash: purchasedEvent.transactionHash,
         ledger: purchasedEvent.ledger,
+        expectedEvent: {
+          eventType: "pass_purchased",
+          customer: owner,
+        },
       },
       { includeExpirationNotices: false },
     )).resolves.toMatchObject({ indexed: 1 });
@@ -157,6 +161,37 @@ describe("EventSyncService", () => {
         total: "50000000",
       },
     });
+  });
+
+  it("rejects a confirmed purchase attributed to a different customer", async () => {
+    const repositories = createOffchainRepositories(createStore());
+    const service = new EventSyncService(
+      {
+        readRetainedEvents: vi.fn().mockResolvedValue(eventBatch([purchasedEvent])),
+      },
+      repositories,
+      {
+        findCampaign: vi.fn().mockResolvedValue(null),
+        getPassCount: vi.fn().mockResolvedValue(BigInt(0)),
+        findPass: vi.fn().mockResolvedValue(null),
+      },
+      createClaimStore(repositories),
+      { send: vi.fn() },
+      testStellarConfig.wrenPassContractId,
+      createCheckpointStore(),
+    );
+
+    await expect(service.sync({
+      transactionHash: purchasedEvent.transactionHash,
+      ledger: purchasedEvent.ledger,
+      expectedEvent: {
+        eventType: "pass_purchased",
+        customer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+      },
+    })).rejects.toThrow("did not contain the expected WrenPass event");
+    await expect(
+      repositories.indexedBlockchainEvents.findById(purchasedEvent.id),
+    ).resolves.toBeNull();
   });
 
   it("does not advance past a confirmed transaction that RPC has not exposed yet", async () => {

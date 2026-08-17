@@ -7,15 +7,15 @@ import {
 } from "node:crypto";
 
 import { Keypair } from "@stellar/stellar-sdk";
+import type { Firestore } from "firebase-admin/firestore";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  FirestoreTestnetSimulatorAccountStore,
-  RsaEncryptedTestnetSimulatorAccountVault,
-  type TestnetSimulatorAccountRecord,
-  type TestnetSimulatorAccountStore,
-} from "@/server/simulator/testnet-simulator-account-vault";
-import type { Firestore } from "firebase-admin/firestore";
+  FirestoreTestnetCustomerWalletStore,
+  RsaEncryptedTestnetCustomerWalletVault,
+  type TestnetCustomerWalletRecord,
+  type TestnetCustomerWalletStore,
+} from "@/server/simulator/testnet-customer-wallet-vault";
 
 function rsaKeyPair(modulusLength = 3_072) {
   return generateKeyPairSync("rsa", {
@@ -25,13 +25,13 @@ function rsaKeyPair(modulusLength = 3_072) {
   });
 }
 
-describe("RsaEncryptedTestnetSimulatorAccountVault", () => {
+describe("RsaEncryptedTestnetCustomerWalletVault", () => {
   it("stores only the public address, encrypted secret, and timestamp", async () => {
     const keys = rsaKeyPair();
-    const create = vi.fn<(record: TestnetSimulatorAccountRecord) => Promise<void>>()
+    const create = vi.fn<(record: TestnetCustomerWalletRecord) => Promise<void>>()
       .mockResolvedValue(undefined);
-    const store: TestnetSimulatorAccountStore = { create };
-    const vault = new RsaEncryptedTestnetSimulatorAccountVault(
+    const store: TestnetCustomerWalletStore = { create };
+    const vault = new RsaEncryptedTestnetCustomerWalletVault(
       keys.publicKey,
       store,
       () => new Date("2026-08-17T00:00:00.000Z"),
@@ -60,45 +60,45 @@ describe("RsaEncryptedTestnetSimulatorAccountVault", () => {
 
   it("rejects weak or invalid encryption keys without exposing their values", () => {
     const weakKey = rsaKeyPair(2_048).publicKey;
-    const store: TestnetSimulatorAccountStore = { create: vi.fn() };
+    const store: TestnetCustomerWalletStore = { create: vi.fn() };
 
-    expect(() => new RsaEncryptedTestnetSimulatorAccountVault(weakKey, store)).toThrow(
+    expect(() => new RsaEncryptedTestnetCustomerWalletVault(weakKey, store)).toThrow(
       "at least 3072 bits",
     );
-    expect(() => new RsaEncryptedTestnetSimulatorAccountVault("not-a-key", store))
+    expect(() => new RsaEncryptedTestnetCustomerWalletVault("not-a-key", store))
       .toThrow("must be a valid PEM public key");
-    expect(() => new RsaEncryptedTestnetSimulatorAccountVault("", store))
+    expect(() => new RsaEncryptedTestnetCustomerWalletVault("", store))
       .toThrow("is required");
   });
 
   it("sanitizes persistence failures so credential material cannot reach monitoring", async () => {
     const keys = rsaKeyPair();
     const wallet = Keypair.random();
-    const store: TestnetSimulatorAccountStore = {
+    const store: TestnetCustomerWalletStore = {
       create: vi.fn().mockRejectedValue(new Error(`failed ${wallet.secret()}`)),
     };
-    const vault = new RsaEncryptedTestnetSimulatorAccountVault(keys.publicKey, store);
+    const vault = new RsaEncryptedTestnetCustomerWalletVault(keys.publicKey, store);
 
     const failure = await vault.persist(wallet).catch((error: unknown) => error);
 
     expect(failure).toBeInstanceOf(Error);
     expect((failure as Error).message).toBe(
-      "The encrypted Testnet simulator account could not be persisted.",
+      "The encrypted Testnet customer wallet could not be persisted.",
     );
     expect(JSON.stringify(failure)).not.toContain(wallet.secret());
   });
 });
 
-describe("FirestoreTestnetSimulatorAccountStore", () => {
+describe("FirestoreTestnetCustomerWalletStore", () => {
   it("creates a write-once document keyed by the public address", async () => {
     const create = vi.fn().mockResolvedValue(undefined);
     const doc = vi.fn(() => ({ create }));
     const collection = vi.fn(() => ({ doc }));
-    const store = new FirestoreTestnetSimulatorAccountStore({
+    const store = new FirestoreTestnetCustomerWalletStore({
       collection,
     } as unknown as Firestore);
     const wallet = Keypair.random();
-    const record: TestnetSimulatorAccountRecord = {
+    const record: TestnetCustomerWalletRecord = {
       public_key: wallet.publicKey(),
       encrypted_secret: Buffer.alloc(384).toString("base64"),
       created_at: "2026-08-17T00:00:00.000Z",
@@ -106,7 +106,7 @@ describe("FirestoreTestnetSimulatorAccountStore", () => {
 
     await store.create(record);
 
-    expect(collection).toHaveBeenCalledWith("testnet_simulator_accounts");
+    expect(collection).toHaveBeenCalledWith("testnet_customer_wallets");
     expect(doc).toHaveBeenCalledWith(wallet.publicKey());
     expect(create).toHaveBeenCalledWith(record);
   });

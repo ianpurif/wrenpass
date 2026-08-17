@@ -366,7 +366,14 @@ function buildReport(input: {
 async function createReport(): Promise<WalletReport> {
   const db = getFirestoreDb();
   const config = getStellarConfig();
-  const [profiles, sessions, events, notifications, managedAssets, retainedBatch] = await Promise.all([
+  const [
+    profiles,
+    sessions,
+    events,
+    notifications,
+    managedAssets,
+    retainedBatch,
+  ] = await Promise.all([
     readCollection(db, "user_profiles", userProfileSchema),
     readCollection(db, "walletAuthSessions", walletSessionSchema),
     readCollection(db, "indexed_blockchain_events", indexedBlockchainEventSchema),

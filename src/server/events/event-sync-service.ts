@@ -49,6 +49,10 @@ export interface EventSyncCheckpointStore {
 export interface ExpectedTransaction {
   transactionHash: string;
   ledger: number;
+  expectedEvent?: {
+    eventType: WrenPassEvent["eventType"];
+    customer?: string;
+  };
 }
 
 export interface EventSyncOptions {
@@ -59,6 +63,13 @@ export class EventNotAvailableYetError extends Error {
   constructor(transactionHash: string) {
     super(`Stellar RPC has not exposed transaction ${transactionHash} to the event index yet.`);
     this.name = "EventNotAvailableYetError";
+  }
+}
+
+export class ExpectedTransactionEventError extends Error {
+  constructor(transactionHash: string) {
+    super(`Stellar transaction ${transactionHash} did not contain the expected WrenPass event.`);
+    this.name = "ExpectedTransactionEventError";
   }
 }
 
@@ -224,13 +235,26 @@ export class EventSyncService {
       checkpointAdvanced: false,
       retentionGap: batch.retentionGap,
     };
-    if (
-      expectedTransaction &&
-      !batch.events.some(
-        (event) => event.transactionHash.toLowerCase() === expectedTransaction.transactionHash.toLowerCase(),
-      )
-    ) {
-      throw new EventNotAvailableYetError(expectedTransaction.transactionHash);
+    if (expectedTransaction) {
+      const transactionEvents = batch.events.filter(
+        (event) => event.transactionHash.toLowerCase()
+          === expectedTransaction.transactionHash.toLowerCase(),
+      );
+      if (transactionEvents.length === 0) {
+        throw new EventNotAvailableYetError(expectedTransaction.transactionHash);
+      }
+      if (
+        expectedTransaction.expectedEvent
+        && !transactionEvents.some((event) => (
+          event.eventType === expectedTransaction.expectedEvent?.eventType
+          && (
+            !expectedTransaction.expectedEvent.customer
+            || event.customer === expectedTransaction.expectedEvent.customer
+          )
+        ))
+      ) {
+        throw new ExpectedTransactionEventError(expectedTransaction.transactionHash);
+      }
     }
 
     for (const event of batch.events) {

@@ -19,9 +19,9 @@ import {
 } from "@/lib/stellar/wrenpass-client";
 import { connectSimulatorWallet } from "@/server/simulator/simulator-wallet-session";
 import {
-  createTestnetSimulatorAccountVault,
-  type TestnetSimulatorAccountVault,
-} from "@/server/simulator/testnet-simulator-account-vault";
+  createTestnetCustomerWalletVault,
+  type TestnetCustomerWalletVault,
+} from "@/server/simulator/testnet-customer-wallet-vault";
 import { getWalletAuthService } from "@/server/wallet-auth/service";
 
 const HORIZON_TESTNET_URL = "https://horizon-testnet.stellar.org";
@@ -108,16 +108,16 @@ export class StellarTestnetSimulationExecutor implements TestnetSimulationExecut
   private readonly horizon: Horizon.Server;
   private readonly writer: StellarCustomerContractWriter;
   private readonly paymentAsset: Asset;
-  private readonly accountVault: TestnetSimulatorAccountVault;
+  private readonly customerWalletVault: TestnetCustomerWalletVault;
 
   constructor(
     private readonly config: StellarConfig,
-    accountVault?: TestnetSimulatorAccountVault,
+    customerWalletVault?: TestnetCustomerWalletVault,
   ) {
     if (config.network !== "testnet") {
       throw new Error("The automated purchase simulator is restricted to Stellar Testnet.");
     }
-    this.accountVault = accountVault ?? createTestnetSimulatorAccountVault();
+    this.customerWalletVault = customerWalletVault ?? createTestnetCustomerWalletVault();
     this.rpc = new rpc.Server(config.rpcUrl);
     this.horizon = new Horizon.Server(HORIZON_TESTNET_URL);
     this.writer = new StellarCustomerContractWriter(config);
@@ -197,7 +197,7 @@ export class StellarTestnetSimulationExecutor implements TestnetSimulationExecut
     origin: string;
   }): Promise<TestnetSimulationExecutionResult> {
     const buyer = Keypair.random();
-    await this.accountVault.persist(buyer);
+    await this.customerWalletVault.persist(buyer);
     await this.fundWithFriendbot(buyer);
     const swap = await this.establishTrustlineAndSwap(buyer, input.fundingAmount);
     const walletSession = await connectSimulatorWallet(

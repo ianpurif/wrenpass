@@ -9,7 +9,7 @@ import {
   operationalStateSchema,
   userProfileSchema,
 } from "@/server/models";
-import { testnetSimulatorAccountRecordSchema } from "@/server/simulator/testnet-simulator-account-vault";
+import { testnetCustomerWalletRecordSchema } from "@/server/simulator/testnet-customer-wallet-vault";
 
 const legacyCollections = [
   "campaign_metadata",
@@ -44,7 +44,7 @@ const retainedCollections = {
   operational_state: operationalStateSchema,
   walletAuthChallenges: challengeSchema,
   walletAuthSessions: sessionSchema,
-  testnet_simulator_accounts: testnetSimulatorAccountRecordSchema,
+  testnet_customer_wallets: testnetCustomerWalletRecordSchema,
 } satisfies Record<string, ZodType>;
 
 const retainedCollectionFields: Record<string, Set<string>> = {
@@ -98,7 +98,7 @@ const retainedCollectionFields: Record<string, Set<string>> = {
     "createdAt",
     "expiresAt",
   ]),
-  testnet_simulator_accounts: new Set([
+  testnet_customer_wallets: new Set([
     "public_key",
     "encrypted_secret",
     "created_at",

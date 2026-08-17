@@ -14,10 +14,10 @@ import { z } from "zod";
 import { getFirestoreDb } from "@/server/firestore/firebase-admin";
 import { TestnetSimulatorConfigurationError } from "@/server/simulator/config";
 
-export const TESTNET_SIMULATOR_ACCOUNTS_COLLECTION = "testnet_simulator_accounts";
+export const TESTNET_CUSTOMER_WALLETS_COLLECTION = "testnet_customer_wallets";
 const MINIMUM_RSA_BITS = 3_072;
 
-export const testnetSimulatorAccountRecordSchema = z.object({
+export const testnetCustomerWalletRecordSchema = z.object({
   public_key: z.string().refine(
     StrKey.isValidEd25519PublicKey,
     "must be a valid Stellar account",
@@ -30,26 +30,26 @@ export const testnetSimulatorAccountRecordSchema = z.object({
   created_at: z.iso.datetime(),
 });
 
-export type TestnetSimulatorAccountRecord = z.infer<
-  typeof testnetSimulatorAccountRecordSchema
+export type TestnetCustomerWalletRecord = z.infer<
+  typeof testnetCustomerWalletRecordSchema
 >;
 
-export interface TestnetSimulatorAccountStore {
-  create(record: TestnetSimulatorAccountRecord): Promise<void>;
+export interface TestnetCustomerWalletStore {
+  create(record: TestnetCustomerWalletRecord): Promise<void>;
 }
 
-export interface TestnetSimulatorAccountVault {
+export interface TestnetCustomerWalletVault {
   persist(wallet: Keypair): Promise<void>;
 }
 
-export class FirestoreTestnetSimulatorAccountStore
-implements TestnetSimulatorAccountStore {
+export class FirestoreTestnetCustomerWalletStore
+implements TestnetCustomerWalletStore {
   constructor(private readonly db: Firestore = getFirestoreDb()) {}
 
-  async create(record: TestnetSimulatorAccountRecord): Promise<void> {
-    const validated = testnetSimulatorAccountRecordSchema.parse(record);
+  async create(record: TestnetCustomerWalletRecord): Promise<void> {
+    const validated = testnetCustomerWalletRecordSchema.parse(record);
     await this.db
-      .collection(TESTNET_SIMULATOR_ACCOUNTS_COLLECTION)
+      .collection(TESTNET_CUSTOMER_WALLETS_COLLECTION)
       .doc(validated.public_key)
       .create(validated);
   }
@@ -82,13 +82,13 @@ function parseEncryptionKey(value: string | undefined): KeyObject {
   return key;
 }
 
-export class RsaEncryptedTestnetSimulatorAccountVault
-implements TestnetSimulatorAccountVault {
+export class RsaEncryptedTestnetCustomerWalletVault
+implements TestnetCustomerWalletVault {
   private readonly encryptionKey: KeyObject;
 
   constructor(
     publicKey: string,
-    private readonly store: TestnetSimulatorAccountStore,
+    private readonly store: TestnetCustomerWalletStore,
     private readonly now: () => Date = () => new Date(),
   ) {
     this.encryptionKey = parseEncryptionKey(publicKey);
@@ -111,16 +111,16 @@ implements TestnetSimulatorAccountVault {
         created_at: this.now().toISOString(),
       });
     } catch {
-      throw new Error("The encrypted Testnet simulator account could not be persisted.");
+      throw new Error("The encrypted Testnet customer wallet could not be persisted.");
     }
   }
 }
 
-export function createTestnetSimulatorAccountVault(
+export function createTestnetCustomerWalletVault(
   publicKey = process.env.TESTNET_SIMULATOR_EXPORT_PUBLIC_KEY,
-): TestnetSimulatorAccountVault {
-  return new RsaEncryptedTestnetSimulatorAccountVault(
+): TestnetCustomerWalletVault {
+  return new RsaEncryptedTestnetCustomerWalletVault(
     publicKey ?? "",
-    new FirestoreTestnetSimulatorAccountStore(),
+    new FirestoreTestnetCustomerWalletStore(),
   );
 }

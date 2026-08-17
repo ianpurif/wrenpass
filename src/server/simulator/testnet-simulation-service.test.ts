@@ -145,7 +145,14 @@ describe("TestnetSimulationService", () => {
       origin: "https://wrenpass.vercel.app",
     });
     expect(synchronize).toHaveBeenCalledWith(
-      { transactionHash: "purchase-hash", ledger: 100 },
+      {
+        transactionHash: "purchase-hash",
+        ledger: 100,
+        expectedEvent: {
+          eventType: "pass_purchased",
+          customer: executionResult.walletAddress,
+        },
+      },
       { includeExpirationNotices: false },
     );
   });
@@ -167,8 +174,7 @@ describe("TestnetSimulationService", () => {
     expect(executor.execute).not.toHaveBeenCalled();
   });
 
-  it("keeps confirmed purchases successful when event indexing is temporarily unavailable", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  it("does not report completion until confirmed purchases are indexed", async () => {
     const service = new TestnetSimulationService(
       { ...config, campaignIds: [1n] },
       store(),
@@ -179,11 +185,8 @@ describe("TestnetSimulationService", () => {
       (minimum) => minimum,
     );
 
-    await expect(service.run("https://wrenpass.vercel.app")).resolves.toEqual(executionResult);
-    expect(consoleError).toHaveBeenCalledWith(
-      "Testnet simulation purchases succeeded but event synchronization failed.",
-      expect.any(Error),
+    await expect(service.run("https://wrenpass.vercel.app")).rejects.toThrow(
+      "index unavailable",
     );
-    consoleError.mockRestore();
   });
 });

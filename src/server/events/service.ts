@@ -7,7 +7,10 @@ import {
   readContractPassCount,
 } from "@/lib/stellar/wrenpass-client";
 import { createEmailService } from "@/server/email/email-service";
-import { EventSyncService } from "@/server/events/event-sync-service";
+import {
+  EventNotAvailableYetError,
+  EventSyncService,
+} from "@/server/events/event-sync-service";
 import type { ExpectedTransaction } from "@/server/events/event-sync-service";
 import type { EventSyncOptions } from "@/server/events/event-sync-service";
 import { StellarWrenPassEventSource } from "@/server/events/event-source";
@@ -18,6 +21,7 @@ import { FirestoreOperationalStateStore } from "@/server/operations/operational-
 let eventSyncService: EventSyncService | undefined;
 const eventSyncRequests = new Map<string, ReturnType<EventSyncService["sync"]>>();
 let eventSyncTail: Promise<void> = Promise.resolve();
+const CONFIRMED_TRANSACTION_RETRY_DELAYS_MS = [0, 400, 800, 1_200] as const;
 
 export function getEventSyncService(): EventSyncService {
   if (!eventSyncService) {
@@ -60,4 +64,26 @@ export function syncEvents(
   );
   eventSyncRequests.set(key, request);
   return request;
+}
+
+export async function syncConfirmedTransaction(
+  expectedTransaction: ExpectedTransaction,
+  options: EventSyncOptions = {},
+) {
+  for (const [index, delayMs] of CONFIRMED_TRANSACTION_RETRY_DELAYS_MS.entries()) {
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    try {
+      return await syncEvents(expectedTransaction, options);
+    } catch (error) {
+      if (
+        !(error instanceof EventNotAvailableYetError)
+        || index === CONFIRMED_TRANSACTION_RETRY_DELAYS_MS.length - 1
+      ) {
+        throw error;
+      }
+    }
+  }
+  throw new Error("Confirmed transaction event synchronization did not complete.");
 }

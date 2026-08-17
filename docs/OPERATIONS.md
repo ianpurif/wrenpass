@@ -23,7 +23,7 @@ Post-transaction sync remains the low-latency path; the cron is the durable reco
 
 cron-job.org calls `/api/cron/testnet-simulation` once per hour. A 55-minute Firestore reservation window prevents overlapping or duplicate executions without skipping the next hourly trigger.
 
-Every generated Testnet wallet secret is encrypted with RSA-OAEP and SHA-256 before the server creates a `testnet_simulator_accounts` record. Firestore contains only `public_key`, `encrypted_secret`, and `created_at`. Client access is denied, and neither the ciphertext nor plaintext is included in APIs, logs, monitoring, analytics, or wallet reports. The RSA private key remains offline and is required to decrypt a selected ciphertext manually.
+Every generated Testnet customer wallet secret is encrypted with RSA-OAEP and SHA-256 before the server creates a `testnet_customer_wallets` record. Firestore contains only `public_key`, `encrypted_secret`, and `created_at`. Client access is denied, and neither the ciphertext nor plaintext is included in APIs, logs, monitoring, analytics, or wallet reports. The RSA private key remains offline and is required to decrypt a selected ciphertext manually.
 
 To inspect one account, copy only its `encrypted_secret` value from the Firebase console and decrypt it locally:
 
