@@ -15,9 +15,11 @@
 | ----------------- | ---------------------------------------------------------------------------------------------- |
 | Live product      | [wrenpass.vercel.app](https://wrenpass.vercel.app)                                             |
 | Demo video        | [Watch the WrenPass demo](https://x.com/wrenpasscorp/status/2087435276172120326?s=20)          |
+| Pitch deck        | [WrenPass pitch deck](https://docs.google.com/presentation/d/1l36aUPqkt4kFOKeSLH_rNM5dZJEhT5Vf/edit?usp=sharing&ouid=100999101172428274179&rtpof=true&sd=true) |
 | On-chain reviews  | [wrenpass.vercel.app/reviews](https://wrenpass.vercel.app/reviews)                             |
 | Testnet contracts | [Deployment manifest](deployments/testnet.json)                                                |
-| User-wallet proof | [11-wallet evidence table](#proof-of-10-user-wallets)                                          |
+| User-wallet proof | [55-wallet evidence table](#proof-of-10-user-wallets)                                          |
+| User feedback     | [Feedback spreadsheet](https://docs.google.com/spreadsheets/d/1yemfWq2ck5gLixD1YWBz11nuzsmo38dh6v7O0RAebDw/edit?usp=sharing) |
 | CI pipeline       | [CI workflow](https://github.com/ianpurif/wrenpass/actions/workflows/ci.yml)                   |
 | Delivery pipeline | [Deploy to Vercel workflow](https://github.com/ianpurif/wrenpass/actions/workflows/deploy.yml) |
 
@@ -705,79 +707,108 @@ Four early deployment transaction hashes were not retained. This limitation is r
 pnpm contract:verify:testnet
 ```
 
-### Successful contract interactions
+### Selected-wallet transaction proof
 
-| Interaction                     | Transaction hash                                                                                                                                                                  |       Ledger | Indexed at (UTC)        |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------: | ----------------------- |
-| Atomic publisher initialization | [`d081ae9dd92d628be48d90b9e743c8871560be4c9fde7d78533c5e0114fa3455`](https://stellar.expert/explorer/testnet/tx/d081ae9dd92d628be48d90b9e743c8871560be4c9fde7d78533c5e0114fa3455) | See explorer | See explorer            |
-| Pass purchase                   | [`ec8da8a6aceeb6e9ae62fb0a7499f510831cbe0577a17d49bbff8a14a09ca6ec`](https://stellar.expert/explorer/testnet/tx/ec8da8a6aceeb6e9ae62fb0a7499f510831cbe0577a17d49bbff8a14a09ca6ec) |    4,069,759 | 2026-08-10 13:52:42.611 |
-| Pass gift                       | [`98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf`](https://stellar.expert/explorer/testnet/tx/98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf) |    4,098,213 | 2026-08-12 05:23:26.982 |
-| Pass redemption                 | [`44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e`](https://stellar.expert/explorer/testnet/tx/44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e) |    4,069,805 | 2026-08-10 14:02:14.763 |
-| Review submission               | [`faa00e0de414f3f50dffb3ed4013c711c5bf00bb538d777337e1e178869db044`](https://stellar.expert/explorer/testnet/tx/faa00e0de414f3f50dffb3ed4013c711c5bf00bb538d777337e1e178869db044) |    4,097,490 | 2026-08-12 04:23:03.633 |
+The transaction records below are restricted to the 55 wallet addresses listed in the [User Feedback Spreadsheet](https://docs.google.com/spreadsheets/d/1yemfWq2ck5gLixD1YWBz11nuzsmo38dh6v7O0RAebDw/edit?usp=sharing) and matched against `wallet-report.json`. The ledger, transaction hash, event type, wallet role, and explorer link are taken directly from the report.
 
-`indexedAt` is the application's cache time. The ledger number and Stellar transaction are the authoritative order and proof.
 
 ## Proof of 10+ user wallets
 
-The local root export `wallet-report.json` was generated from real retained application data on **2026-08-12 at 07:37:48.284 UTC**. The public proof below includes only wallet and blockchain fields. The raw export also contains private operational data and must not be committed or shared without redaction.
+The local root export `wallet-report.json` was generated from retained indexed application data on **2026-08-20 at 16:14:23.229 UTC**. The proof below is intentionally limited to the **55 unique wallet addresses present in the User Feedback Spreadsheet**. Each address was matched against `wallet-report.json`; all 55 matched. No wallet outside the spreadsheet is included in these proof tables.
 
 ### Snapshot totals
 
 | Metric                                           | Result |
 | ------------------------------------------------ | -----: |
-| Distinct Stellar wallet addresses                | **11** |
-| Unique on-chain event IDs                        | **40** |
-| Unique Stellar transaction hashes                | **40** |
-| Wallet-attributed blockchain records             | **45** |
-| Verified wallet sessions retained at export time |      2 |
-| Notification records                             |      6 |
-| Managed Cloudinary asset references              |      8 |
+| Feedback rows in the spreadsheet                | **55** |
+| Unique spreadsheet wallet addresses              | **55** |
+| Addresses matched in `wallet-report.json`        | **55** |
+| On-chain records attributed to selected wallets | **168** |
+| Unique transaction hashes in selected records    | **168** |
 
-The 45 count is an attribution count. A two-party gift or redemption is attached to both participant wallets. After deduplication, the report contains 40 unique event IDs and 40 unique transaction hashes. Wallet addresses prove distinct accounts; they should not be interpreted as proof of 11 unique human identities.
+The selected records are an evidence slice, not a claim about unique human identities. A wallet address proves a distinct Stellar account, while the ledger, event type, transaction hash, and explorer link prove the recorded on-chain interaction.
 
 ### Event distribution
 
-| Event type             | Unique on-chain events | Wallet attributions |
-| ---------------------- | ---------------------: | ------------------: |
-| `campaign_created`     |                      8 |                   8 |
-| `merchant_profile_set` |                      3 |                   3 |
-| `pass_purchased`       |                     13 |                  13 |
-| `pass_gifted`          |                      2 |                   4 |
-| `pass_redeemed`        |                      3 |                   6 |
-| `review_submitted`     |                     11 |                  11 |
-| **Total**              |                 **40** |              **45** |
+| Event type             | Selected records |
+| ---------------------- | ---------------: |
+| `pass_purchased`       |              149 |
+| `review_submitted`     |                9 |
+| `merchant_profile_set` |                4 |
+| `pass_redeemed`        |                3 |
+| `pass_gifted`          |                2 |
+| `campaign_sold_out`    |                1 |
+| **Total**              |          **168** |
 
-### Wallet-level proof
+### Selected-wallet records
 
-| ID  | Wallet address                                             | Interactions | Event types                                          | Roles                                          |        Ledger range |
-| --- | ---------------------------------------------------------- | -----------: | ---------------------------------------------------- | ---------------------------------------------- | ------------------: |
-| W1  | `GA27SB63Y3TKTUOW3GBE7BF6ZU6NOCPX6PSO3TCNBVOCDUYQQ7O2GD2H` |            3 | Gift, purchase, review                               | Customer, previous owner, reviewer             | 4,097,486-4,098,213 |
-| W2  | `GA2LG25AK4TPIZH7S2LVVIOYRTNTQRLOXEDZEKPWBRL66NQESSPZQVRZ` |            2 | Gift, purchase                                       | Customer, previous owner                       | 4,048,437-4,048,485 |
-| W3  | `GA5GX6HXCZVXWJ6W5ZEQSLH5FCLGDBYOGJMYO5B3SMJBF5YXDD3MYL3W` |            2 | Gift, redemption                                     | Owner, recipient                               | 4,098,213-4,098,289 |
-| W4  | `GA5P65P3SDKNH7OV6WBRGL2EOM7MABZC6VDS6BQRPNH4K6HBGVCKCD2O` |            3 | Merchant profile, purchase, review                   | Customer, merchant, reviewer                   | 4,066,506-4,069,034 |
-| W5  | `GADRDDWDRMVMA3UBOSZAA5NYPO6RPH6NRYMA5SCGDE33E7NC46P7KGDO` |           11 | Campaign, merchant profile, redemption, review       | Merchant, reviewer                             | 4,047,981-4,096,849 |
-| W6  | `GAV5YXNQ5LD3SRTCHMXVYWS7BVHE5ZTZODZF2DOQA7F2J2IARWB5BL6D` |            3 | Purchase                                             | Customer                                       | 4,099,799-4,099,810 |
-| W7  | `GBLYXTXRCTOA5C2FN4GDHGUPEBFFAHZVA46HB6NYJMHCL3GWMPKBPL3D` |            3 | Campaign, redemption, review                         | Merchant, reviewer                             | 4,097,458-4,098,289 |
-| W8  | `GC4LXTPHSIV2UQWTQACO7ZHJRQA4KJLIPOJ2NJTNYRMKIILZV3RYNQJH` |           10 | Merchant profile, gift, purchase, redemption, review | Customer, merchant, owner, recipient, reviewer | 4,048,485-4,069,805 |
-| W9  | `GCR4JB3TV7FZCXD4GKLYOWUYMHJL4KQIUUN23UGNKQRRP2L33NE6L4LM` |            2 | Purchase, review                                     | Customer, reviewer                             | 4,081,469-4,081,475 |
-| W10 | `GDJ44GXZZDDCXVQPGPFWQ6J37CLV46MHQRJUHWHO6YQLKIMYWRXVYPNK` |            4 | Purchase, review                                     | Customer, reviewer                             | 4,096,585-4,096,609 |
-| W11 | `GDMQTZTIFMIJ2B6S26XADEOGXWGEU25EOMAUPWTG7FCC3HGG7ZYFU4NM` |            2 | Purchase, review                                     | Customer, reviewer                             | 4,088,539-4,088,545 |
+The table below shows one latest transaction proof per spreadsheet wallet. The selected-wallet slice contains 168 indexed records in total.
 
-### Latest retained transaction for each wallet
+| ID | Wallet address | Records | Event types | Roles | Latest transaction | Ledger | Indexed at (UTC) |
+| -- | -------------- | ------: | ----------- | ----- | ------------------ | -----: | ---------------- |
+| F01 | `GA27SB63Y3TKTUOW3GBE7BF6ZU6NOCPX6PSO3TCNBVOCDUYQQ7O2GD2H` | 2 | `review_submitted`, `pass_purchased` | reviewer, customer | [`faa00e0de414f3f50dffb3ed4013c711c5bf00bb538d777337e1e178869db044`](https://stellar.expert/explorer/testnet/tx/faa00e0de414f3f50dffb3ed4013c711c5bf00bb538d777337e1e178869db044) | 4,097,490 | 2026-08-12T04:23:03.633Z |
+| F02 | `GA2LG25AK4TPIZH7S2LVVIOYRTNTQRLOXEDZEKPWBRL66NQESSPZQVRZ` | 1 | `pass_purchased` | customer | [`5775f36193f609438aa2821983c4470d19a6437c054d09c7d56083df37976034`](https://stellar.expert/explorer/testnet/tx/5775f36193f609438aa2821983c4470d19a6437c054d09c7d56083df37976034) | 4,048,437 | 2026-08-09T10:38:52.635Z |
+| F03 | `GA3JG3JUDRLVU47QW7IBQVRGTZPK5PCCWF544NOW55643EZ6YJEUAZ3A` | 5 | `pass_purchased` | customer | [`4b45348f4ab7dfb46dfc251734bb2f51eef0a0407ed1de1d59f54743ea2856c1`](https://stellar.expert/explorer/testnet/tx/4b45348f4ab7dfb46dfc251734bb2f51eef0a0407ed1de1d59f54743ea2856c1) | 4,214,391 | 2026-08-18T23:01:01.721Z |
+| F04 | `GA5GX6HXCZVXWJ6W5ZEQSLH5FCLGDBYOGJMYO5B3SMJBF5YXDD3MYL3W` | 1 | `pass_gifted` | recipient | [`98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf`](https://stellar.expert/explorer/testnet/tx/98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf) | 4,098,213 | 2026-08-12T05:23:26.982Z |
+| F05 | `GA5P65P3SDKNH7OV6WBRGL2EOM7MABZC6VDS6BQRPNH4K6HBGVCKCD2O` | 3 | `merchant_profile_set`, `review_submitted`, `pass_purchased` | merchant, reviewer, customer | [`ae1cfc7f2fd0b3c96aa14e7aedc8224d352cd63a64a3ced9f2d756765d730d9a`](https://stellar.expert/explorer/testnet/tx/ae1cfc7f2fd0b3c96aa14e7aedc8224d352cd63a64a3ced9f2d756765d730d9a) | 4,069,034 | 2026-08-10T12:48:05Z |
+| F06 | `GA7DOCJGV27UMWEKVE57Q6K5ULS3KVNOXPLI7INZKQUQOAH7U5Z2ZWJN` | 1 | `pass_purchased` | customer | [`68b3354608ed7b65042f2eba7de058b4f21c6b385327626f05d15c06404161e6`](https://stellar.expert/explorer/testnet/tx/68b3354608ed7b65042f2eba7de058b4f21c6b385327626f05d15c06404161e6) | 4,203,607 | 2026-08-18T08:00:43.367Z |
+| F07 | `GA7HK7OMIGJ5TH24FFPDPXRLDML32D3P7ZAWUY2MK3VEVVT5J2NUU52A` | 4 | `pass_purchased` | customer | [`ad43cfb9e321e4f4653853c35bc68df2ad10fcd608db0917a2fb3a01f9cd417c`](https://stellar.expert/explorer/testnet/tx/ad43cfb9e321e4f4653853c35bc68df2ad10fcd608db0917a2fb3a01f9cd417c) | 4,207,204 | 2026-08-18T13:01:00.862Z |
+| F08 | `GA7ZKQR5OWGHY4YGE36SMKSDZ5DZ7U37JJFOYKKAUVQKIW5U5XP5QMKM` | 3 | `pass_purchased` | customer | [`64d0dba5968a48425b38b753f88ae1bc24fe9784cffdb4f68101f3aa25afdaaf`](https://stellar.expert/explorer/testnet/tx/64d0dba5968a48425b38b753f88ae1bc24fe9784cffdb4f68101f3aa25afdaaf) | 4,187,797 | 2026-08-17T10:00:52.444Z |
+| F09 | `GADRDDWDRMVMA3UBOSZAA5NYPO6RPH6NRYMA5SCGDE33E7NC46P7KGDO` | 5 | `campaign_sold_out`, `review_submitted`, `pass_redeemed`, `merchant_profile_set` | merchant, reviewer | [`a7158e5bf0cb4a5bcbd8634ba1b109514bf6665d974ae33cccb1326d226216dc`](https://stellar.expert/explorer/testnet/tx/a7158e5bf0cb4a5bcbd8634ba1b109514bf6665d974ae33cccb1326d226216dc) | 4,220,856 | 2026-08-19T08:00:43.038Z |
+| F10 | `GADV6LABZNF5D5OEJG3XVDUQOBU65F6RFXWB67JMHHIFOO2DYGMI6ZTN` | 4 | `pass_purchased` | customer | [`0c415815ddce5012768ff51abec0aef3526cdd135c4226a225ea0e3f0760152e`](https://stellar.expert/explorer/testnet/tx/0c415815ddce5012768ff51abec0aef3526cdd135c4226a225ea0e3f0760152e) | 4,188,517 | 2026-08-17T11:01:01.294Z |
+| F11 | `GAHHDZG43GGJP4PKVDW5HSQ6SXBWE2GVNGZBS2VSKB57ECVLDDC2LZAV` | 2 | `pass_purchased` | customer | [`177bcf79f41bdd51b3b28f89cf047b1a6c1a92cdba7ab20b3d9ce983b94c6577`](https://stellar.expert/explorer/testnet/tx/177bcf79f41bdd51b3b28f89cf047b1a6c1a92cdba7ab20b3d9ce983b94c6577) | 4,190,671 | 2026-08-17T14:00:47.701Z |
+| F12 | `GAICCFDP3RZL4525WQPBZXAALK7IWVO6GGGBMCC5WOP3XPCHXEZCUGYQ` | 4 | `pass_purchased` | customer | [`c39761d9bd434d4602e922d3cde8256ce696aa8a056581e67d0efe8245ed0d4f`](https://stellar.expert/explorer/testnet/tx/c39761d9bd434d4602e922d3cde8256ce696aa8a056581e67d0efe8245ed0d4f) | 4,216,546 | 2026-08-19T02:00:57.433Z |
+| F13 | `GAJNULBCAFETHTFEWNNH7HQCTPKQCU6MNATFOEUL73OPIBJYTSHMBAOT` | 5 | `pass_purchased` | customer | [`9dfcf86379b61ae9c225e4d73cae7c7321a9a5de4b35d61f930fa350a49cb79f`](https://stellar.expert/explorer/testnet/tx/9dfcf86379b61ae9c225e4d73cae7c7321a9a5de4b35d61f930fa350a49cb79f) | 4,212,954 | 2026-08-18T21:01:04.857Z |
+| F14 | `GALWPGAEEXXVIVAUSUQOSMK7WT4RUHCRO5SQBDFFY64PYPH73EBWUPRG` | 4 | `pass_purchased` | customer | [`a1ec35feecf1a7aca579d0269be469a02551c358b0c9e036b5204f55f8c2143d`](https://stellar.expert/explorer/testnet/tx/a1ec35feecf1a7aca579d0269be469a02551c358b0c9e036b5204f55f8c2143d) | 4,220,140 | 2026-08-19T07:00:58.066Z |
+| F15 | `GANKMXSQAFUGRWQDP42XZSCNLXS5TIWEUGWLVUDX3MPLXLUIZD3S7EOF` | 2 | `pass_purchased` | customer | [`13b42c6308162ec8589379f1b9523b6565314312392a5616ebbd0a0d9df5d701`](https://stellar.expert/explorer/testnet/tx/13b42c6308162ec8589379f1b9523b6565314312392a5616ebbd0a0d9df5d701) | 4,200,015 | 2026-08-18T03:00:51.982Z |
+| F16 | `GAP3MYHSNECETWVLG775LRIB6KPHEMDAIWJSSQQR4KQ7UQHJXPGFUORY` | 4 | `pass_purchased` | customer | [`f3b50e4a8823ac16de683339cf61f858f23a8221a585965f738243175f33cf01`](https://stellar.expert/explorer/testnet/tx/f3b50e4a8823ac16de683339cf61f858f23a8221a585965f738243175f33cf01) | 4,189,236 | 2026-08-17T12:01:02.012Z |
+| F17 | `GAPOE53VOR5STKO6HVPJ6B4DQKGX5DCEL2DTGFJ2Z73YTZCTFRVO4OSO` | 5 | `pass_purchased` | customer | [`bef00219b5fa54fb3f0856850410a8ba5606b58ecf42d5e20d62ca4f2c86c5f7`](https://stellar.expert/explorer/testnet/tx/bef00219b5fa54fb3f0856850410a8ba5606b58ecf42d5e20d62ca4f2c86c5f7) | 4,211,517 | 2026-08-18T19:01:04.947Z |
+| F18 | `GAV5YXNQ5LD3SRTCHMXVYWS7BVHE5ZTZODZF2DOQA7F2J2IARWB5BL6D` | 3 | `pass_purchased` | customer | [`fcbe6b15a812c5ce56a4ba4f4a6cd7640f575df31fdf03bc14c2708430908f88`](https://stellar.expert/explorer/testnet/tx/fcbe6b15a812c5ce56a4ba4f4a6cd7640f575df31fdf03bc14c2708430908f88) | 4,099,810 | 2026-08-12T07:36:42.991Z |
+| F19 | `GAYQMQUQNZJA263Y5IPY5ONZPN5ZIHQXTDZWPM4AALLBWV6MQARX6HET` | 3 | `pass_purchased` | customer | [`09686f50f19579a0721be84839e1545a4e5059e93f5bf419d8689b0c8efc94d6`](https://stellar.expert/explorer/testnet/tx/09686f50f19579a0721be84839e1545a4e5059e93f5bf419d8689b0c8efc94d6) | 4,160,480 | 2026-08-15T20:00:48.764Z |
+| F20 | `GB355UEQEGF357CWQRE6W5CW4OUKCUX7AQ7UMDLX4MDFRDMKNZ3VWROV` | 3 | `pass_purchased` | customer | [`16e161c1d07992eec400e6dd2029c2cc7d467e46861e196bb6f75e625fa110f4`](https://stellar.expert/explorer/testnet/tx/16e161c1d07992eec400e6dd2029c2cc7d467e46861e196bb6f75e625fa110f4) | 4,205,046 | 2026-08-18T10:00:51.107Z |
+| F21 | `GB3GLRPPHF4UFPMPPRIDYS5MOICK2YIZY6TPD462UMHQK7HHFAIEUZEE` | 2 | `pass_purchased` | customer | [`a831255f37cdd0c2006df689ed793c2fdfa284f1ff6a00be41165464ee18ce95`](https://stellar.expert/explorer/testnet/tx/a831255f37cdd0c2006df689ed793c2fdfa284f1ff6a00be41165464ee18ce95) | 4,204,326 | 2026-08-18T09:00:43.782Z |
+| F22 | `GB3QLNMDUNRW25PLGNRKWSP4FYQG2WXKNJ6NLOLQ4P6TAHNP2UV3SY3D` | 4 | `pass_purchased` | customer | [`dfb926dedad54c370c84d18596436b7ffb4722b74a780fe70b4fd6452c953417`](https://stellar.expert/explorer/testnet/tx/dfb926dedad54c370c84d18596436b7ffb4722b74a780fe70b4fd6452c953417) | 4,195,703 | 2026-08-17T21:00:58.141Z |
+| F23 | `GB4O4CGUDUQVLSUP3NEMFUE5XJW2L6I33LKW2QNC4DP3SNB67BUAS54T` | 1 | `pass_purchased` | customer | [`f19357e5ba80a533a46c98e380ce16f1c6ebcddaade15ea1e6e35a04969e7ed7`](https://stellar.expert/explorer/testnet/tx/f19357e5ba80a533a46c98e380ce16f1c6ebcddaade15ea1e6e35a04969e7ed7) | 4,206,482 | 2026-08-18T12:00:41.778Z |
+| F24 | `GB4ZUAQLKB7PCKMVKKY2FJ7UCMPKM3V26ZMCZH23HINZD3Y47J7IQVX4` | 2 | `pass_purchased` | customer | [`b4ea193cdae79847cddbb89f52051beab00fc12e5f9f4adfa13b4f1292eb32ec`](https://stellar.expert/explorer/testnet/tx/b4ea193cdae79847cddbb89f52051beab00fc12e5f9f4adfa13b4f1292eb32ec) | 4,187,077 | 2026-08-17T09:00:46.269Z |
+| F25 | `GB7MYTL7BAX6UHMFAVYO4KXALYIZDJNAIICLWUGXWR2DUATVFTMSPMH4` | 2 | `pass_purchased` | customer | [`d6801e5f438130aaf37ad09f47fa35d15ea2d5c60900570f9b2550d91be04377`](https://stellar.expert/explorer/testnet/tx/d6801e5f438130aaf37ad09f47fa35d15ea2d5c60900570f9b2550d91be04377) | 4,185,639 | 2026-08-17T07:00:43.878Z |
+| F26 | `GBC62OALEZZJEPSCYICXEEA4VBSMEHQEUTOG62BEPQUXRVVIXQCJBNOL` | 1 | `pass_purchased` | customer | [`9023216abf8eced92e022c16d45df24e0e598cb00e0fffe372ddb3b215866c2b`](https://stellar.expert/explorer/testnet/tx/9023216abf8eced92e022c16d45df24e0e598cb00e0fffe372ddb3b215866c2b) | 4,192,826 | 2026-08-17T17:00:41.095Z |
+| F27 | `GBFV2UEO4NH3U4EOYGKIA6O7UTLTILEWC7IWCQ2PPCG54TORNZMOGCHQ` | 3 | `pass_purchased` | customer | [`d81200922e52601b1acf0e6c97a6c82dcc00619f36066a00c8439936c4d19a32`](https://stellar.expert/explorer/testnet/tx/d81200922e52601b1acf0e6c97a6c82dcc00619f36066a00c8439936c4d19a32) | 4,210,796 | 2026-08-18T18:00:52.146Z |
+| F28 | `GBGRE5RFLIU2FWAQEFOXGBPQXDWAZ575CNS2XSYITKMKQJ7B5SWU6LPY` | 5 | `pass_purchased` | customer | [`4b20aeb7404bb57d1611d58705c30e14c44d97db45935fca569644a4632f840a`](https://stellar.expert/explorer/testnet/tx/4b20aeb7404bb57d1611d58705c30e14c44d97db45935fca569644a4632f840a) | 4,192,111 | 2026-08-17T16:01:06.015Z |
+| F29 | `GBLN5TZFGRKCEPW5VQZCAFZL7H3CQHYKYHFVWVE2P3ZSFUSUQVND635Q` | 3 | `pass_purchased` | customer | [`a62927a6a44f2861a80d14562cfaefa4051a64834329a951e8ef6191ffe483a2`](https://stellar.expert/explorer/testnet/tx/a62927a6a44f2861a80d14562cfaefa4051a64834329a951e8ef6191ffe483a2) | 4,217,263 | 2026-08-19T03:00:50.589Z |
+| F30 | `GBLP26JI5VQTAP3AKGSJCFKQ57EPDM5PQOL2W6F4PMLRBHV6PRNHPGUO` | 3 | `pass_purchased` | customer | [`c3b5b2cbe309f3113a95f449b55ce0b00a1fbcb349e55b3096d56e9c25ded15b`](https://stellar.expert/explorer/testnet/tx/c3b5b2cbe309f3113a95f449b55ce0b00a1fbcb349e55b3096d56e9c25ded15b) | 4,175,577 | 2026-08-16T17:00:53.316Z |
+| F31 | `GBLYXTXRCTOA5C2FN4GDHGUPEBFFAHZVA46HB6NYJMHCL3GWMPKBPL3D` | 2 | `pass_redeemed`, `review_submitted` | merchant, reviewer | [`0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c`](https://stellar.expert/explorer/testnet/tx/0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c) | 4,098,289 | 2026-08-12T05:29:48.331Z |
+| F32 | `GBMWJ2TASMVV3Q4IXHICCQE3CP7XPJ3TW45GRNTR23WEST7FHQH6233E` | 2 | `pass_purchased` | customer | [`177818e53cd87419b3b779ea60dcb35866a769fd3d9db55e5f337a7df802e611`](https://stellar.expert/explorer/testnet/tx/177818e53cd87419b3b779ea60dcb35866a769fd3d9db55e5f337a7df802e611) | 4,194,983 | 2026-08-17T20:00:46.595Z |
+| F33 | `GBMXI272OMUS35SH7ZOBDRCJBE7UR3Y6LRGU5ZPPAHPHYZR5YD5URMNB` | 5 | `pass_purchased` | customer | [`1bafe1c0a96dda2b28f2a9ce803050587534168417738cd4d0339f43cc5a9e64`](https://stellar.expert/explorer/testnet/tx/1bafe1c0a96dda2b28f2a9ce803050587534168417738cd4d0339f43cc5a9e64) | 4,186,361 | 2026-08-17T08:01:02.479Z |
+| F34 | `GBRQMPB42EBA6YFU7HG23EKPA34WVZX5LQJZND6BEQNBN3XB27KXQ64F` | 2 | `pass_purchased` | customer | [`da39f1499fda36b2d4df51164b8f3f2855bc284c6ce2fd84e5e16d4d72538c30`](https://stellar.expert/explorer/testnet/tx/da39f1499fda36b2d4df51164b8f3f2855bc284c6ce2fd84e5e16d4d72538c30) | 4,184,860 | 2026-08-17T05:55:43.566Z |
+| F35 | `GBSS4U7TU3J7LMZOZQJRVQVLO3RMRZTMY4FO5MLQ664TLO6FH7SS4IOD` | 4 | `pass_purchased` | customer | [`871fb3ebe75eb3bcf6cce8a599d903b42eac755ff1b763666f5556bdbcf5f76c`](https://stellar.expert/explorer/testnet/tx/871fb3ebe75eb3bcf6cce8a599d903b42eac755ff1b763666f5556bdbcf5f76c) | 4,215,827 | 2026-08-19T01:00:55.656Z |
+| F36 | `GBTKKJENSXOMXDOCELCSYD2UZZG43GPAECJBO5VSVO5EP5K7PX2ZS532` | 1 | `pass_purchased` | customer | [`01e86d2888a20811aca4e3f741c06372992128e00d2a8e25da5ab8f46564963f`](https://stellar.expert/explorer/testnet/tx/01e86d2888a20811aca4e3f741c06372992128e00d2a8e25da5ab8f46564963f) | 4,221,575 | 2026-08-19T09:00:43.492Z |
+| F37 | `GBTLEMZD5H2YDQUUU3JBE4A6M45LK6MYDKJQPDAFJHXDWKWJA3SBAB2P` | 5 | `pass_purchased` | customer | [`2769fe80f66bb569352b08e07cf119cf960857b5fe25e5eae46dcba71b621b43`](https://stellar.expert/explorer/testnet/tx/2769fe80f66bb569352b08e07cf119cf960857b5fe25e5eae46dcba71b621b43) | 4,202,173 | 2026-08-18T06:01:02.375Z |
+| F38 | `GBUD76AMSLT56RSPIHL6JN3RRNBBICCLGFRLN6GQMQHXTCPT4QJEFUXD` | 2 | `pass_purchased` | customer | [`8ef303e06d6a184636cea5c5efdede3cc66fc4b0383c2bb34374178a25909815`](https://stellar.expert/explorer/testnet/tx/8ef303e06d6a184636cea5c5efdede3cc66fc4b0383c2bb34374178a25909815) | 4,156,674 | 2026-08-15T14:43:07.955Z |
+| F39 | `GC2UJWR2IQD2PXKCBUTSDWRRTLDU647ZIHD3QC6MAXEM2QICNI5WFAMX` | 5 | `pass_purchased` | customer | [`df4660876fa1c6fc1658c08729f776c8b45eb07cbbe2233a5d4c5a255755c045`](https://stellar.expert/explorer/testnet/tx/df4660876fa1c6fc1658c08729f776c8b45eb07cbbe2233a5d4c5a255755c045) | 4,217,984 | 2026-08-19T04:01:03.232Z |
+| F40 | `GC4JCVLELIGUHGYJM2EAEXDYIN7XUW4V4YBYWADVZHNIBIRIK4MFJJKU` | 2 | `pass_purchased` | customer | [`1e459bf1fb1a04e56dfdb08c55515a7af54e8c95c95d8b7fc211a48694e78c89`](https://stellar.expert/explorer/testnet/tx/1e459bf1fb1a04e56dfdb08c55515a7af54e8c95c95d8b7fc211a48694e78c89) | 4,209,358 | 2026-08-18T16:00:49.362Z |
+| F41 | `GC4KKRIEUTM6W7ZF6LKPVMVJY2ICV5VCAQTEQCJN4Y6HPFFDBRBJOV5C` | 3 | `pass_purchased` | customer | [`5223cbb167abeb4776b80b3ab3fda01117c2c17019ff329fddbbb66a0ef6454b`](https://stellar.expert/explorer/testnet/tx/5223cbb167abeb4776b80b3ab3fda01117c2c17019ff329fddbbb66a0ef6454b) | 4,194,266 | 2026-08-17T19:00:56.573Z |
+| F42 | `GC4LXTPHSIV2UQWTQACO7ZHJRQA4KJLIPOJ2NJTNYRMKIILZV3RYNQJH` | 8 | `review_submitted`, `pass_purchased`, `merchant_profile_set`, `pass_gifted` | reviewer, customer, merchant, recipient | [`922e6d0d608278cf6296dfe3d203fe14859f334d7ac66acb90205cbe3fc6e3ff`](https://stellar.expert/explorer/testnet/tx/922e6d0d608278cf6296dfe3d203fe14859f334d7ac66acb90205cbe3fc6e3ff) | 4,069,765 | 2026-08-10T13:49:05Z |
+| F43 | `GC4XITFXXRNTNBPRBYRBLTT3U65V3DMHW6ZXKELJVV3T66RZKPHPQTNN` | 3 | `pass_purchased` | customer | [`4194d6443bdac971c05207bc097c922139cc9831d9973de6cd7e00f1f1775f72`](https://stellar.expert/explorer/testnet/tx/4194d6443bdac971c05207bc097c922139cc9831d9973de6cd7e00f1f1775f72) | 4,191,391 | 2026-08-17T15:00:55.576Z |
+| F44 | `GC5YNAOL552S5DB6WJ3SMYOTEWVNV3TILNOO3OGLJFSOCNWMITAZFJG4` | 3 | `pass_purchased` | customer | [`48d6c12fe19248c6db944689270b818db602a6c07aa27760d7f72410599e33f2`](https://stellar.expert/explorer/testnet/tx/48d6c12fe19248c6db944689270b818db602a6c07aa27760d7f72410599e33f2) | 4,222,296 | 2026-08-19T10:00:55.982Z |
+| F45 | `GCJ2GCHZ44QNFR4NAQCDUXDOEN5KBUEO4XAP44JOOOX5FX4LXCGNCE7S` | 4 | `pass_purchased` | customer | [`c436bb1ac6b003348d28959f84064268747bc5e7d53df5c5ab2cf5c570dfd9ca`](https://stellar.expert/explorer/testnet/tx/c436bb1ac6b003348d28959f84064268747bc5e7d53df5c5ab2cf5c570dfd9ca) | 4,198,578 | 2026-08-18T01:00:55.794Z |
+| F46 | `GCLDZG7HON2PJBSY3JEA5SOUQLNLCHUT4NYTDI7ITKSUDH65E2JOTCA2` | 3 | `pass_purchased` | customer | [`8b64b651677e8495bf793802ad0fe0e84c8047446ccaa5b1ce4f7b33b34d5229`](https://stellar.expert/explorer/testnet/tx/8b64b651677e8495bf793802ad0fe0e84c8047446ccaa5b1ce4f7b33b34d5229) | 4,199,296 | 2026-08-18T02:00:51.646Z |
+| F47 | `GCLNGNJ2SJOJ7Z2C6YSXOJUXEJIZ5DZ3Y77WCZ5EELC6ZLOVBX744U2I` | 2 | `pass_purchased` | customer | [`d4a2f4805bed10b9abcc7382dacf06404bc9c84dbe4a5a1775fcadbf70c2db0a`](https://stellar.expert/explorer/testnet/tx/d4a2f4805bed10b9abcc7382dacf06404bc9c84dbe4a5a1775fcadbf70c2db0a) | 4,200,733 | 2026-08-18T04:00:47.899Z |
+| F48 | `GCMVXPO2FPDY4E3LOAFUKZKHZZGYKRB6BAUJNVXZNBFL52XJLEUOCH6U` | 1 | `pass_purchased` | customer | [`b8433e608dcf1159fb4f4c37be25ed457ceb401579716f941f00f5af9a87c6a0`](https://stellar.expert/explorer/testnet/tx/b8433e608dcf1159fb4f4c37be25ed457ceb401579716f941f00f5af9a87c6a0) | 4,196,419 | 2026-08-17T22:00:39.529Z |
+| F49 | `GCNKZBG5THOTN3G4SHT2IHEJN3O2FLLHXDLGYX3RQRAAUQIF7VBLYPGP` | 5 | `pass_purchased` | customer | [`33f47c50649807b825999a290c7c1b03fe3522956223523f0a3be6dc177769a9`](https://stellar.expert/explorer/testnet/tx/33f47c50649807b825999a290c7c1b03fe3522956223523f0a3be6dc177769a9) | 4,205,767 | 2026-08-18T11:01:04.936Z |
+| F50 | `GCQPDMEMOIIKYSNZV5OVGLI6DXPANXVRQ6MSG6SAHIY3PLGI3YRRSKTW` | 4 | `pass_purchased` | customer | [`e08900b3f0551b8e7da80e64278becc97816c9647df8a3bb2782e274fff0096e`](https://stellar.expert/explorer/testnet/tx/e08900b3f0551b8e7da80e64278becc97816c9647df8a3bb2782e274fff0096e) | 4,210,078 | 2026-08-18T17:00:57.375Z |
+| F51 | `GCR4JB3TV7FZCXD4GKLYOWUYMHJL4KQIUUN23UGNKQRRP2L33NE6L4LM` | 2 | `review_submitted`, `pass_purchased` | reviewer, customer | [`3d464a520615491ff78cacb06aacd6e6258c544182fdda317f967f5cda97214a`](https://stellar.expert/explorer/testnet/tx/3d464a520615491ff78cacb06aacd6e6258c544182fdda317f967f5cda97214a) | 4,081,475 | 2026-08-11T06:06:27.875Z |
+| F52 | `GCS4JBIHS7OSEXMDC6OZVE2HVAWRS6IA37ABY3C7RYG2Z3EPEGWVLG7J` | 2 | `review_submitted`, `merchant_profile_set` | reviewer, merchant | [`16d7df67b92659cde63d36ea82d9f60bc41ab6c78f0c64248f0336f1c2c65e61`](https://stellar.expert/explorer/testnet/tx/16d7df67b92659cde63d36ea82d9f60bc41ab6c78f0c64248f0336f1c2c65e61) | 4,139,379 | 2026-08-14T14:39:21.446Z |
+| F53 | `GCSDWPYEOVAOYDRG3NQ2SVFO43C6RBNUY6P7PRUGB3TPBD2DPTD3YBVW` | 4 | `pass_purchased` | customer | [`cfed7d391f166d7d9cd958b024a19a66f0b7bac741741355c89fce7879b3facc`](https://stellar.expert/explorer/testnet/tx/cfed7d391f166d7d9cd958b024a19a66f0b7bac741741355c89fce7879b3facc) | 4,184,268 | 2026-08-17T05:06:20.695Z |
+| F54 | `GCWRDRGWCRQZBZUKLO6CFEXLX5VOZLPI7NVA3ZKEL5SXXCMCRHNZGDMV` | 3 | `pass_purchased` | customer | [`26a11ed56c69c1ee3f00643de060b4f7855da6ccf916333051e45320adc7d4aa`](https://stellar.expert/explorer/testnet/tx/26a11ed56c69c1ee3f00643de060b4f7855da6ccf916333051e45320adc7d4aa) | 4,201,452 | 2026-08-18T05:00:50.646Z |
+| F55 | `GCYI3MOEQMEEPO6EQDNPQQP4IA2EL3OUI5OO2D4TSZQS7PXEE5E5VJJ3` | 1 | `pass_purchased` | customer | [`7a79b23814c90e5f8a5f938999d7565f2f358a3a7f65cabdc7b7497394495fc4`](https://stellar.expert/explorer/testnet/tx/7a79b23814c90e5f8a5f938999d7565f2f358a3a7f65cabdc7b7497394495fc4) | 4,189,951 | 2026-08-17T13:00:40.280Z |
 
-| Wallet | Event                  | Transaction hash                                                                                                                                                                  |    Ledger | Indexed at (UTC)        |
-| ------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------: | ----------------------- |
-| W1     | `pass_gifted`          | [`98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf`](https://stellar.expert/explorer/testnet/tx/98e3e38c78899a3f03b3c6e7472cae1d030247e07d88071927695ec0a1d45adf) | 4,098,213 | 2026-08-12 05:23:26.982 |
-| W2     | `pass_gifted`          | [`33aff12d6f8155ded2723b927b4d8b1256b7d5ed5ffff9844f471c844f22c040`](https://stellar.expert/explorer/testnet/tx/33aff12d6f8155ded2723b927b4d8b1256b7d5ed5ffff9844f471c844f22c040) | 4,048,485 | 2026-08-09 10:38:53.301 |
-| W3     | `pass_redeemed`        | [`0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c`](https://stellar.expert/explorer/testnet/tx/0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c) | 4,098,289 | 2026-08-12 05:29:48.331 |
-| W4     | `merchant_profile_set` | [`ae1cfc7f2fd0b3c96aa14e7aedc8224d352cd63a64a3ced9f2d756765d730d9a`](https://stellar.expert/explorer/testnet/tx/ae1cfc7f2fd0b3c96aa14e7aedc8224d352cd63a64a3ced9f2d756765d730d9a) | 4,069,034 | 2026-08-10 12:48:05.000 |
-| W5     | `campaign_created`     | [`9553c88314dbbd9b8f037a8b5c9c910fc2dedf0f793597d919cc105c8bf6f987`](https://stellar.expert/explorer/testnet/tx/9553c88314dbbd9b8f037a8b5c9c910fc2dedf0f793597d919cc105c8bf6f987) | 4,096,849 | 2026-08-12 04:20:27.051 |
-| W6     | `pass_purchased`       | [`fcbe6b15a812c5ce56a4ba4f4a6cd7640f575df31fdf03bc14c2708430908f88`](https://stellar.expert/explorer/testnet/tx/fcbe6b15a812c5ce56a4ba4f4a6cd7640f575df31fdf03bc14c2708430908f88) | 4,099,810 | 2026-08-12 07:36:42.991 |
-| W7     | `pass_redeemed`        | [`0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c`](https://stellar.expert/explorer/testnet/tx/0ec788cf7928f7a2b16386a668290f46ba64833d9deab473c28b72ba2d6bb39c) | 4,098,289 | 2026-08-12 05:29:48.331 |
-| W8     | `pass_redeemed`        | [`44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e`](https://stellar.expert/explorer/testnet/tx/44991dba47a8d7d3de9a77af506eef3987967dec584a3a630258af65a136603e) | 4,069,805 | 2026-08-10 14:02:14.763 |
-| W9     | `review_submitted`     | [`3d464a520615491ff78cacb06aacd6e6258c544182fdda317f967f5cda97214a`](https://stellar.expert/explorer/testnet/tx/3d464a520615491ff78cacb06aacd6e6258c544182fdda317f967f5cda97214a) | 4,081,475 | 2026-08-11 06:06:27.875 |
-| W10    | `review_submitted`     | [`0d350bf63c73ee7782d53d0ff6259db732833ec62e4d864e24c29a18f7a4d130`](https://stellar.expert/explorer/testnet/tx/0d350bf63c73ee7782d53d0ff6259db732833ec62e4d864e24c29a18f7a4d130) | 4,096,609 | 2026-08-12 03:09:32.377 |
-| W11    | `review_submitted`     | [`6d2f60dbdec212657d4d87b12a640f8c50ea764e365d53494a38a7878c6c2d8c`](https://stellar.expert/explorer/testnet/tx/6d2f60dbdec212657d4d87b12a640f8c50ea764e365d53494a38a7878c6c2d8c) | 4,088,545 | 2026-08-11 15:56:29.650 |
+`indexedAt` is the application's cache timestamp. The ledger number and linked Stellar transaction are the authoritative proof.
+
+#### Visual transaction evidence
+
+![Transaction proof 1](public/transaction1.png)
+
+![Transaction proof 2](public/transaction2.png)
 
 ### Reproduce the report
 
@@ -791,16 +822,19 @@ This is a private administrative export. Review and redact optional emails, noti
 
 ## User feedback
 
-The live review contract contained **11 reviews with an average rating of 4.64/5** in the 2026-08-12 snapshot. Review text and ratings are read from Soroban; Firestore is not a review source of truth.
+Source: [User Feedback Spreadsheet](https://docs.google.com/spreadsheets/d/1yemfWq2ck5gLixD1YWBz11nuzsmo38dh6v7O0RAebDw/edit?usp=sharing). The sheet contains **55 responses**, all with a matching wallet record in the cross-referenced `wallet-report.json` snapshot. Ratings range from 4–5, with an average of **4.78/5**.
 
-Common positive themes:
+Observed themes include fast Stellar payments, quick pass visibility after purchase, clear customer value, and a smooth overall flow. Improvement comments specifically mention wallet connection taking too long or being confusing initially, making redemption instructions easier to find, clarifying campaign pages, and keeping fees low and transparent.
 
-- Fast purchase flow: “very fast to buy”
-- Simple merchant flow: “easy to create campaign”
-- Clear customer value: “i get more value”
-- Smooth experience: “it's so seamless experience”
+### Next-phase improvement outline
 
-One 3-star response mentioned slow internet. The full unedited set remains visible on the [on-chain reviews page](https://wrenpass.vercel.app/reviews) and through each linked transaction.
+1. **Wallet onboarding:** shorten the connect/checking path, explain what is happening during reconnection, and provide a clear retry state.
+2. **Redemption discoverability:** make the redemption location and owner-approval steps visible from the pass detail view.
+3. **Campaign clarity:** make price, service value, bonus, expiration, and where to redeem scannable at a glance.
+4. **Fee transparency:** keep the platform fee easy to understand and continue evaluating lower sustainable pricing.
+5. **Preserve speed:** retain immediate pass confirmation and transaction reconciliation while monitoring payment latency.
+
+The full unedited set remains visible on the [on-chain reviews page](https://wrenpass.vercel.app/reviews) and through each linked transaction.
 
 ![On-chain WrenPass reviews](public/usersreview.png)
 
@@ -1036,8 +1070,8 @@ At snapshot commit [`6ec06fc659187bb2c4375ee50c10ad1165685e5e`](https://github.c
 | Demo video                            | [WrenPass demo](https://x.com/wrenpasscorp/status/2087435276172120326?s=20)                                                                                                                                 |
 | Product and mobile screenshots        | [Product UI](#product-ui) and [mobile responsive UI](#mobile-responsive-ui).                                                                                                                                |
 | Analytics or monitoring screenshot    | [Sentry and PostHog evidence](#monitoring-and-analytics).                                                                                                                                                   |
-| Basic user feedback summary           | 11 on-chain reviews, 4.64/5 snapshot average, themes, raw screenshot, public page, and transaction-backed records.                                                                                          |
-| Proof of 10+ user wallet interactions | 11 wallet addresses, 40 unique transaction hashes, 40 unique events, 45 wallet-role attributions, roles, ledger ranges, timestamps, and explorer links in [wallet proof](#proof-of-10-user-wallets).        |
+| Basic user feedback summary           | 55 spreadsheet responses, 4.78/5 average, improvement themes, public feedback link, on-chain reviews, and transaction-backed records.                                                                       |
+| Proof of 10+ user wallet interactions | 55 spreadsheet wallets, 168 indexed transaction records, roles, ledgers, timestamps, and explorer links in [wallet proof](#proof-of-10-user-wallets).                                                      |
 
 ## Current limits and roadmap
 
