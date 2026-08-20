@@ -709,12 +709,12 @@ pnpm contract:verify:testnet
 
 ### Selected-wallet transaction proof
 
-The transaction records below are restricted to the 55 wallet addresses listed in the [User Feedback Spreadsheet](https://docs.google.com/spreadsheets/d/1yemfWq2ck5gLixD1YWBz11nuzsmo38dh6v7O0RAebDw/edit?usp=sharing) and matched against `wallet-report.json`. The ledger, transaction hash, event type, wallet role, and explorer link are taken directly from the report.
+The transaction records below are restricted to the 55 wallet addresses listed in the [User Feedback Spreadsheet](https://docs.google.com/spreadsheets/d/1yemfWq2ck5gLixD1YWBz11nuzsmo38dh6v7O0RAebDw/edit?usp=sharing) and cross-referenced against the retained wallet-interaction export. The ledger, transaction hash, event type, wallet role, and explorer link are taken directly from the report.
 
 
 ## Proof of 10+ user wallets
 
-The local root export `wallet-report.json` was generated from retained indexed application data on **2026-08-20 at 16:14:23.229 UTC**. The proof below is intentionally limited to the **55 unique wallet addresses present in the User Feedback Spreadsheet**. Each address was matched against `wallet-report.json`; all 55 matched. No wallet outside the spreadsheet is included in these proof tables.
+The retained wallet-interaction export was generated from indexed application data on **2026-08-20 at 16:14:23.229 UTC**. The proof below is intentionally limited to the **55 unique wallet addresses present in the User Feedback Spreadsheet**. All 55 addresses matched the retained records. No wallet outside the spreadsheet is included in these proof tables.
 
 ### Snapshot totals
 
@@ -722,7 +722,7 @@ The local root export `wallet-report.json` was generated from retained indexed a
 | ------------------------------------------------ | -----: |
 | Feedback rows in the spreadsheet                | **55** |
 | Unique spreadsheet wallet addresses              | **55** |
-| Addresses matched in `wallet-report.json`        | **55** |
+| Addresses matched in retained records            | **55** |
 | On-chain records attributed to selected wallets | **168** |
 | Unique transaction hashes in selected records    | **168** |
 
@@ -815,14 +815,14 @@ The table below shows one latest transaction proof per spreadsheet wallet. The s
 With valid local Firebase and Stellar configuration:
 
 ```bash
-pnpm users:wallet-report --output ./wallet-report.json --force
+pnpm users:wallet-report --output ./wallet-interactions-export.json --force
 ```
 
 This is a private administrative export. Review and redact optional emails, notifications, and provider-management records before sharing it. The exporter paginates the retained collections, validates every record, enriches indexed events with still-retained Stellar RPC actor topics, excludes session tokens and challenges, and sorts blockchain activity by ledger and event index. See [scripts/export-user-wallet-interactions.ts](scripts/export-user-wallet-interactions.ts).
 
 ## User feedback
 
-Source: [User Feedback Spreadsheet](https://docs.google.com/spreadsheets/d/1yemfWq2ck5gLixD1YWBz11nuzsmo38dh6v7O0RAebDw/edit?usp=sharing). The sheet contains **55 responses**, all with a matching wallet record in the cross-referenced `wallet-report.json` snapshot. Ratings range from 4–5, with an average of **4.78/5**.
+Source: [User Feedback Spreadsheet](https://docs.google.com/spreadsheets/d/1yemfWq2ck5gLixD1YWBz11nuzsmo38dh6v7O0RAebDw/edit?usp=sharing). The sheet contains **55 responses**, all with a matching wallet record in the cross-referenced indexed snapshot. Ratings range from 4–5, with an average of **4.78/5**.
 
 Observed themes include fast Stellar payments, quick pass visibility after purchase, clear customer value, and a smooth overall flow. Improvement comments specifically mention wallet connection taking too long or being confusing initially, making redemption instructions easier to find, clarifying campaign pages, and keeping fees low and transparent.
 
@@ -984,7 +984,7 @@ pnpm offchain:audit
 ```bash
 pnpm operations:run
 pnpm stellar:ttl:plan
-pnpm users:wallet-report --output ./wallet-report.json --force
+pnpm users:wallet-report --output ./wallet-interactions-export.json --force
 ```
 
 ### Current local validation
@@ -1098,4 +1098,4 @@ At snapshot commit [`6ec06fc659187bb2c4375ee50c10ad1165685e5e`](https://github.c
 - [Operations and recovery](docs/OPERATIONS.md)
 - [Security policy and trust boundaries](SECURITY.md)
 - [Testnet deployment manifest](deployments/testnet.json)
-- [Wallet report exporter](scripts/export-user-wallet-interactions.ts)
+- [Wallet interaction exporter](scripts/export-user-wallet-interactions.ts)
