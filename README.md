@@ -16,7 +16,6 @@
 | Live product      | [wrenpass.vercel.app](https://wrenpass.vercel.app)                                             |
 | Demo video        | [Watch the WrenPass demo](https://x.com/wrenpasscorp/status/2087435276172120326?s=20)          |
 | Pitch deck        | [WrenPass pitch deck](https://docs.google.com/presentation/d/1l36aUPqkt4kFOKeSLH_rNM5dZJEhT5Vf/edit?usp=sharing&ouid=100999101172428274179&rtpof=true&sd=true) |
-| On-chain reviews  | [wrenpass.vercel.app/reviews](https://wrenpass.vercel.app/reviews)                             |
 | Testnet contracts | [Deployment manifest](deployments/testnet.json)                                                |
 | User-wallet proof | [55-wallet evidence table](#proof-of-10-user-wallets)                                          |
 | User feedback     | [Feedback spreadsheet](https://docs.google.com/spreadsheets/d/1yemfWq2ck5gLixD1YWBz11nuzsmo38dh6v7O0RAebDw/edit?usp=sharing) |
@@ -309,7 +308,6 @@ wrenpass/
 │   ├── sentry2.png
 │   ├── sentry3.png
 │   ├── Test-output.png
-│   └── usersreview.png
 ├── README.md
 ├── scripts/
 │   ├── audit-offchain-boundary.ts
@@ -853,9 +851,7 @@ Observed themes include fast Stellar payments, quick pass visibility after purch
 | Fees should stay low and transparent. | The platform fee is shown in the financial terms and the contract uses the lower sustainable fee configuration. | [Campaign contract](contracts/wrenpass-campaign/src/lib.rs), [fee commit](https://github.com/ianpurif/wrenpass/commit/73452a7) |
 | Users valued fast payment confirmation and pass visibility. | Purchases reconcile immediately while the event indexer provides cursor-based recovery. | [Event recovery](#cicd-and-production-operations), [purchase-sync commit](https://github.com/ianpurif/wrenpass/commit/6ec06fc) |
 
-The full unedited set remains visible on the [on-chain reviews page](https://wrenpass.vercel.app/reviews) and through each linked transaction.
-
-![On-chain WrenPass reviews](public/usersreview.png)
+The spreadsheet is the sole source of user-feedback evidence for this submission.
 
 ## Product and engineering screenshots
 
