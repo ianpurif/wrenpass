@@ -80,7 +80,7 @@
     "jsdom": "30.0.1",
     "postcss": "8.5.26",
     "tailwindcss": "4.3.3",
-    "tsx": "4.23.11",
+    "tsx": "4.23.12",
     "typescript": "5.9.3",
     "vitest": "4.1.10"
   }
