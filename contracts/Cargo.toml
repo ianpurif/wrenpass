@@ -9,7 +9,7 @@ members = [
 ]
 
 [workspace.dependencies]
-soroban-sdk = "=27.0.5"
+soroban-sdk = "=29.0.1"
 
 [profile.release]
 opt-level = "z"
